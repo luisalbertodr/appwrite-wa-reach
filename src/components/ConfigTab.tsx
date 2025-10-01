@@ -5,145 +5,126 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings, Save, Shield, Database, Loader2 } from 'lucide-react';
+import { Settings, Save, Shield, Bot, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CONFIG_COLLECTION_ID, DATABASE_ID, PROJECT_ID } from '@/lib/appwrite';
-// import { setupAppwrite } from '@/lib/appwrite_schema'; // La creación de esquema no es compatible desde el frontend
+import { CONFIG_COLLECTION_ID } from '@/lib/appwrite';
+
+const defaultConfig: Omit<WahaConfig, '$id' | 'apiKey'> = {
+  apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api',
+  minDelayMs: 2000,
+  maxDelayMs: 5000,
+  batchSizeMin: 15,
+  batchSizeMax: 25,
+  batchDelayMsMin: 60000,
+  batchDelayMsMax: 120000,
+  adminPhoneNumber: '',
+  notificationInterval: 50,
+};
 
 export function ConfigTab() {
   const { data: configs, loading, create, update, reload } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
   const { toast } = useToast();
-  const [config, setConfig] = useState<WahaConfig>({
-    apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api/send',
-    // apiKey is handled securely on the backend
-  });
-  // const [isSettingUp, setIsSettingUp] = useState(false); // No se usa si no hay setup automático
+  const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
 
   useEffect(() => {
     if (configs.length > 0) {
-      setConfig(configs[0]);
+      const fetchedConfig = configs[0];
+      setConfig({
+        apiUrl: fetchedConfig.apiUrl || defaultConfig.apiUrl,
+        minDelayMs: fetchedConfig.minDelayMs ?? defaultConfig.minDelayMs,
+        maxDelayMs: fetchedConfig.maxDelayMs ?? defaultConfig.maxDelayMs,
+        batchSizeMin: fetchedConfig.batchSizeMin ?? defaultConfig.batchSizeMin,
+        batchSizeMax: fetchedConfig.batchSizeMax ?? defaultConfig.batchSizeMax,
+        batchDelayMsMin: fetchedConfig.batchDelayMsMin ?? defaultConfig.batchDelayMsMin,
+        batchDelayMsMax: fetchedConfig.batchDelayMsMax ?? defaultConfig.batchDelayMsMax,
+        adminPhoneNumber: fetchedConfig.adminPhoneNumber || defaultConfig.adminPhoneNumber,
+        notificationInterval: fetchedConfig.notificationInterval ?? defaultConfig.notificationInterval,
+      });
     }
   }, [configs]);
 
   const handleSave = async () => {
     try {
+      const configToSave = Object.fromEntries(
+        Object.entries(config).map(([key, value]) => [key, value === '' ? 0 : value])
+      );
+
       if (configs.length > 0 && configs[0].$id) {
-        await update(configs[0].$id, config);
+        await update(configs[0].$id, configToSave);
       } else {
-        await create(config);
+        await create(configToSave);
       }
       reload();
       toast({ title: 'Configuración guardada exitosamente' });
     } catch (error) {
-      toast({ title: 'Error al guardar configuración', variant: 'destructive' });
+      toast({ title: 'Error al guardar configuración', variant: 'destructive', description: (error as Error).message });
     }
   };
-  
-  // const handleSetup = async () => { // Función de setup eliminada
-  //     setIsSettingUp(true);
-  //     await setupAppwrite();
-  //     setIsSettingUp(false);
-  // };
 
-  const testConnection = () => {
-    console.log('=== TEST CONEXIÓN WAHA ===');
-    console.log('URL:', config.apiUrl);
-    console.log('API Key: No expuesta en el frontend');
-    console.log('Header completo: Manejado en el backend');
-    
-    toast({ 
-      title: 'Test de conexión', 
-      description: 'Ver consola para detalles de la configuración' 
-    });
-  };
-
-  if (loading) return <div className="p-6">Cargando configuración...</div>;
+  if (loading) {
+    return <div className="p-6">Cargando configuración...</div>;
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-2">
         <Settings className="w-6 h-6" />
-        <h2 className="text-2xl font-bold">Configuración y Seguridad</h2>
+        <h2 className="text-2xl font-bold">Configuración del Sistema</h2>
       </div>
       
-      {/* TARJETA DE SETUP (AHORA SOLO INFORMATIVA) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5" />
-            Setup del Sistema (Manual)
-          </CardTitle>
-          <CardDescription>
-            La creación de bases de datos, colecciones y atributos en Appwrite no es compatible directamente desde el frontend.
-            Por favor, usa el CLI de Appwrite, la consola de Appwrite o una Appwrite Function (backend) para configurar el esquema.
-            Consulta la consola para ver la estructura de la base de datos necesaria.
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" />Configuración de Waha API</CardTitle>
+          <CardDescription>URL del endpoint de Waha. La API Key se gestiona en el backend.</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* <Button onClick={handleSetup} disabled={isSettingUp}> */}
-          {/*   {isSettingUp ? ( */}
-          {/*     <> */}
-          {/*       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> */}
-          {/*       Configurando... */}
-          {/*     </> */}
-          {/*   ) : ( */}
-          {/*     'Iniciar Configuración Automática' */}
-          {/*   )} */}
-          {/* </Button> */}
-          <Button variant="outline" onClick={() => toast({ title: 'Información de Setup', description: 'Revisa la consola para la estructura de la base de datos.' })}>
-            Ver Estructura de BD
-          </Button>
+          <div>
+            <Label htmlFor="apiUrl">URL de la API de Waha</Label>
+            <Input id="apiUrl" value={config.apiUrl || ''} onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })} placeholder="http://localhost:3000/api"/>
+          </div>
         </CardContent>
       </Card>
 
-
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Configuración de Waha API
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5" />Políticas de Envío (Humanización)</CardTitle>
+          <CardDescription>Parámetros para simular un comportamiento humano y reducir el riesgo de bloqueo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="apiUrl">URL de la API</Label>
-            <Input
-              id="apiUrl"
-              value={config.apiUrl}
-              onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}
-              placeholder="http://192.168.30.50:3000/api/send"
-            />
-            <div className="text-xs text-muted-foreground mt-1">
-              URL completa del endpoint de Waha para envío de mensajes
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="minDelayMs">Retardo Mínimo (ms)</Label>
+              <Input id="minDelayMs" type="number" value={config.minDelayMs || ''} onChange={(e) => setConfig({ ...config, minDelayMs: Number(e.target.value) })} placeholder="2000"/>
+              <p className="text-xs text-muted-foreground mt-1">Tiempo mínimo de espera entre mensajes.</p>
+            </div>
+            <div>
+              <Label htmlFor="maxDelayMs">Retardo Máximo (ms)</Label>
+              <Input id="maxDelayMs" type="number" value={config.maxDelayMs || ''} onChange={(e) => setConfig({ ...config, maxDelayMs: Number(e.target.value) })} placeholder="5000"/>
+              <p className="text-xs text-muted-foreground mt-1">Tiempo máximo de espera entre mensajes.</p>
             </div>
           </div>
-
-
-          <div className="flex gap-4 pt-4">
-            <Button onClick={handleSave} className="flex-1">
-              <Save className="w-4 h-4 mr-2" />
-              Guardar Configuración
-            </Button>
-            <Button onClick={testConnection} variant="outline" className="flex-1">
-              Test Conexión
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="batchSizeMin">Tamaño Mínimo de Lote</Label>
+              <Input id="batchSizeMin" type="number" value={config.batchSizeMin || ''} onChange={(e) => setConfig({ ...config, batchSizeMin: Number(e.target.value) })} placeholder="15"/>
+              <p className="text-xs text-muted-foreground mt-1">Mínimo de mensajes antes de una pausa.</p>
+            </div>
+            <div>
+              <Label htmlFor="batchSizeMax">Tamaño Máximo de Lote</Label>
+              <Input id="batchSizeMax" type="number" value={config.batchSizeMax || ''} onChange={(e) => setConfig({ ...config, batchSizeMax: Number(e.target.value) })} placeholder="25"/>
+              <p className="text-xs text-muted-foreground mt-1">Máximo de mensajes antes de una pausa.</p>
+            </div>
           </div>
-
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Estado de la Configuración</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>URL API:</span>
-                <span className={config.apiUrl ? 'text-green-600' : 'text-red-600'}>
-                  {config.apiUrl ? 'Configurada' : 'No configurada'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>API Key:</span>
-                <span className="text-yellow-600">
-                  Manejada en el backend
-                </span>
-              </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="batchDelayMsMin">Pausa Mínima entre Lotes (ms)</Label>
+              <Input id="batchDelayMsMin" type="number" value={config.batchDelayMsMin || ''} onChange={(e) => setConfig({ ...config, batchDelayMsMin: Number(e.target.value) })} placeholder="60000"/>
+              <p className="text-xs text-muted-foreground mt-1">Tiempo mínimo de espera tras un lote.</p>
+            </div>
+            <div>
+              <Label htmlFor="batchDelayMsMax">Pausa Máxima entre Lotes (ms)</Label>
+              <Input id="batchDelayMsMax" type="number" value={config.batchDelayMsMax || ''} onChange={(e) => setConfig({ ...config, batchDelayMsMax: Number(e.target.value) })} placeholder="120000"/>
+              <p className="text-xs text-muted-foreground mt-1">Tiempo máximo de espera tras un lote.</p>
             </div>
           </div>
         </CardContent>
@@ -151,29 +132,26 @@ export function ConfigTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Información del Sistema</CardTitle>
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5" />Notificaciones del Administrador</CardTitle>
+          <CardDescription>Recibe notificaciones sobre el progreso de las campañas.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <strong>Base de Datos ID:</strong>
-              <div className="text-muted-foreground">{DATABASE_ID}</div>
+              <Label htmlFor="adminPhoneNumber">Nº de Teléfono del Admin (con cód. país)</Label>
+              <Input id="adminPhoneNumber" value={config.adminPhoneNumber || ''} onChange={(e) => setConfig({ ...config, adminPhoneNumber: e.target.value })} placeholder="34600123456"/>
+              <p className="text-xs text-muted-foreground mt-1">Ej: 34 para España.</p>
             </div>
             <div>
-              <strong>Endpoint:</strong>
-              <div className="text-muted-foreground">https://appwrite.lipoout.com/v1</div>
-            </div>
-            <div>
-              <strong>Project ID:</strong>
-              <div className="text-muted-foreground">{PROJECT_ID}</div>
-            </div>
-            <div>
-              <strong>Estado:</strong>
-              <div className="text-green-600">Activo</div>
+              <Label htmlFor="notificationInterval">Intervalo de Notificación</Label>
+              <Input id="notificationInterval" type="number" value={config.notificationInterval || ''} onChange={(e) => setConfig({ ...config, notificationInterval: Number(e.target.value) })} placeholder="50"/>
+              <p className="text-xs text-muted-foreground mt-1">Notificar cada X mensajes enviados.</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <Button onClick={handleSave} className="w-full"><Save className="w-4 h-4 mr-2" />Guardar Toda la Configuración</Button>
     </div>
   );
 }

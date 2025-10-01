@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'; // Import useEffect
+import { useState, useEffect } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
 import { Client } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload } from 'lucide-react'; // Import Search, RotateCcw, HardDriveUpload
+import { Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download } from 'lucide-react'; // Import Download icon
 import { useToast } from '@/hooks/use-toast';
 import { CLIENTS_COLLECTION_ID, DATABASE_ID, databases, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { ID, Query } from 'appwrite';
-import Papa from 'papaparse'; // Import PapaParse
+import Papa from 'papaparse';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function ClientsTab() {
-  // Initialize with no specific queries to get the total count, Appwrite will return total even with default limit
   const { data: clients, total, loading: loadingClients, create, remove, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID);
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs, applyQueries: applyImportLogQueries } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   const { toast } = useToast();
@@ -46,42 +45,37 @@ export function ClientsTab() {
     enviar: 0,
     sexo: 'Otro',
     fecalta: new Date().toISOString().split('T')[0],
-    facturacion: 0, // Added facturacion
-    intereses: [], // Added intereses
+    facturacion: 0,
+    intereses: [],
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showImportErrorsDialog, setShowImportErrorsDialog] = useState(false);
   const [importErrorLogs, setImportErrorLogs] = useState<string[]>([]);
-  const [isLocalImporting, setIsLocalImporting] = useState(false); // New state for local import loading
+  const [isLocalImporting, setIsLocalImporting] = useState(false);
 
   // Filter states
   const [filterCodcli, setFilterCodcli] = useState('');
-  const [filterCodcliMin, setFilterCodcliMin] = useState(''); // New filter state
-  const [filterCodcliMax, setFilterCodcliMax] = useState(''); // New filter state
+  const [filterCodcliMin, setFilterCodcliMin] = useState('');
+  const [filterCodcliMax, setFilterCodcliMax] = useState('');
   const [filterNomcli, setFilterNomcli] = useState('');
   const [filterEmail, setFilterEmail] = useState('');
   const [filterDnicli, setFilterDnicli] = useState('');
-  const [filterTelefono, setFilterTelefono] = useState(''); // New filter state for tel2cli
-  const [filterFecaltaMin, setFilterFecaltaMin] = useState(''); // New filter state
-  const [filterFecaltaMax, setFilterFecaltaMax] = useState(''); // New filter state
-  const [isFiltered, setIsFiltered] = useState(false); // Track if a filter has been applied
+  const [filterTelefono, setFilterTelefono] = useState('');
+  const [filterFecaltaMin, setFilterFecaltaMin] = useState('');
+  const [filterFecaltaMax, setFilterFecaltaMax] = useState('');
+  const [isFiltered, setIsFiltered] = useState(false);
 
-  // Effect to load initial total count
   useEffect(() => {
-    // When the component mounts, we want to get the total count without fetching all documents.
-    // The useAppwriteCollection hook is initialized with Query.limit(0) for this purpose.
-    // No need to call applyQueries here, as it's handled by initialQueries.
+    // Initial load
   }, []);
 
   const validateClient = (clientData: Omit<Client, '$id' | 'edad' | 'importErrors'>, isStrict: boolean = true) => {
     const errors: Record<string, string> = {};
 
-    // codcli is always strictly required
     if (!clientData.codcli || !/^\d{6}$/.test(clientData.codcli)) {
       errors.codcli = 'El código de cliente es requerido y debe tener 6 dígitos.';
     }
 
-    // For other fields, validate only if present or if strict validation is enabled
     if (isStrict || clientData.nomcli) {
       if (!clientData.nomcli) errors.nomcli = 'El nombre es requerido.';
     }
@@ -115,7 +109,7 @@ export function ClientsTab() {
       if (!tel2Validation.isValid) errors.tel2cli = tel2Validation.message;
     }
 
-    if (clientData.tel1cli) { // tel1cli is optional, only validate if provided
+    if (clientData.tel1cli) {
       if (!/^\d{9}$/.test(clientData.tel1cli)) errors.tel1cli = 'Teléfono secundario inválido (9 dígitos).';
     }
 
@@ -133,15 +127,12 @@ export function ClientsTab() {
     if (isStrict || clientData.fecalta) {
       if (!clientData.fecalta) errors.fecalta = 'La fecha de alta es requerida.';
     }
-    // New validations for facturacion and intereses
     if (isStrict || clientData.facturacion !== undefined) {
       if (clientData.facturacion === undefined || isNaN(clientData.facturacion) || clientData.facturacion < 0) errors.facturacion = 'La facturación es requerida y debe ser un número positivo.';
     }
-    // Intereses is optional, only validate if present
     if (clientData.intereses && !Array.isArray(clientData.intereses)) {
       errors.intereses = 'Los intereses deben ser una lista de cadenas.';
     }
-
 
     return errors;
   };
@@ -163,7 +154,7 @@ export function ClientsTab() {
     const nieRegex = /^[XYZ]\d{7}[A-Z]$/;
     const letterMap = 'TRWAGMYFPDXBNJZSQVHLCKE';
 
-    if (dniRegex.test(dni)) { // DNI Nacional
+    if (dniRegex.test(dni)) {
       const [, num, letter] = dni.match(dniRegex)!;
       const expectedLetter = letterMap[parseInt(num) % 23];
       if (letter === expectedLetter) {
@@ -171,7 +162,7 @@ export function ClientsTab() {
       } else {
         return { isValid: false, message: `Letra de DNI incorrecta. La letra correcta es ${expectedLetter}.` };
       }
-    } else if (nieRegex.test(dni)) { // NIE Extranjero
+    } else if (nieRegex.test(dni)) {
       const niePrefix = dni.charAt(0);
       const nieNum = (niePrefix === 'X' ? '0' : niePrefix === 'Y' ? '1' : '2') + dni.substring(1, 8);
       const letter = dni.charAt(8);
@@ -197,7 +188,7 @@ export function ClientsTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validateClient(newClient, !editingClient); // Use non-strict validation if editing
+    const errors = validateClient(newClient, !editingClient);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast({ title: 'Errores de validación', description: 'Por favor, corrige los campos marcados.', variant: 'destructive' });
@@ -208,21 +199,19 @@ export function ClientsTab() {
     try {
       const clientToSave: Client = {
         ...newClient,
-        $id: editingClient?.$id || newClient.codcli, // Use existing $id if editing, otherwise codcli
-        edad: newClient.fecnac ? calculateAge(newClient.fecnac) : undefined, // Calculate age if date is present
+        $id: editingClient?.$id || newClient.codcli,
+        edad: newClient.fecnac ? calculateAge(newClient.fecnac) : undefined,
       };
 
       if (editingClient) {
-        // Update existing client
         await databases.updateDocument(
           DATABASE_ID,
           CLIENTS_COLLECTION_ID,
-          editingClient.$id!, // Use the $id of the client being edited
+          editingClient.$id!,
           clientToSave
         );
         toast({ title: 'Cliente actualizado exitosamente' });
       } else {
-        // Check if client with codcli already exists (for new client creation)
         const existingClients = await databases.listDocuments(
           DATABASE_ID,
           CLIENTS_COLLECTION_ID,
@@ -230,7 +219,6 @@ export function ClientsTab() {
         );
 
         if (existingClients.documents.length > 0) {
-          // If codcli exists, update it (this handles cases where a new client is added with an existing codcli)
           await databases.updateDocument(
             DATABASE_ID,
             CLIENTS_COLLECTION_ID,
@@ -239,14 +227,13 @@ export function ClientsTab() {
           );
           toast({ title: 'Cliente actualizado exitosamente' });
         } else {
-          // Create new client
-          await create(clientToSave, clientToSave.$id); // Pass codcli as document ID
+          await create(clientToSave, clientToSave.$id);
           toast({ title: 'Cliente agregado exitosamente' });
         }
       }
       
       setNewClient({
-        codcli: '', // Reset codcli
+        codcli: '',
         nomcli: '',
         ape1cli: '',
         email: '',
@@ -261,11 +248,11 @@ export function ClientsTab() {
         enviar: 0,
         sexo: 'Otro',
         fecalta: new Date().toISOString().split('T')[0],
-        facturacion: 0, // Reset facturacion
-        intereses: [], // Reset intereses
+        facturacion: 0,
+        intereses: [],
       });
       setIsAddingClient(false);
-      setEditingClient(null); // Clear editing client after save
+      setEditingClient(null);
     } catch (error) {
       console.error('Error al guardar cliente:', error);
       toast({ title: 'Error al guardar cliente', description: (error as Error).message, variant: 'destructive' });
@@ -285,13 +272,12 @@ export function ClientsTab() {
     }
 
     setLoading(true);
-    setImportErrorLogs([]); // Clear previous errors
+    setImportErrorLogs([]);
 
     try {
-      // Upload the CSV file to Appwrite Storage
       await storage.createFile(
         IMPORT_BUCKET_ID,
-        ID.unique(), // Let Appwrite generate a unique ID for the file
+        ID.unique(),
         file
       );
       toast({ 
@@ -299,7 +285,7 @@ export function ClientsTab() {
         description: 'El archivo se está procesando en el servidor. Los resultados de la importación aparecerán en la sección de "Historial de Importaciones".',
         duration: 8000
       });
-      reloadImportLogs(); // Reload import logs to show new entry
+      reloadImportLogs();
     } catch (error) {
       console.error('Error al subir archivo CSV:', error);
       toast({ title: 'Error al subir archivo CSV', description: (error as Error).message, variant: 'destructive' });
@@ -307,7 +293,6 @@ export function ClientsTab() {
       setShowImportErrorsDialog(true);
     } finally {
       setLoading(false);
-      // Clear the file input after upload attempt
       event.target.value = ''; 
     }
   };
@@ -325,7 +310,7 @@ export function ClientsTab() {
     }
 
     setIsLocalImporting(true);
-    setImportErrorLogs([]); // Clear previous errors
+    setImportErrorLogs([]);
     const importErrors: string[] = [];
     let successfulImports = 0;
     let totalProcessed = 0;
@@ -333,12 +318,12 @@ export function ClientsTab() {
     const fileName = file.name;
 
     try {
-      const fileContent = await file.text(); // Read file content directly
+      const fileContent = await file.text();
 
       const results = Papa.parse(fileContent, {
         header: true,
         skipEmptyLines: true,
-        delimiter: ',', // Changed to comma as per user feedback
+        delimiter: ',',
       });
 
       totalProcessed = results.data.length;
@@ -349,8 +334,8 @@ export function ClientsTab() {
       }
 
       const clientsToImport = results.data;
-      const BATCH_SIZE = 50; // Process 50 clients at a time
-const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiting
+      const BATCH_SIZE = 50;
+      const BATCH_DELAY_MS = 20000;
 
       for (let i = 0; i < clientsToImport.length; i += BATCH_SIZE) {
         const batch = clientsToImport.slice(i, i + BATCH_SIZE);
@@ -361,10 +346,9 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
         });
 
         for (const [indexInBatch, row] of batch.entries()) {
-          const clientData = row as Record<string, string>; // Cast to Record<string, string> for easier access
-          const rowNumber = i + indexInBatch + 2; // Global row number (+1 for 0-index to 1-index, +1 for header row)
+          const clientData = row as Record<string, string>;
+          const rowNumber = i + indexInBatch + 2;
 
-          // Convert date formats if necessary (reusing logic from serverless function)
           const convertDate = (dateStr: string) => {
             if (!dateStr) return undefined;
             const parts = dateStr.split('-');
@@ -386,7 +370,7 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
               }
             }
             const dateObj = new Date(dateStr);
-            if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) { // Check for valid date and reasonable year
+            if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) {
               return dateObj.toISOString().split('T')[0];
             }
             return undefined;
@@ -395,7 +379,7 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
           const fecnacFormatted = convertDate(clientData.fecnac);
           const fecaltaFormatted = convertDate(clientData.fecalta);
 
-          const newClientRecord: Omit<Client, '$id' | 'edad' | 'importErrors'> = { // Removed importErrors from Omit
+          const newClientRecord: Omit<Client, '$id' | 'edad' | 'importErrors'> = {
             codcli: clientData.codcli || '',
             nomcli: clientData.nomcli || '',
             ape1cli: clientData.ape1cli || '',
@@ -408,14 +392,14 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
             tel1cli: clientData.tel1cli || '',
             tel2cli: clientData.tel2cli || '',
             fecnac: fecnacFormatted || '',
-            enviar: clientData.enviar === '1' ? 1 : (clientData.enviar === '0' ? 0 : 0), // Default to 0 if undefined
-            sexo: (clientData.sexo === 'H' || clientData.sexo === 'M' || clientData.sexo === 'Otro') ? clientData.sexo : 'Otro', // Default to 'Otro'
-            fecalta: fecaltaFormatted || new Date().toISOString().split('T')[0], // Default to today if undefined
-            facturacion: parseFloat(clientData.facturacion || '0'), // Added facturacion
-            intereses: clientData.intereses ? clientData.intereses.split(',').map(i => i.trim()) : [], // Added intereses
+            enviar: clientData.enviar === '1' ? 1 : (clientData.enviar === '0' ? 0 : 0),
+            sexo: (clientData.sexo === 'H' || clientData.sexo === 'M' || clientData.sexo === 'Otro') ? clientData.sexo : 'Otro',
+            fecalta: fecaltaFormatted || new Date().toISOString().split('T')[0],
+            facturacion: parseFloat(clientData.facturacion || '0'),
+            intereses: clientData.intereses ? clientData.intereses.split(',').map(i => i.trim()) : [],
           };
 
-          const validationResult = validateClient(newClientRecord, false); // Use non-strict validation
+          const validationResult = validateClient(newClientRecord, false);
           const currentClientImportErrors: string[] = [];
           if (Object.keys(validationResult).length > 0) {
             Object.values(validationResult).forEach(err => currentClientImportErrors.push(err));
@@ -425,12 +409,11 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
           try {
             const clientToSave: Client = {
               ...newClientRecord,
-              $id: newClientRecord.codcli, // Use codcli as document ID
+              $id: newClientRecord.codcli,
               edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
-              importErrors: currentClientImportErrors.length > 0 ? currentClientImportErrors : [], // Store errors
+              importErrors: currentClientImportErrors.length > 0 ? currentClientImportErrors : [],
             };
 
-            // Check if client with codcli already exists
             const existingClients = await databases.listDocuments(
               DATABASE_ID,
               CLIENTS_COLLECTION_ID,
@@ -438,7 +421,6 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
             );
 
             if (existingClients.documents.length > 0) {
-              // Update existing client
               await databases.updateDocument(
                 DATABASE_ID,
                 CLIENTS_COLLECTION_ID,
@@ -446,11 +428,10 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
                 clientToSave
               );
             } else {
-              // Create new client
               await databases.createDocument(
                 DATABASE_ID,
                 CLIENTS_COLLECTION_ID,
-                clientToSave.$id, // Use codcli as document ID
+                clientToSave.$id,
                 clientToSave
               );
             }
@@ -459,10 +440,6 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
             console.error(`Error al guardar cliente ${newClientRecord.codcli}:`, dbError);
             currentClientImportErrors.push(`Fallo al guardar en DB: ${(dbError as Error).message}`);
             importErrors.push(`Fallo al guardar cliente ${newClientRecord.codcli} (Fila ${rowNumber}): ${(dbError as Error).message}`);
-            // Even if there's a DB error, we still want to save the client with its errors if possible.
-            // This part of the logic needs to be carefully considered if Appwrite throws an error
-            // that prevents saving the document at all. For now, we assume it might still save
-            // but with an error message. If not, the client won't be in the DB.
           }
         }
         if (i + BATCH_SIZE < clientsToImport.length) {
@@ -470,10 +447,9 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
         }
       }
 
-      // Save import log to Appwrite database
       const importLogDocument = {
         timestamp: timestamp,
-        filename: fileName, // Changed to lowercase 'f'
+        filename: fileName,
         successfulImports: successfulImports,
         totalProcessed: totalProcessed,
         errors: importErrors.length > 0 ? importErrors : ['Ninguno'],
@@ -487,10 +463,9 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
           ID.unique(),
           importLogDocument
         );
-        console.log('Import log created:', createdLog); // Log the created document
-        // Add a small delay to allow Appwrite to process the document before re-fetching
-        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
-        applyImportLogQueries([]); // Explicitly clear any filters and force a full reload for import logs
+        console.log('Import log created:', createdLog);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        applyImportLogQueries([]);
       } catch (logError) {
         console.error(`Failed to save import log for ${fileName}:`, logError);
         importErrors.push(`Fallo al guardar log de importación: ${(logError as Error).message}`);
@@ -512,8 +487,7 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
           duration: 5000
         });
       }
-      // Reload clients data after import
-      applyQueries([]); // This will trigger a reload of clients
+      applyQueries([]);
     } catch (error) {
       console.error('Error durante la importación local:', error);
       importErrors.push(`Error general durante la importación local: ${(error as Error).message}`);
@@ -522,7 +496,7 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
       toast({ title: 'Error durante la importación local', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setIsLocalImporting(false);
-      event.target.value = ''; // Clear the file input
+      event.target.value = '';
     }
   };
 
@@ -553,17 +527,16 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
       enviar: client.enviar,
       sexo: client.sexo,
       fecalta: client.fecalta,
-      facturacion: client.facturacion, // Added facturacion
-      intereses: client.intereses, // Added intereses
+      facturacion: client.facturacion,
+      intereses: client.intereses,
     });
-    setIsAddingClient(true); // Open the form
+    setIsAddingClient(true);
   };
 
-  // Define the ImportLog interface (can be moved to types/index.ts if preferred)
   interface ImportLog {
     $id?: string;
     timestamp: string;
-    filename: string; // Changed to lowercase 'f'
+    filename: string;
     successfulImports: number;
     totalProcessed: number;
     errors: string[];
@@ -571,23 +544,57 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
   }
 
   const handleFilter = () => {
-    const newQueries: string[] = []; // Change type to string[]
-    if (filterCodcli) newQueries.push(Query.equal('codcli', filterCodcli).toString()); // Convert to string
-    if (filterNomcli) newQueries.push(Query.search('nomcli', filterNomcli).toString()); // Convert to string
-    if (filterEmail) newQueries.push(Query.search('email', filterEmail).toString()); // Convert to string
-    if (filterDnicli) newQueries.push(Query.equal('dnicli', filterDnicli).toString()); // Convert to string
+    const newQueries: string[] = [];
+    if (filterCodcliMin) newQueries.push(Query.greaterThanEqual('codcli', filterCodcliMin).toString());
+    if (filterCodcliMax) newQueries.push(Query.lessThanEqual('codcli', filterCodcliMax).toString());
+    if (filterCodcli) newQueries.push(Query.equal('codcli', filterCodcli).toString());
+    if (filterNomcli) newQueries.push(Query.search('nomcli', filterNomcli).toString());
+    if (filterEmail) newQueries.push(Query.search('email', filterEmail).toString());
+    if (filterDnicli) newQueries.push(Query.equal('dnicli', filterDnicli).toString());
+    if (filterTelefono) newQueries.push(Query.search('tel2cli', filterTelefono).toString());
+    if (filterFecaltaMin) newQueries.push(Query.greaterThanEqual('fecalta', filterFecaltaMin).toString());
+    if (filterFecaltaMax) newQueries.push(Query.lessThanEqual('fecalta', filterFecaltaMax).toString());
 
-    applyQueries(newQueries); // applyQueries now expects string[]
+    applyQueries(newQueries);
     setIsFiltered(true);
   };
 
   const handleClearFilters = () => {
     setFilterCodcli('');
+    setFilterCodcliMin('');
+    setFilterCodcliMax('');
     setFilterNomcli('');
     setFilterEmail('');
     setFilterDnicli('');
-    applyQueries([]); // Reset to initial state (no filters, Appwrite will return total with default limit)
+    setFilterTelefono('');
+    setFilterFecaltaMin('');
+    setFilterFecaltaMax('');
+    applyQueries([]);
     setIsFiltered(false);
+  };
+
+  const handleExport = () => {
+    if (clients.length === 0) {
+      toast({ title: 'No hay clientes para exportar', variant: 'destructive' });
+      return;
+    }
+
+    // We use the `clients` from the hook which are already filtered by `applyQueries`
+    const dataToExport = clients.map(client => ({
+      ...client,
+      intereses: client.intereses?.join(', ') || '', // Convert array to comma-separated string
+    }));
+
+    const csv = Papa.unparse(dataToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `segmentacion_clientes_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: 'Exportación completada', description: `Se han exportado ${clients.length} clientes.` });
   };
 
   return (
@@ -954,6 +961,10 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
               <RotateCcw className="w-4 h-4 mr-2" />
               Limpiar Filtros
             </Button>
+            <Button variant="outline" onClick={handleExport} disabled={clients.length === 0}>
+              <Download className="w-4 h-4 mr-2" />
+              Exportar a CSV
+            </Button>
           </div >
 
           {isFiltered && clients.length > 0 && (
@@ -1055,7 +1066,6 @@ const BATCH_DELAY_MS = 20000; // Increased to 20 seconds to mitigate rate limiti
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Historial de Importaciones */}
       <Card>
         <CardHeader>
           <CardTitle>Historial de Importaciones ({importLogs.length})</CardTitle>

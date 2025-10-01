@@ -1,24 +1,24 @@
 export interface Client {
   $id?: string;
-  codcli: string; // Client code, 6 digits, required
+  codcli: string; 
   nomcli?: string;
   ape1cli?: string;
   email?: string;
-  dnicli?: string; // DNI/NIE
+  dnicli?: string; 
   dircli?: string;
   codposcli?: string;
   pobcli?: string;
-  procli?: string; // Assuming procli is 'provincia' (province)
-  tel1cli?: string; // Secondary phone, no notifications
-  tel2cli?: string; // Primary phone, for notifications (must be mobile)
-  fecnac?: string; // Date of birth (YYYY-MM-DD)
-  enviar?: 0 | 1; // 1 for send notifications, 0 for not
-  sexo?: 'H' | 'M' | 'Otro'; // H: Hombre, M: Mujer, Otro: Other
-  fecalta?: string; // Date of registration (YYYY-MM-DD)
-  edad?: number; // Calculated age
-  facturacion: number; // Client's billing amount
-  intereses?: string[]; // Client's interests as an array of strings
-  importErrors?: string[]; // To store errors for display after import
+  procli?: string;
+  tel1cli?: string; 
+  tel2cli?: string; 
+  fecnac?: string;
+  enviar?: 0 | 1; 
+  sexo?: 'H' | 'M' | 'Otro';
+  fecalta?: string; 
+  edad?: number; 
+  facturacion: number; 
+  intereses?: string[]; 
+  importErrors?: string[];
 }
 
 export interface WhatsAppFunctionPayload {
@@ -37,6 +37,7 @@ export interface Template {
   $id?: string;
   name: string;
   message: string;
+  imageUrls?: string[];
 }
 
 export interface Campaign {
@@ -59,5 +60,13 @@ export interface Campaign {
 export interface WahaConfig {
   $id?: string;
   apiUrl: string;
-  apiKey: string; // API Key should not be exposed to the frontend
+  apiKey: string; // No se expone en el frontend
+  minDelayMs?: number; 
+  maxDelayMs?: number; 
+  batchSizeMin?: number; // Mínimo de mensajes por lote
+  batchSizeMax?: number; // Máximo de mensajes por lote
+  batchDelayMsMin?: number; // Pausa mínima entre lotes (ms)
+  batchDelayMsMax?: number; // Pausa máxima entre lotes (ms)
+  adminPhoneNumber?: string; 
+  notificationInterval?: number;
 }
