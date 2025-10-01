@@ -1,0 +1,12 @@
+{
+  "name": "sendwhatsappfunction",
+  "version": "1.0.0",
+  "description": "Appwrite function to send WhatsApp messages via Waha API",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
