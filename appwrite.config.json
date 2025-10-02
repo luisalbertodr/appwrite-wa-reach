@@ -92,7 +92,7 @@
                 "log.write"
             ],
             "events": [
-                "buckets.68d7cd3a0019edb5703b.files.*.create"
+                "buckets.*.files.*.create"
             ],
             "schedule": "",
             "timeout": 600,
@@ -100,7 +100,29 @@
             "commands": "npm install",
             "specification": "s-0.5vcpu-512mb",
             "path": "functions/ImportCsvFunction"
-        }
+        },
+        {
+        "$id": "sendWhatsAppFunction",
+        "execute": [
+            "users"
+        ],
+        "name": "sendWhatsAppFunction",
+        "enabled": true,
+        "logging": true,
+        "runtime": "node-16.0",
+        "scopes": [
+            "databases.read",
+            "databases.write",
+            "documents.read",
+            "documents.write"
+        ],
+        "events": [],
+        "schedule": "",
+        "timeout": 300,
+        "entrypoint": "src/main.js",
+        "commands": "npm install",
+        "path": "functions/sendWhatsAppFunction"
+    }
     ],
     "tablesDB": [
         {
@@ -222,6 +244,78 @@
                     "size": 255,
                     "default": null,
                     "encrypt": false
+                },
+                {
+                    "key": "minDelayMs",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "maxDelayMs",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "batchSizeMin",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "batchSizeMax",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "batchDelayMsMin",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "batchDelayMsMax",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "adminPhoneNumber",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "default": "667435503",
+                    "encrypt": false
+                },
+                {
+                    "key": "notificationInterval",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
                 }
             ],
             "indexes": []
@@ -232,7 +326,11 @@
                 "create(\"users\")",
                 "read(\"users\")",
                 "update(\"users\")",
-                "delete(\"users\")"
+                "delete(\"users\")",
+                "create(\"any\")",
+                "read(\"any\")",
+                "update(\"any\")",
+                "delete(\"any\")"
             ],
             "databaseId": "68d78cb20028fac621d4",
             "name": "Clientes_Import",
@@ -388,7 +486,7 @@
                     "key": "importErrors",
                     "type": "string",
                     "required": false,
-                    "array": false,
+                    "array": true,
                     "size": 2000,
                     "default": null,
                     "encrypt": false
@@ -411,7 +509,11 @@
                 "create(\"users\")",
                 "read(\"users\")",
                 "update(\"users\")",
-                "delete(\"users\")"
+                "delete(\"users\")",
+                "create(\"any\")",
+                "read(\"any\")",
+                "update(\"any\")",
+                "delete(\"any\")"
             ],
             "databaseId": "68d78cb20028fac621d4",
             "name": "import_logs",
@@ -467,6 +569,63 @@
                     "required": true,
                     "array": false,
                     "size": 50,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "message_logs",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")"
+            ],
+            "databaseId": "68d78cb20028fac621d4",
+            "name": "MessageLogs",
+            "enabled": true,
+            "columns": [
+                {
+                    "key": "campaingId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "clientId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "status",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "timestamp",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "error",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 500,
                     "default": null,
                     "encrypt": false
                 }

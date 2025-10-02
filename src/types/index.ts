@@ -44,7 +44,7 @@ export interface Campaign {
   $id?: string;
   name: string;
   templateId: string;
-  filters: {
+  filters?: {
     edadMin?: number;
     edadMax?: number;
     facturacionMin?: number;

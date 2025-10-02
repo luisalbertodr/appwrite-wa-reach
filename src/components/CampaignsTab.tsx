@@ -9,14 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Clock, Filter, Download, Loader2 } from 'lucide-react';
+import { Send, Filter, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID } from '@/lib/appwrite';
 import { Functions, ID, Query } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
+import { Checkbox } from '@/components/ui/checkbox';
 
 const functions = new Functions(client);
 const MESSAGE_LOGS_COLLECTION_ID = 'message_logs'; 
@@ -28,7 +28,6 @@ interface Progress {
   total: number;
 }
 
-// Función para normalizar texto (quitar acentos)
 const normalizeText = (text: string) => {
   if (!text) return '';
   return text
@@ -54,12 +53,12 @@ export function CampaignsTab() {
   const [isSending, setIsSending] = useState(false);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [progress, setProgress] = useState<Progress>({ sent: 0, failed: 0, skipped: 0, total: 0 });
+  const [selectedClients, setSelectedClients] = useState<Map<string, Client>>(new Map());
 
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
 
   useEffect(() => {
     if (!activeCampaignId) return;
-
     const interval = setInterval(async () => {
       try {
         const response = await databases.listDocuments(
@@ -87,24 +86,19 @@ export function CampaignsTab() {
     return () => clearInterval(interval);
   }, [activeCampaignId, progress.total]);
 
-
   const filteredClients = useMemo(() => {
     return clients.filter(client => {
       const normalizedNombreApellidoFilter = normalizeText(filters.nombreApellido);
       const searchTerms = normalizedNombreApellidoFilter.split(' ').filter(term => term);
 
-      // Lógica de búsqueda combinada y sin acentos
       if (searchTerms.length > 0) {
         const clientFullName = normalizeText(`${client.nomcli || ''} ${client.ape1cli || ''}`);
         const matchesAllTerms = searchTerms.every(term => clientFullName.includes(term));
-        if (!matchesAllTerms) {
-          return false;
-        }
+        if (!matchesAllTerms) return false;
       }
 
       const lowerCaseEmailFilter = filters.email.toLowerCase();
       if (lowerCaseEmailFilter && !(client.email || '').toLowerCase().includes(lowerCaseEmailFilter)) return false;
-
       if (filters.codcli && !client.codcli.includes(filters.codcli)) return false;
       if (filters.dnicli && !(client.dnicli || '').toLowerCase().includes(filters.dnicli.toLowerCase())) return false;
       if (filters.telefono && !(client.tel2cli || '').includes(filters.telefono)) return false;
@@ -131,19 +125,64 @@ export function CampaignsTab() {
   }, [clients, filters]);
 
   const handleCreateTemplate = async () => {
-    if (!newTemplate.name || !newTemplate.message) return;
-    await createTemplate(newTemplate);
-    setNewTemplate({ name: '', message: '' });
-    toast({ title: 'Plantilla creada' });
-    reloadTemplates();
+    if (!newTemplate.name || !newTemplate.message) {
+      toast({ title: 'Error', description: 'Complete todos los campos de la plantilla.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await createTemplate(newTemplate);
+      setNewTemplate({ name: '', message: '' });
+      toast({ title: 'Plantilla creada' });
+      reloadTemplates();
+    } catch(e) {
+        toast({ title: 'Error al crear plantilla', variant: 'destructive' });
+    }
   };
   
-  const getTemplateContent = (templateId: string) => templates.find(t => t.$id === templateId)?.message || 'Selecciona una plantilla...';
+  const getTemplateContent = (templateId: string) => {
+    const template = templates.find(t => t.$id === templateId);
+    return template ? template.message : 'Selecciona una plantilla para previsualizar...';
+  };
+  
+  const handleSelectClient = (client: Client, isSelected: boolean) => {
+    setSelectedClients(prev => {
+      const newMap = new Map(prev);
+      if (isSelected) {
+        newMap.set(client.$id!, client);
+      } else {
+        newMap.delete(client.$id!);
+      }
+      return newMap;
+    });
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    setSelectedClients(prev => {
+      const newMap = new Map(prev);
+      if (isSelected) {
+        filteredClients.forEach(client => newMap.set(client.$id!, client));
+      } else {
+        filteredClients.forEach(client => newMap.delete(client.$id!));
+      }
+      return newMap;
+    });
+  };
+
+  const clientsToDisplay = useMemo(() => {
+    const combined = new Map<string, Client>();
+    selectedClients.forEach((client, id) => combined.set(id, client));
+    filteredClients.forEach(client => combined.set(client.$id!, client));
+    return Array.from(combined.values());
+  }, [filteredClients, selectedClients]);
+
+  const areAllFilteredSelected = filteredClients.length > 0 && filteredClients.every(client => selectedClients.has(client.$id!));
 
   const startCampaign = async () => {
     const selectedTemplate = templates.find(t => t.$id === selectedTemplateId);
-    if (!selectedTemplate || filteredClients.length === 0 || !wahaConfig) {
-      toast({ title: 'Error', description: 'Selecciona una plantilla, configura el sistema y asegúrate de que la segmentación tenga clientes.', variant: 'destructive' });
+    const finalAudience = Array.from(selectedClients.values());
+
+    if (!selectedTemplate || finalAudience.length === 0 || !wahaConfig) {
+      toast({ title: 'Error', description: 'Selecciona una plantilla y al menos un cliente para la campaña.', variant: 'destructive' });
       return;
     }
 
@@ -153,30 +192,30 @@ export function CampaignsTab() {
       const campaignDoc = await createCampaign({
         name: `Campaña: ${selectedTemplate.name}`,
         templateId: selectedTemplateId,
-        filters: {},
         status: 'pending',
-        audienceCount: filteredClients.length,
+        audienceCount: finalAudience.length,
         createdAt: new Date().toISOString()
       });
       const campaignId = campaignDoc.$id;
       setActiveCampaignId(campaignId);
-      setProgress({ sent: 0, failed: 0, skipped: 0, total: filteredClients.length });
+      setProgress({ sent: 0, failed: 0, skipped: 0, total: finalAudience.length });
       
       toast({ 
         title: 'Iniciando Campaña...', 
-        description: `El envío a ${filteredClients.length} clientes ha comenzado.`,
+        description: `El envío a ${finalAudience.length} clientes ha comenzado.`,
       });
 
-      await functions.createExecution(
-        'sendWhatsAppFunction',
-        JSON.stringify({
-          clients: filteredClients,
+      // ***** LÍNEA CORREGIDA CON LA NUEVA SINTAXIS *****
+      await functions.createExecution({
+        functionId: 'sendWhatsAppFunction',
+        body: JSON.stringify({
+          clients: finalAudience,
           template: selectedTemplate,
           config: wahaConfig,
           campaignId: campaignId,
         }),
-        false
-      );
+        async: true,
+      });
       
       reloadCampaigns();
 
@@ -187,28 +226,29 @@ export function CampaignsTab() {
   };
 
   const handleExport = () => {
-    if (filteredClients.length === 0) {
-      toast({ title: 'No hay clientes para exportar', variant: 'destructive' });
+    const audience = Array.from(selectedClients.values());
+    if (audience.length === 0) {
+      toast({ title: 'No hay clientes seleccionados para exportar', variant: 'destructive' });
       return;
     }
-    const dataToExport = filteredClients.map(client => ({ ...client, intereses: client.intereses?.join(', ') || '' }));
+    const dataToExport = audience.map(client => ({ ...client, intereses: client.intereses?.join(', ') || '' }));
     const csv = Papa.unparse(dataToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `segmentacion_campana_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `seleccion_clientes_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast({ title: 'Exportación completada' });
   };
-
+  
   if (loadingClients || loadingTemplates || loadingCampaigns) return <div className="p-6">Cargando...</div>;
 
   const processedCount = progress.sent + progress.failed + progress.skipped;
   const progressPercentage = progress.total > 0 ? (processedCount / progress.total) * 100 : 0;
-
+  
   return (
     <div className="p-6 space-y-6">
       <h2 className="text-2xl font-bold">Campañas WhatsApp</h2>
@@ -230,12 +270,10 @@ export function CampaignsTab() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Filter className="w-5 h-5" />Segmentación de Audiencia</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Filter className="w-5 h-5" />Segmentación de Audiencia</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div><Label htmlFor="nombreApellido">Nombre o Apellido</Label><Input id="nombreApellido" value={filters.nombreApellido} onChange={(e) => setFilters({ ...filters, nombreApellido: e.target.value })} placeholder="Ej: Juan Pérez"/></div>
               <div><Label htmlFor="email">Email</Label><Input id="email" type="email" value={filters.email} onChange={(e) => setFilters({ ...filters, email: e.target.value })} placeholder="Ej: juan.perez@example.com"/></div>
@@ -259,14 +297,21 @@ export function CampaignsTab() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Previsualización de Audiencia ({filteredClients.length})</CardTitle>
+              <CardTitle>Previsualización y Selección ({clientsToDisplay.length} visibles, {selectedClients.size} seleccionados)</CardTitle>
             </CardHeader>
             <CardContent>
-               <Button variant="outline" onClick={handleExport} disabled={filteredClients.length === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar a CSV</Button>
+               <Button variant="outline" onClick={handleExport} disabled={selectedClients.size === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección a CSV</Button>
                <ScrollArea className="h-72 w-full rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={areAllFilteredSelected}
+                          onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                          aria-label="Seleccionar todos los filtrados"
+                        />
+                      </TableHead>
                       <TableHead>Cód.</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Apellidos</TableHead>
@@ -274,9 +319,16 @@ export function CampaignsTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredClients.length > 0 ? (
-                      filteredClients.map((client) => (
-                        <TableRow key={client.$id}>
+                    {clientsToDisplay.length > 0 ? (
+                      clientsToDisplay.map((client) => (
+                        <TableRow key={client.$id} data-state={selectedClients.has(client.$id!) && 'selected'}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedClients.has(client.$id!)}
+                              onCheckedChange={(checked) => handleSelectClient(client, Boolean(checked))}
+                              aria-label={`Seleccionar cliente ${client.nomcli}`}
+                            />
+                          </TableCell>
                           <TableCell>{client.codcli}</TableCell>
                           <TableCell>{client.nomcli}</TableCell>
                           <TableCell>{client.ape1cli}</TableCell>
@@ -285,7 +337,7 @@ export function CampaignsTab() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center">No hay clientes que coincidan.</TableCell>
+                        <TableCell colSpan={5} className="text-center">No hay clientes que coincidan.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -313,8 +365,8 @@ export function CampaignsTab() {
           <Card>
             <CardHeader><CardTitle>Iniciar Campaña</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">La campaña se enviará a los <strong className="text-primary">{filteredClients.length}</strong> clientes.</p>
-              <Button onClick={startCampaign} disabled={isSending || activeCampaignId !== null} className="w-full">
+              <p className="text-sm text-muted-foreground">La campaña se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
+              <Button onClick={startCampaign} disabled={isSending || activeCampaignId !== null || selectedClients.size === 0} className="w-full">
                 {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {activeCampaignId ? 'Campaña en Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
               </Button>
