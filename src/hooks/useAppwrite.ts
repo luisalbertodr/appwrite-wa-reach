@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { databases, DATABASE_ID } from '@/lib/appwrite';
-import { ID, Query, AppwriteException } from 'appwrite';
+import { ID, Query, AppwriteException, Models } from 'appwrite';
 import { getAppwriteErrorMessage } from '@/lib/appwriteErrors';
 
-export function useAppwriteCollection<T extends { $id: string }>(collectionId: string, storageKey?: string) {
-  const [data, setData] = useState<T[]>([]);
+// CORRECCIÓN: Se eliminó la restricción genérica y se usan los tipos de Appwrite
+// para definir con precisión los datos que vienen de la base de datos.
+export function useAppwriteCollection<T>(collectionId: string, storageKey?: string) {
+  // El estado 'data' ahora espera un array de objetos que son una combinación
+  // de tu tipo (T) y el tipo Document de Appwrite, que incluye $id, $createdAt, etc.
+  const [data, setData] = useState<(T & Models.Document)[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,12 +25,14 @@ export function useAppwriteCollection<T extends { $id: string }>(collectionId: s
     setLoading(true);
     setError(null);
     try {
-      const response = await databases.listDocuments(
+      // Le indicamos a la función qué tipo de documento esperamos
+      const response = await databases.listDocuments<T & Models.Document>(
         DATABASE_ID,
         collectionId,
         currentQueries.length > 0 ? currentQueries : undefined
       );
-      setData(response.documents as T[]);
+      // El tipado es ahora correcto y no necesita conversiones forzadas
+      setData(response.documents);
       setTotal(response.total);
     } catch (err) {
       console.error('Error loading data:', err);
@@ -63,13 +69,15 @@ export function useAppwriteCollection<T extends { $id: string }>(collectionId: s
     loadData(newQueries);
   }, [storageKey, loadData]);
 
-  const create = useCallback(async (item: Omit<T, '$id'>, documentId: string = ID.unique()) => {
+  // Al crear, solo enviamos los datos del usuario (T), sin los campos de Appwrite ($id, etc.)
+  const create = useCallback(async (item: Omit<T, keyof Models.Document>, documentId: string = ID.unique()) => {
     const response = await databases.createDocument(DATABASE_ID, collectionId, documentId, item);
     await loadData(queries);
     return response;
   }, [collectionId, loadData, queries]);
 
-  const update = useCallback(async (id: string, item: Partial<Omit<T, '$id'>>) => {
+  // Al actualizar, también enviamos solo los datos del usuario
+  const update = useCallback(async (id: string, item: Partial<Omit<T, keyof Models.Document>>) => {
     const response = await databases.updateDocument(DATABASE_ID, collectionId, id, item);
     await loadData(queries);
     return response;
