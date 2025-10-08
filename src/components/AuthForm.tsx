@@ -5,14 +5,12 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from './ui/card';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
-const AuthForm: React.FC = () => {
+const AuthForm: React.FC<{ onLoginSuccess: (user: any) => void }> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate(); // Initialize useNavigate
 
   const handleEmailPasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +18,8 @@ const AuthForm: React.FC = () => {
     setLoading(true);
     try {
       await account.createEmailPasswordSession(email, password);
-      navigate('/clients'); // Redirect to clients tab on successful login
+      const user = await account.get();
+      onLoginSuccess(user); // Llama a la función del componente padre
     } catch (err: any) {
       setError(err.message || 'An error occurred during authentication.');
     } finally {
@@ -32,7 +31,8 @@ const AuthForm: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      await account.createOAuth2Session(OAuthProvider.Google, 'http://localhost:5173/', 'http://localhost:5173/login'); // Replace with your actual redirect URLs
+      // Reemplaza con tus URLs de redirección reales si son diferentes
+      await account.createOAuth2Session(OAuthProvider.Google, 'http://localhost:8080/', 'http://localhost:8080/login');
     } catch (err: any) {
       setError(err.message || 'An error occurred during Google authentication.');
     } finally {
@@ -48,7 +48,7 @@ const AuthForm: React.FC = () => {
             Login
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password or use Google
+            Introduce tu email y contraseña o usa Google
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -66,7 +66,7 @@ const AuthForm: React.FC = () => {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
@@ -76,7 +76,7 @@ const AuthForm: React.FC = () => {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : 'Login'}
+              {loading ? 'Iniciando...' : 'Iniciar Sesión'}
             </Button>
           </form>
           <div className="relative">
@@ -85,7 +85,7 @@ const AuthForm: React.FC = () => {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
+                O continuar con
               </span>
             </div>
           </div>
@@ -93,9 +93,7 @@ const AuthForm: React.FC = () => {
             Google
           </Button>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          {/* Registration option removed as per user request */}
-        </CardFooter>
+        <CardFooter className="flex justify-center" />
       </Card>
     </div>
   );
