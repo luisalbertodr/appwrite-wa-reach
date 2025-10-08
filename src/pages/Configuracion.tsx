@@ -31,12 +31,14 @@ const defaultConfig: Omit<WahaConfig, '$id' | 'apiKey'> = {
   batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumber: '', notificationInterval: 50,
 };
 
+const FILTERS_STORAGE_KEY = 'client-filters';
+
 const Configuracion = () => {
   const { data: configs, loading: loadingConfig, create: createConfig, update: updateConfig, reload: reloadConfig } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
   const { toast } = useToast();
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
   
-  const { data: clients, total, loading: loadingClients, create: createClient, remove: removeClient, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID);
+  const { data: clients, total, loading: loadingClients, create: createClient, remove: removeClient, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   
   const [isAddingClient, setIsAddingClient] = useState(false);
@@ -53,15 +55,10 @@ const Configuracion = () => {
   const [importErrorLogs, setImportErrorLogs] = useState<string[]>([]);
   const [isLocalImporting, setIsLocalImporting] = useState(false);
 
-  const [filterCodcli, setFilterCodcli] = useState('');
-  const [filterCodcliMin, setFilterCodcliMin] = useState('');
-  const [filterCodcliMax, setFilterCodcliMax] = useState('');
-  const [filterNomcli, setFilterNomcli] = useState('');
-  const [filterEmail, setFilterEmail] = useState('');
-  const [filterDnicli, setFilterDnicli] = useState('');
-  const [filterTelefono, setFilterTelefono] = useState('');
-  const [filterFecaltaMin, setFilterFecaltaMin] = useState('');
-  const [filterFecaltaMax, setFilterFecaltaMax] = useState('');
+  const [filters, setFilters] = useState({
+      codcli: '', codcliMin: '', codcliMax: '', nomcli: '', email: '', dnicli: '',
+      telefono: '', fecaltaMin: '', fecaltaMax: ''
+  });
   const [isFiltered, setIsFiltered] = useState(false);
 
   useEffect(() => {
@@ -80,6 +77,15 @@ const Configuracion = () => {
       });
     }
   }, [configs]);
+  
+  useEffect(() => {
+    const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY + '_values');
+    if (savedFiltersJSON) {
+        const savedFilters = JSON.parse(savedFiltersJSON);
+        setFilters(savedFilters);
+        setIsFiltered(true);
+    }
+  }, []);
 
   const calculateAge = (dob: string): number => {
     if (!dob) return 0;
@@ -93,10 +99,11 @@ const Configuracion = () => {
 
   const handleSaveConfig = async () => {
     try {
+      const configToSave = { ...config };
       if (configs.length > 0 && configs[0].$id) {
-        await updateConfig(configs[0].$id, config);
+        await updateConfig(configs[0].$id, configToSave);
       } else {
-        await createConfig(config);
+        await createConfig(configToSave as Omit<WahaConfig, '$id'>);
       }
       reloadConfig();
       toast({ title: 'Configuración del sistema guardada' });
@@ -120,9 +127,10 @@ const Configuracion = () => {
 
     setValidationErrors({});
     try {
-      const clientToSave: Partial<Client> = {
+      const clientToSave: Omit<Client, '$id'> = {
         ...newClient,
         edad: calculateAge(newClient.fecnac || ''),
+        facturacion: newClient.facturacion || 0,
       };
 
       if (editingClient) {
@@ -184,24 +192,30 @@ const Configuracion = () => {
   
   const handleFilter = () => {
     const newQueries: string[] = [];
-    if (filterCodcliMin) newQueries.push(Query.greaterThanEqual('codcli', filterCodcliMin));
-    if (filterCodcliMax) newQueries.push(Query.lessThanEqual('codcli', filterCodcliMax));
-    if (filterCodcli) newQueries.push(Query.equal('codcli', filterCodcli));
-    if (filterNomcli) newQueries.push(Query.search('nomcli', filterNomcli));
-    if (filterEmail) newQueries.push(Query.search('email', filterEmail));
-    if (filterDnicli) newQueries.push(Query.equal('dnicli', filterDnicli));
-    if (filterTelefono) newQueries.push(Query.search('tel2cli', filterTelefono));
-    if (filterFecaltaMin) newQueries.push(Query.greaterThanEqual('fecalta', filterFecaltaMin));
-    if (filterFecaltaMax) newQueries.push(Query.lessThanEqual('fecalta', filterFecaltaMax));
+    if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
+    if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax));
+    if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
+    if (filters.nomcli) newQueries.push(Query.search('nomcli', filters.nomcli));
+    if (filters.email) newQueries.push(Query.search('email', filters.email));
+    if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
+    if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
+    if (filters.fecaltaMin) newQueries.push(Query.greaterThanEqual('fecalta', filters.fecaltaMin));
+    if (filters.fecaltaMax) newQueries.push(Query.lessThanEqual('fecalta', filters.fecaltaMax));
     
+    if (newQueries.length === 0) {
+      toast({ title: 'Sin filtros', description: 'Por favor, introduce al menos un criterio de búsqueda.', variant: 'destructive' });
+      return;
+    }
+    
+    localStorage.setItem(FILTERS_STORAGE_KEY + '_values', JSON.stringify(filters));
     applyQueries(newQueries);
     setIsFiltered(true);
   };
 
   const handleClearFilters = () => {
-    setFilterCodcli(''); setFilterCodcliMin(''); setFilterCodcliMax('');
-    setFilterNomcli(''); setFilterEmail(''); setFilterDnicli('');
-    setFilterTelefono(''); setFilterFecaltaMin(''); setFilterFecaltaMax('');
+    setFilters({ codcli: '', codcliMin: '', codcliMax: '', nomcli: '', email: '', dnicli: '', telefono: '', fecaltaMin: '', fecaltaMax: ''});
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
+    localStorage.removeItem(FILTERS_STORAGE_KEY + '_values');
     applyQueries([]);
     setIsFiltered(false);
   };
@@ -220,7 +234,7 @@ const Configuracion = () => {
     toast({ title: 'Exportación completada' });
   };
   
-  if (loadingConfig || loadingClients) {
+  if (loadingConfig) {
     return <div className="p-6">Cargando...</div>;
   }
 
@@ -291,7 +305,7 @@ const Configuracion = () => {
           )}
 
           <Card>
-            <CardHeader><CardTitle>Base de Datos de Clientes ({total})</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Base de Datos de Clientes ({isFiltered ? total : 'N/A'})</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-4">
                 <Label htmlFor="csv-upload-server" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><Upload className="w-4 h-4" />Importar (Servidor)<Input id="csv-upload-server" type="file" accept=".csv" onChange={handleImport} className="sr-only" /></Label>
@@ -301,10 +315,10 @@ const Configuracion = () => {
               <div className="space-y-2 mb-4 border-t pt-4">
                 <h3 className="text-md font-medium">Filtrar Clientes</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Input value={filterCodcli} onChange={(e) => setFilterCodcli(e.target.value)} placeholder="Cód. Cliente"/>
-                  <Input value={filterNomcli} onChange={(e) => setFilterNomcli(e.target.value)} placeholder="Nombre"/>
-                  <Input value={filterEmail} onChange={(e) => setFilterEmail(e.target.value)} placeholder="Email"/>
-                  <Input value={filterDnicli} onChange={(e) => setFilterDnicli(e.target.value)} placeholder="DNI"/>
+                  <Input value={filters.codcli} onChange={(e) => setFilters({...filters, codcli: e.target.value})} placeholder="Cód. Cliente"/>
+                  <Input value={filters.nomcli} onChange={(e) => setFilters({...filters, nomcli: e.target.value})} placeholder="Nombre"/>
+                  <Input value={filters.email} onChange={(e) => setFilters({...filters, email: e.target.value})} placeholder="Email"/>
+                  <Input value={filters.dnicli} onChange={(e) => setFilters({...filters, dnicli: e.target.value})} placeholder="DNI"/>
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleFilter}><Search className="w-4 h-4 mr-2" />Filtrar</Button>
@@ -313,7 +327,8 @@ const Configuracion = () => {
                 </div>
               </div>
               
-              {isFiltered ? (
+              {loadingClients && <p>Buscando clientes...</p>}
+              {!loadingClients && (isFiltered || clients.length > 0) && (
                 <Table>
                   <TableHeader><TableRow><TableHead>Cód.</TableHead><TableHead>Nombre</TableHead><TableHead>Teléfono</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
                   <TableBody>
@@ -325,13 +340,15 @@ const Configuracion = () => {
                     ))}
                   </TableBody>
                 </Table>
-              ) : <p className="text-center text-muted-foreground">Aplica un filtro para ver los clientes.</p>}
+              )}
+              {!isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">Introduce un criterio de búsqueda y pulsa "Filtrar" para ver los clientes.</p>}
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader><CardTitle>Historial de Importaciones</CardTitle></CardHeader>
             <CardContent>
+              {loadingImportLogs ? <p>Cargando historial...</p> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Archivo</TableHead><TableHead>Resultado</TableHead><TableHead>Estado</TableHead><TableHead>Errores</TableHead></TableRow></TableHeader>
                 <TableBody>
@@ -346,6 +363,7 @@ const Configuracion = () => {
                   ))}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
 
