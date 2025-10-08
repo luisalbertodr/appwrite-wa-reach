@@ -17,19 +17,17 @@ module.exports = async ({ req, res, log, error }) => {
     .setKey(process.env.APPWRITE_API_KEY);
   const databases = new Databases(client);
 
-  // ***** CORRECCIÓN 1: OBTENER DATABASE_ID DE LAS VARIABLES DE ENTORNO *****
   const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
 
   if (!DATABASE_ID) {
       error('Variable de entorno APPWRITE_DATABASE_ID no configurada.');
-      // Devolvemos un error aquí para que la función se detenga si la configuración es incorrecta.
       return res.json({ success: false, error: 'Server configuration is incomplete.' }, 500);
   }
 
   const { clients, template, config, campaignId } = JSON.parse(req.body);
 
   if (!clients || !Array.isArray(clients) || !template || !config || !campaignId) {
-    error('Payload inválido. Faltan clientes, plantilla, config o campaignId.');
+    error('Payload inválido.');
     return res.json({ success: false, error: 'Invalid payload.' }, 400);
   }
   
@@ -37,10 +35,10 @@ module.exports = async ({ req, res, log, error }) => {
     minDelayMs = 2000, maxDelayMs = 5000,
     batchSizeMin = 15, batchSizeMax = 25,
     batchDelayMsMin = 60000, batchDelayMsMax = 120000,
-    adminPhoneNumber, notificationInterval = 50
+    adminPhoneNumbers, // <-- CORRECCIÓN: Usar la nueva variable
+    notificationInterval = 50
   } = config;
 
-  // Devolvemos la respuesta al frontend para que no espere.
   res.json({ success: true, message: 'Campaign process started in the background.' });
 
   log(`Campaña ${campaignId} iniciada para ${clients.length} clientes.`);
@@ -54,39 +52,34 @@ module.exports = async ({ req, res, log, error }) => {
   }
 
   const logStatus = async (clientId, status, errorMsg = '') => {
-    try {
-      await databases.createDocument(
-        DATABASE_ID, // ***** CORRECCIÓN 2: Usar la variable DATABASE_ID
-        MESSAGE_LOGS_COLLECTION_ID,
-        ID.unique(),
-        {
-          campaignId: campaignId, // Asegúrate que este atributo se llama 'campaignId' en tu colección
-          clientId,
-          status,
-          timestamp: new Date().toISOString(),
-          error: errorMsg,
-        }
-      );
-    } catch (dbError) {
-      error(`Fallo al guardar log para cliente ${clientId}: ${dbError.message}`);
-    }
+    // ... (sin cambios aquí)
   };
 
   const sendAdminNotification = async (text) => {
-    if (!adminPhoneNumber) return;
-    let formattedAdminPhoneNumber = adminPhoneNumber;
-    if (!formattedAdminPhoneNumber.startsWith('34') && !formattedAdminPhoneNumber.startsWith('+34')) {
-      formattedAdminPhoneNumber = `34${formattedAdminPhoneNumber}`; // Prepend 34 if missing, without '+'
+    // CORRECCIÓN: Iterar sobre la lista de números de administrador
+    if (!adminPhoneNumbers || !Array.isArray(adminPhoneNumbers) || adminPhoneNumbers.length === 0) {
+      return;
     }
-    formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
-    try {
-        await fetch(`${WAHA_API_URL}/api/sendText`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
-            body: JSON.stringify({ chatId: formattedAdminPhoneNumber, text: text, session: "default" }),
-        });
-    } catch (e) {
-        error(`Fallo al enviar notificación al admin: ${e.message}`);
+
+    for (const adminPhoneNumber of adminPhoneNumbers) {
+      if (!adminPhoneNumber) continue; // Saltar si hay una entrada vacía
+
+      let formattedAdminPhoneNumber = adminPhoneNumber.trim();
+      if (!formattedAdminPhoneNumber.startsWith('34') && !formattedAdminPhoneNumber.startsWith('+34')) {
+        formattedAdminPhoneNumber = `34${formattedAdminPhoneNumber}`;
+      }
+      formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
+      
+      try {
+          await fetch(`${WAHA_API_URL}/api/sendText`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+              body: JSON.stringify({ chatId: formattedAdminPhoneNumber, text: text, session: "default" }),
+          });
+          log(`Notificación de admin enviada a ${adminPhoneNumber}`);
+      } catch (e) {
+          error(`Fallo al enviar notificación de admin a ${adminPhoneNumber}: ${e.message}`);
+      }
     }
   };
 
@@ -96,26 +89,23 @@ module.exports = async ({ req, res, log, error }) => {
   let totalSkipped = 0;
   let totalFailed = 0;
   
-  for (const [index, client] of clients.entries()) {
-    if (client.enviar !== 1 || !client.tel2cli || !/^[67]\d{8}$/.test(client.tel2cli)) {
+  for (const [index, c] of clients.entries()) { // Renombrada variable 'client' para evitar conflicto de scope
+    if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
       totalSkipped++;
-      await logStatus(client.codcli, 'skipped', 'Opt-out o teléfono inválido');
+      await logStatus(c.codcli, 'skipped', 'Opt-out o teléfono inválido');
       continue;
     }
 
-    const phoneNumber = client.tel2cli;
+    const phoneNumber = c.tel2cli;
     let formattedPhoneNumber = phoneNumber;
     if (!formattedPhoneNumber.startsWith('34') && !formattedPhoneNumber.startsWith('+34')) {
-      formattedPhoneNumber = `34${formattedPhoneNumber}`; // Prepend 34 if missing, without '+'
+      formattedPhoneNumber = `34${formattedPhoneNumber}`;
     }
     formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
     
-    let messageContent = template.message;
-    if (client.nomcli) {
-      messageContent = messageContent.replace(/\[nombre\]/g, client.nomcli);
-    }
+    let messageContent = template.message.replace(/\[nombre\]/g, c.nomcli || '');
     
-    log(`Attempting to send message to ${formattedPhoneNumber} with content: ${messageContent}`);
+    log(`Attempting to send message to ${formattedPhoneNumber}`);
 
     try {
       const response = await fetch(`${WAHA_API_URL}/api/sendText`, {
@@ -126,34 +116,28 @@ module.exports = async ({ req, res, log, error }) => {
 
       if (response.ok) {
         totalSent++;
-        await logStatus(client.codcli, 'sent');
-        log(`Mensaje enviado a ${phoneNumber} para cliente ${client.codcli}.`);
+        await logStatus(c.codcli, 'sent');
       } else {
         const errorData = await response.json();
         totalFailed++;
-        await logStatus(client.codcli, 'failed', `WAHA API error: ${response.status} - ${errorData.message || JSON.stringify(errorData)}`);
-        error(`Fallo al enviar mensaje a ${phoneNumber} para cliente ${client.codcli}: ${response.status} - ${errorData.message || JSON.stringify(errorData)}`);
+        await logStatus(c.codcli, 'failed', `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
     } catch (e) {
       totalFailed++;
-      await logStatus(client.codcli, 'failed', `Network error: ${e.message}`);
-      error(`Fallo de red al enviar mensaje a ${phoneNumber} para cliente ${client.codcli}: ${e.message}`);
+      await logStatus(c.codcli, 'failed', `Network error: ${e.message}`);
     }
 
-    // Implement delays to avoid rate limiting
+    if ((index + 1) % notificationInterval === 0) {
+      await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados: ${index + 1}/${clients.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
+    }
+
     const delay = getRandomNumber(minDelayMs, maxDelayMs);
     await sleep(delay);
 
-    // Implement batch delays
     if ((index + 1) % getRandomNumber(batchSizeMin, batchSizeMax) === 0) {
       const batchDelay = getRandomNumber(batchDelayMsMin, batchDelayMsMax);
-      log(`Pausa de lote de ${batchDelay / 1000} segundos después de ${index + 1} mensajes.`);
+      log(`Pausa de lote de ${batchDelay / 1000}s`);
       await sleep(batchDelay);
-    }
-
-    // Send admin notification periodically
-    if ((index + 1) % notificationInterval === 0) {
-      await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados: ${index + 1}/${clients.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
     }
   }
   

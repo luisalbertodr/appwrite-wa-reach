@@ -60,13 +60,13 @@ export interface Campaign {
 export interface WahaConfig {
   $id?: string;
   apiUrl: string;
-  apiKey?: string; // <-- CORRECCIÓN: Hecho opcional
+  apiKey?: string;
   minDelayMs?: number; 
   maxDelayMs?: number; 
   batchSizeMin?: number;
   batchSizeMax?: number;
   batchDelayMsMin?: number;
   batchDelayMsMax?: number;
-  adminPhoneNumber?: string; 
+  adminPhoneNumbers?: string[]; // <-- CORRECCIÓN: Cambiado a un array de strings
   notificationInterval?: number;
 }

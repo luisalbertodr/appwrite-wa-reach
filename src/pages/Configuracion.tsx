@@ -10,13 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Settings, Save, Shield, Bot, AlertTriangle, Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download, Users, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CONFIG_COLLECTION_ID, CLIENTS_COLLECTION_ID, DATABASE_ID, databases, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
-import { ID, Query } from 'appwrite';
+import { ID, Query, Models } from 'appwrite';
 import Papa from 'papaparse';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
+import { Textarea } from '@/components/ui/textarea';
 
-interface ImportLog {
-  $id?: string;
+interface ImportLog extends Models.Document {
   timestamp: string;
   filename: string;
   successfulImports: number;
@@ -28,7 +28,7 @@ interface ImportLog {
 const defaultConfig: Omit<WahaConfig, '$id' | 'apiKey'> = {
   apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api',
   minDelayMs: 2000, maxDelayMs: 5000, batchSizeMin: 15, batchSizeMax: 25,
-  batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumber: '', notificationInterval: 50,
+  batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumbers: [], notificationInterval: 50,
 };
 
 const FILTERS_STORAGE_KEY = 'client-filters';
@@ -38,11 +38,13 @@ const Configuracion = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
   
-  const { data: clients, total, loading: loadingClients, create: createClient, remove: removeClient, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
+  // <-- CORRECCIÓN: Se renombra 'update' a 'updateClient' al desestructurar el hook
+  const { data: clients, total, loading: loadingClients, create: createClient, update: updateClient, remove: removeClient, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
+  
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   
   const [isAddingClient, setIsAddingClient] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<(Client & Models.Document) | null>(null);
   const [clientLoading, setClientLoading] = useState(false);
   const [newClient, setNewClient] = useState<Omit<Client, '$id' | 'edad' | 'importErrors'>>({
     codcli: '', nomcli: '', ape1cli: '', email: '', dnicli: '', dircli: '',
@@ -72,7 +74,7 @@ const Configuracion = () => {
         batchSizeMax: fetchedConfig.batchSizeMax ?? defaultConfig.batchSizeMax,
         batchDelayMsMin: fetchedConfig.batchDelayMsMin ?? defaultConfig.batchDelayMsMin,
         batchDelayMsMax: fetchedConfig.batchDelayMsMax ?? defaultConfig.batchDelayMsMax,
-        adminPhoneNumber: fetchedConfig.adminPhoneNumber || defaultConfig.adminPhoneNumber,
+        adminPhoneNumbers: fetchedConfig.adminPhoneNumbers || defaultConfig.adminPhoneNumbers,
         notificationInterval: fetchedConfig.notificationInterval ?? defaultConfig.notificationInterval,
       });
     }
@@ -96,7 +98,6 @@ const Configuracion = () => {
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
   };
-
   const handleSaveConfig = async () => {
     try {
       const configToSave = { ...config };
@@ -111,7 +112,6 @@ const Configuracion = () => {
       toast({ title: 'Error al guardar configuración', variant: 'destructive', description: (error as Error).message });
     }
   };
-
   const handleSubmitClient = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
@@ -124,7 +124,6 @@ const Configuracion = () => {
       toast({ title: 'Errores de validación', variant: 'destructive' });
       return;
     }
-
     setValidationErrors({});
     try {
       const clientToSave: Omit<Client, '$id'> = {
@@ -132,22 +131,19 @@ const Configuracion = () => {
         edad: calculateAge(newClient.fecnac || ''),
         facturacion: newClient.facturacion || 0,
       };
-
       if (editingClient) {
-        await databases.updateDocument(DATABASE_ID, CLIENTS_COLLECTION_ID, editingClient.$id!, clientToSave);
+        await updateClient(editingClient.$id, clientToSave);
         toast({ title: 'Cliente actualizado' });
       } else {
         await createClient(clientToSave, newClient.codcli);
         toast({ title: 'Cliente agregado' });
       }
-      
       setIsAddingClient(false);
       setEditingClient(null);
     } catch (error) {
       toast({ title: 'Error al guardar cliente', description: (error as Error).message, variant: 'destructive' });
     }
   };
-
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -163,11 +159,9 @@ const Configuracion = () => {
       event.target.value = ''; 
     }
   };
-  
   const handleLocalImport = () => {
      toast({ title: 'Importación Local', description: 'Funcionalidad en desarrollo.' });
   };
-
   const handleDeleteClient = async (id: string) => {
     try {
       await removeClient(id);
@@ -176,8 +170,7 @@ const Configuracion = () => {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
     }
   };
-
-  const handleEditClient = (client: Client) => {
+  const handleEditClient = (client: Client & Models.Document) => {
     setEditingClient(client);
     setNewClient({
       codcli: client.codcli, nomcli: client.nomcli || '', ape1cli: client.ape1cli || '',
@@ -189,7 +182,6 @@ const Configuracion = () => {
     });
     setIsAddingClient(true);
   };
-  
   const handleFilter = () => {
     const newQueries: string[] = [];
     if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
@@ -211,7 +203,6 @@ const Configuracion = () => {
     applyQueries(newQueries);
     setIsFiltered(true);
   };
-
   const handleClearFilters = () => {
     setFilters({ codcli: '', codcliMin: '', codcliMax: '', nomcli: '', email: '', dnicli: '', telefono: '', fecaltaMin: '', fecaltaMax: ''});
     localStorage.removeItem(FILTERS_STORAGE_KEY);
@@ -219,7 +210,6 @@ const Configuracion = () => {
     applyQueries([]);
     setIsFiltered(false);
   };
-  
   const handleExport = () => {
     if (clients.length === 0) {
       toast({ title: 'No hay clientes para exportar', variant: 'destructive' });
@@ -237,7 +227,7 @@ const Configuracion = () => {
   if (loadingConfig) {
     return <div className="p-6">Cargando...</div>;
   }
-
+  
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card">
@@ -264,8 +254,21 @@ const Configuracion = () => {
             <CardContent className="space-y-4">
               <div><Label htmlFor="apiUrl">URL de la API de Waha</Label><Input id="apiUrl" value={config.apiUrl || ''} onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}/></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>Nº Teléfono Admin</Label><Input value={config.adminPhoneNumber || ''} onChange={(e) => setConfig({ ...config, adminPhoneNumber: e.target.value })}/></div>
-                <div><Label>Intervalo de Notificación</Label><Input type="number" value={config.notificationInterval || ''} onChange={(e) => setConfig({ ...config, notificationInterval: Number(e.target.value) })}/></div>
+                <div>
+                  <Label htmlFor="adminPhoneNumbers">Nº de Teléfonos de Admin (separados por comas)</Label>
+                  <Textarea
+                    id="adminPhoneNumbers"
+                    value={config.adminPhoneNumbers?.join(', ') || ''}
+                    onChange={(e) => setConfig({ ...config, adminPhoneNumbers: e.target.value.split(',').map(phone => phone.trim()).filter(phone => phone) })}
+                    placeholder="34600111222, 34600333444"
+                  />
+                   <p className="text-xs text-muted-foreground mt-1">Incluye el código de país para cada número. Ej: 34 para España.</p>
+                </div>
+                <div>
+                    <Label>Intervalo de Notificación</Label>
+                    <Input type="number" value={config.notificationInterval || ''} onChange={(e) => setConfig({ ...config, notificationInterval: Number(e.target.value) })}/>
+                    <p className="text-xs text-muted-foreground mt-1">Notificar cada X mensajes enviados.</p>
+                </div>
               </div>
             </CardContent>
           </Card>
