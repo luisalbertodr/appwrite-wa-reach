@@ -74,11 +74,16 @@ module.exports = async ({ req, res, log, error }) => {
 
   const sendAdminNotification = async (text) => {
     if (!adminPhoneNumber) return;
+    let formattedAdminPhoneNumber = adminPhoneNumber;
+    if (!formattedAdminPhoneNumber.startsWith('34') && !formattedAdminPhoneNumber.startsWith('+34')) {
+      formattedAdminPhoneNumber = `34${formattedAdminPhoneNumber}`; // Prepend 34 if missing, without '+'
+    }
+    formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
     try {
         await fetch(`${WAHA_API_URL}/api/sendText`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WAHA_API_KEY}` },
-            body: JSON.stringify({ to: adminPhoneNumber, body: text }),
+            headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+            body: JSON.stringify({ chatId: formattedAdminPhoneNumber, text: text, session: "default" }),
         });
     } catch (e) {
         error(`Fallo al enviar notificación al admin: ${e.message}`);
@@ -92,16 +97,68 @@ module.exports = async ({ req, res, log, error }) => {
   let totalFailed = 0;
   
   for (const [index, client] of clients.entries()) {
-    // ... (El resto del bucle de envío no necesita cambios, ya que los errores se manejarán aquí)
     if (client.enviar !== 1 || !client.tel2cli || !/^[67]\d{8}$/.test(client.tel2cli)) {
       totalSkipped++;
       await logStatus(client.codcli, 'skipped', 'Opt-out o teléfono inválido');
       continue;
     }
 
-    // ... (la lógica de envío y pausas sigue igual)
+    const phoneNumber = client.tel2cli;
+    let formattedPhoneNumber = phoneNumber;
+    if (!formattedPhoneNumber.startsWith('34') && !formattedPhoneNumber.startsWith('+34')) {
+      formattedPhoneNumber = `34${formattedPhoneNumber}`; // Prepend 34 if missing, without '+'
+    }
+    formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
+    
+    let messageContent = template.message;
+    if (client.nomcli) {
+      messageContent = messageContent.replace(/\[nombre\]/g, client.nomcli);
+    }
+    
+    log(`Attempting to send message to ${formattedPhoneNumber} with content: ${messageContent}`);
+
+    try {
+      const response = await fetch(`${WAHA_API_URL}/api/sendText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+        body: JSON.stringify({ chatId: formattedPhoneNumber, text: messageContent, session: "default" }),
+      });
+
+      if (response.ok) {
+        totalSent++;
+        await logStatus(client.codcli, 'sent');
+        log(`Mensaje enviado a ${phoneNumber} para cliente ${client.codcli}.`);
+      } else {
+        const errorData = await response.json();
+        totalFailed++;
+        await logStatus(client.codcli, 'failed', `WAHA API error: ${response.status} - ${errorData.message || JSON.stringify(errorData)}`);
+        error(`Fallo al enviar mensaje a ${phoneNumber} para cliente ${client.codcli}: ${response.status} - ${errorData.message || JSON.stringify(errorData)}`);
+      }
+    } catch (e) {
+      totalFailed++;
+      await logStatus(client.codcli, 'failed', `Network error: ${e.message}`);
+      error(`Fallo de red al enviar mensaje a ${phoneNumber} para cliente ${client.codcli}: ${e.message}`);
+    }
+
+    // Implement delays to avoid rate limiting
+    const delay = getRandomNumber(minDelayMs, maxDelayMs);
+    await sleep(delay);
+
+    // Implement batch delays
+    if ((index + 1) % getRandomNumber(batchSizeMin, batchSizeMax) === 0) {
+      const batchDelay = getRandomNumber(batchDelayMsMin, batchDelayMsMax);
+      log(`Pausa de lote de ${batchDelay / 1000} segundos después de ${index + 1} mensajes.`);
+      await sleep(batchDelay);
+    }
+
+    // Send admin notification periodically
+    if ((index + 1) % notificationInterval === 0) {
+      await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados: ${index + 1}/${clients.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
+    }
   }
   
   log(`Campaña ${campaignId} finalizada.`);
   await sendAdminNotification(`✅ *Campaña Finalizada*\n\n- ID: ${campaignId}\n- Total: ${clients.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
+
+  return res.empty();
 };
