@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { CampaignsTab } from '@/components/CampaignsTab';
 import { Settings, LogOut } from 'lucide-react';
 import AuthForm from '@/components/AuthForm';
@@ -68,7 +68,6 @@ const Index = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        {/* Renderiza directamente el componente de Campañas */}
         <CampaignsTab />
       </div>
     </div>

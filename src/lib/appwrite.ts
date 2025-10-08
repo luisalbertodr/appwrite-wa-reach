@@ -18,3 +18,4 @@ export const TEMPLATES_COLLECTION_ID = 'templates';
 export const CONFIG_COLLECTION_ID = 'config';
 export const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b'; // New: Appwrite Storage Bucket ID for CSV imports
 export const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID'; // New: Collection to store import results
+export const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';

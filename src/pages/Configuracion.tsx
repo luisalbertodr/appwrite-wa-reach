@@ -4,10 +4,10 @@ import { WahaConfig, Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Save, Shield, Bot, AlertTriangle, Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download, Users, ArrowLeft } from 'lucide-react';
+import { Save, Shield, Bot, Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download, Users, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CONFIG_COLLECTION_ID, CLIENTS_COLLECTION_ID, DATABASE_ID, databases, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { ID, Query, Models } from 'appwrite';
@@ -15,6 +15,7 @@ import Papa from 'papaparse';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
+import { validateClient, calculateAge } from '@/lib/validators';
 
 interface ImportLog extends Models.Document {
   timestamp: string;
@@ -38,8 +39,7 @@ const Configuracion = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
   
-  // <-- CORRECCIÓN: Se renombra 'update' a 'updateClient' al desestructurar el hook
-  const { data: clients, total, loading: loadingClients, create: createClient, update: updateClient, remove: removeClient, applyQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
+  const { data: clients, total, loading: loadingClients, create: createClient, update: updateClient, remove: removeClient, applyQueries, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
   
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   
@@ -89,15 +89,6 @@ const Configuracion = () => {
     }
   }, []);
 
-  const calculateAge = (dob: string): number => {
-    if (!dob) return 0;
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
-  };
   const handleSaveConfig = async () => {
     try {
       const configToSave = { ...config };
@@ -112,12 +103,10 @@ const Configuracion = () => {
       toast({ title: 'Error al guardar configuración', variant: 'destructive', description: (error as Error).message });
     }
   };
+
   const handleSubmitClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors: Record<string, string> = {};
-    if (!newClient.codcli || !/^\d{6}$/.test(newClient.codcli)) errors.codcli = 'Cód. Cliente requerido (6 dígitos).';
-    if (!newClient.nomcli) errors.nomcli = 'Nombre requerido.';
-    if (!newClient.tel2cli) errors.tel2cli = 'Teléfono principal requerido.';
+    const errors = validateClient(newClient);
     
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -125,6 +114,7 @@ const Configuracion = () => {
       return;
     }
     setValidationErrors({});
+    setClientLoading(true);
     try {
       const clientToSave: Omit<Client, '$id'> = {
         ...newClient,
@@ -140,10 +130,14 @@ const Configuracion = () => {
       }
       setIsAddingClient(false);
       setEditingClient(null);
+      reloadClients();
     } catch (error) {
       toast({ title: 'Error al guardar cliente', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setClientLoading(false);
     }
   };
+
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -151,7 +145,7 @@ const Configuracion = () => {
     try {
       await storage.createFile(IMPORT_BUCKET_ID, ID.unique(), file);
       toast({ title: 'Archivo CSV subido', description: 'Procesando en el servidor...' });
-      reloadImportLogs();
+      setTimeout(reloadImportLogs, 3000);
     } catch (error) {
       toast({ title: 'Error al subir archivo', description: (error as Error).message, variant: 'destructive' });
     } finally {
@@ -159,10 +153,84 @@ const Configuracion = () => {
       event.target.value = ''; 
     }
   };
-  const handleLocalImport = () => {
-     toast({ title: 'Importación Local', description: 'Funcionalidad en desarrollo.' });
+
+  const handleLocalImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLocalImporting(true);
+    setClientLoading(true);
+    toast({ title: 'Iniciando importación local...' });
+
+    Papa.parse<Client>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const clientsToImport = results.data;
+        const importPromises = clientsToImport.map(async (clientData) => {
+          const clientToSave: Partial<Client> = {
+            ...clientData,
+            edad: calculateAge(clientData.fecnac || ''),
+            facturacion: Number(clientData.facturacion) || 0,
+            enviar: clientData.enviar == 1 ? 1 : 0,
+          };
+          
+          const errors = validateClient(clientToSave, false);
+          if (Object.keys(errors).length > 0) {
+            return { status: 'rejected', reason: `Cliente ${clientData.codcli}: ${Object.values(errors).join(', ')}` };
+          }
+          
+          try {
+            const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [
+              Query.equal('codcli', clientData.codcli),
+            ]);
+
+            if (existing.documents.length > 0) {
+              return updateClient(existing.documents[0].$id, clientToSave);
+            } else {
+              return createClient(clientToSave as Client, clientData.codcli);
+            }
+          } catch (error: any) {
+            return { status: 'rejected', reason: `Error al importar cliente ${clientData.codcli}: ${error.message}` };
+          }
+        });
+
+        const outcomes = await Promise.allSettled(importPromises);
+        const successfulImports = outcomes.filter(o => o.status === 'fulfilled').length;
+        const importErrors = outcomes
+            .filter((o): o is PromiseRejectedResult => o.status === 'rejected')
+            .map(o => o.reason);
+
+        toast({
+          title: 'Importación Local Completada',
+          description: `${successfulImports} clientes importados, ${importErrors.length} errores.`,
+        });
+
+        if (importErrors.length > 0) {
+          setImportErrorLogs(importErrors);
+          setShowImportErrorsDialog(true);
+        }
+
+        setIsLocalImporting(false);
+        setClientLoading(false);
+        reloadClients();
+      },
+      error: (error: any) => {
+        toast({
+          title: 'Error al parsear el archivo CSV',
+          description: error.message,
+          variant: 'destructive',
+        });
+        setIsLocalImporting(false);
+        setClientLoading(false);
+      },
+    });
+
+    event.target.value = '';
   };
+  
   const handleDeleteClient = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
     try {
       await removeClient(id);
       toast({ title: 'Cliente eliminado' });
@@ -176,8 +244,8 @@ const Configuracion = () => {
       codcli: client.codcli, nomcli: client.nomcli || '', ape1cli: client.ape1cli || '',
       email: client.email || '', dnicli: client.dnicli || '', dircli: client.dircli || '',
       codposcli: client.codposcli || '', pobcli: client.pobcli || '', procli: client.procli || '',
-      tel1cli: client.tel1cli || '', tel2cli: client.tel2cli || '', fecnac: client.fecnac || '',
-      enviar: client.enviar ?? 1, sexo: client.sexo || 'Otro', fecalta: client.fecalta || '',
+      tel1cli: client.tel1cli || '', tel2cli: client.tel2cli || '', fecnac: client.fecnac ? new Date(client.fecnac).toISOString().split('T')[0] : '',
+      enviar: client.enviar ?? 1, sexo: client.sexo || 'Otro', fecalta: client.fecalta ? new Date(client.fecalta).toISOString().split('T')[0] : '',
       facturacion: client.facturacion || 0, intereses: client.intereses || [],
     });
     setIsAddingClient(true);
@@ -301,7 +369,7 @@ const Configuracion = () => {
                   <div><Label>Código Cliente</Label><Input value={newClient.codcli} onChange={(e) => setNewClient({ ...newClient, codcli: e.target.value })} required disabled={!!editingClient}/>{validationErrors.codcli && <p className="text-red-500 text-xs mt-1">{validationErrors.codcli}</p>}</div>
                   <div><Label>Nombre</Label><Input value={newClient.nomcli} onChange={(e) => setNewClient({ ...newClient, nomcli: e.target.value })} required/>{validationErrors.nomcli && <p className="text-red-500 text-xs mt-1">{validationErrors.nomcli}</p>}</div>
                   <div><Label>Teléfono Principal</Label><Input value={newClient.tel2cli} onChange={(e) => setNewClient({ ...newClient, tel2cli: e.target.value })} required/>{validationErrors.tel2cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel2cli}</p>}</div>
-                  <div className="md:col-span-2 flex gap-2"><Button type="submit">Guardar</Button><Button type="button" variant="outline" onClick={() => setIsAddingClient(false)}>Cancelar</Button></div>
+                  <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={clientLoading}>{clientLoading ? 'Guardando...' : 'Guardar'}</Button><Button type="button" variant="outline" onClick={() => {setIsAddingClient(false); setEditingClient(null);}}>Cancelar</Button></div>
                 </form>
               </CardContent>
             </Card>
@@ -311,9 +379,9 @@ const Configuracion = () => {
             <CardHeader><CardTitle>Base de Datos de Clientes ({isFiltered ? total : 'N/A'})</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-4">
-                <Label htmlFor="csv-upload-server" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><Upload className="w-4 h-4" />Importar (Servidor)<Input id="csv-upload-server" type="file" accept=".csv" onChange={handleImport} className="sr-only" /></Label>
-                <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><HardDriveUpload className="w-4 h-4" />Importar (Local)<Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" /></Label>
-                <Button onClick={() => setIsAddingClient(true)}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
+                <Label htmlFor="csv-upload-server" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><Upload className="w-4 h-4" />Importar (Servidor)<Input id="csv-upload-server" type="file" accept=".csv" onChange={handleImport} className="sr-only" disabled={clientLoading} /></Label>
+                <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><HardDriveUpload className="w-4 h-4" />Importar (Local)<Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" disabled={isLocalImporting} /></Label>
+                <Button onClick={() => setIsAddingClient(true)} disabled={isAddingClient}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
               </div>
               <div className="space-y-2 mb-4 border-t pt-4">
                 <h3 className="text-md font-medium">Filtrar Clientes</h3>
@@ -338,13 +406,14 @@ const Configuracion = () => {
                     {clients.map((client) => (
                       <TableRow key={client.$id}>
                         <TableCell>{client.codcli}</TableCell><TableCell>{client.nomcli}</TableCell><TableCell>{client.tel2cli}</TableCell>
-                        <TableCell className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleEditClient(client)}><Edit className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => client.$id && handleDeleteClient(client.$id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                        <TableCell className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleEditClient(client)}><Edit className="w-4 h-4" /></Button><Button variant="destructive" size="sm" onClick={() => client.$id && handleDeleteClient(client.$id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               )}
-              {!isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">Introduce un criterio de búsqueda y pulsa "Filtrar" para ver los clientes.</p>}
+              {!loadingClients && !isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">Introduce un criterio de búsqueda y pulsa "Filtrar" para ver los clientes.</p>}
+              {!loadingClients && isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">No se encontraron clientes con los filtros aplicados.</p>}
             </CardContent>
           </Card>
           
@@ -360,8 +429,8 @@ const Configuracion = () => {
                       <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
                       <TableCell>{log.filename}</TableCell>
                       <TableCell>{log.successfulImports} / {log.totalProcessed}</TableCell>
-                      <TableCell><Badge variant={log.status === 'completed' ? 'default' : 'destructive'}>{log.status}</Badge></TableCell>
-                      <TableCell>{log.errors.length > 1 && <Button variant="ghost" size="sm" onClick={() => { setImportErrorLogs(log.errors); setShowImportErrorsDialog(true); }}><XCircle className="w-4 h-4 text-red-500" /> {log.errors.length}</Button>}</TableCell>
+                      <TableCell><Badge variant={log.status === 'completed' ? 'default' : log.status === 'completed_with_errors' ? 'secondary' : 'destructive'}>{log.status}</Badge></TableCell>
+                      <TableCell>{log.errors && log.errors.length > 0 && log.errors[0] !== 'Ninguno' && <Button variant="ghost" size="sm" onClick={() => { setImportErrorLogs(log.errors); setShowImportErrorsDialog(true); }}><XCircle className="w-4 h-4 text-red-500" /> {log.errors.length}</Button>}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -372,8 +441,8 @@ const Configuracion = () => {
 
           <AlertDialog open={showImportErrorsDialog} onOpenChange={setShowImportErrorsDialog}>
             <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Errores de Importación</AlertDialogTitle><AlertDialogDescription>Se encontraron los siguientes errores.</AlertDialogDescription></AlertDialogHeader>
-              <div className="max-h-[400px] overflow-y-auto rounded-md bg-slate-950 p-4"><code className="text-white whitespace-pre-wrap">{importErrorLogs.join('\n')}</code></div>
+              <AlertDialogHeader><AlertDialogTitle>Errores de Importación</AlertDialogTitle><AlertDialogDescription>Se encontraron los siguientes errores durante el proceso.</AlertDialogDescription></AlertDialogHeader>
+              <div className="max-h-[400px] overflow-y-auto rounded-md bg-slate-950 p-4"><code className="text-white whitespace-pre-wrap">{importErrorLogs.join('\n\n')}</code></div>
               <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

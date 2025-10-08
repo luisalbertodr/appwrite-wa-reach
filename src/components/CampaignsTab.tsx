@@ -11,15 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send, Filter, Download, Loader2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID } from '@/lib/appwrite';
-import { Functions, ID, Query } from 'appwrite';
+import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID } from '@/lib/appwrite';
+import { Functions, Query } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const functions = new Functions(client);
-const MESSAGE_LOGS_COLLECTION_ID = 'message_logs'; 
 
 interface Progress {
   sent: number;
@@ -60,7 +59,6 @@ export function CampaignsTab() {
   }, []);
   
   useEffect(() => {
-    // Carga inicial de plantillas e historial al montar el componente
     reloadTemplates();
     reloadCampaigns();
   }, [reloadTemplates, reloadCampaigns]);
@@ -109,7 +107,7 @@ export function CampaignsTab() {
       } catch (error) { clearInterval(interval); }
     }, 5000);
     return () => clearInterval(interval);
-  }, [activeCampaignId, progress.total]);
+  }, [activeCampaignId, progress.total, toast]);
 
   const handleCreateTemplate = async () => {
     if (!newTemplate.name || !newTemplate.message) return;
@@ -165,14 +163,13 @@ export function CampaignsTab() {
       
       toast({ title: 'Iniciando Campaña...', description: `Enviando a ${finalAudience.length} clientes.` });
       
-      // La función createExecution ahora usa un objeto como primer parámetro
       await functions.createExecution(
-        'sendWhatsAppFunction', // functionId
+        'sendWhatsAppFunction',
         JSON.stringify({
           clients: finalAudience, template: selectedTemplate,
           config: wahaConfig, campaignId: campaignId,
-        }), // body
-        true // <-- CORRECCIÓN: async puesto a true
+        }),
+        true
       );
       
       reloadCampaigns();
