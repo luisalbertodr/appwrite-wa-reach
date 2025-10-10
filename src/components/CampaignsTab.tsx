@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
 import { Client, Template, Campaign, WahaConfig } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Filter, Download, Loader2, Search } from 'lucide-react';
+import { Send, Filter, Download, Loader2, Search, Clock, ImagePlus, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID } from '@/lib/appwrite';
-import { Functions, Query } from 'appwrite';
+import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
+import { Functions, Query, ID, Models } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,29 +26,58 @@ interface Progress {
   skipped: number;
   total: number;
 }
+interface ImportLog extends Models.Document {
+  timestamp: string;
+  filename: string;
+  successfulImports: number;
+  totalProcessed: number;
+  errors: string[];
+  status: 'completed' | 'completed_with_errors' | 'failed';
+}
 
 const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
 
 export function CampaignsTab() {
-  const { data: clients, loading: loadingClients, applyQueries: applyClientQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_CAMPAIGNS);
-  const { data: templates, create: createTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
+  const { data: clients, total, loading: loadingClients, applyQueries: applyClientQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_CAMPAIGNS, true);
+  const { data: templates, create: createTemplate, update: updateTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
   const { data: campaigns, create: createCampaign, loading: loadingCampaigns, reload: reloadCampaigns } = useAppwriteCollection<Campaign>(CAMPAIGNS_COLLECTION_ID);
   const { data: configs } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
+  const { data: importLogs, loading: loadingImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   const { toast } = useToast();
 
   const [filters, setFilters] = useState({
     nombreApellido: '', email: '', codcli: '', dnicli: '', telefono: '', sexo: 'all',
-    edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: ''
+    edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: '',
+    codposcli: '', pobcli: '', procli: '', codcliMin: '', codcliMax: ''
   });
-  
-  const [newTemplate, setNewTemplate] = useState({ name: '', message: '' });
+
+  const [newTemplate, setNewTemplate] = useState<Omit<Template, '$id'>>({ name: '', messages: ['', '', '', ''], imageUrls: ['', '', '', ''] });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [progress, setProgress] = useState<Progress>({ sent: 0, failed: 0, skipped: 0, total: 0 });
   const [selectedClients, setSelectedClients] = useState<Map<string, Client>>(new Map());
 
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
+
+  const estimatedDuration = useMemo(() => {
+    if (!wahaConfig || selectedClients.size === 0) return 'N/A';
+    const avgDelay = ((wahaConfig.minDelayMs || 2000) + (wahaConfig.maxDelayMs || 5000)) / 2;
+    const avgBatchSize = ((wahaConfig.batchSizeMin || 15) + (wahaConfig.batchSizeMax || 25)) / 2;
+    const avgBatchDelay = ((wahaConfig.batchDelayMsMin || 60000) + (wahaConfig.batchDelayMsMax || 120000)) / 2;
+    const totalDuration = selectedClients.size * avgDelay + Math.floor(selectedClients.size / avgBatchSize) * avgBatchDelay;
+    const hours = Math.floor(totalDuration / 3600000);
+    const minutes = Math.floor((totalDuration % 3600000) / 60000);
+    return `${hours}h ${minutes}m`;
+  }, [wahaConfig, selectedClients.size]);
+
 
   useEffect(() => {
     const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values');
@@ -57,7 +86,7 @@ export function CampaignsTab() {
         setFilters(savedFilters);
     }
   }, []);
-  
+
   useEffect(() => {
     reloadTemplates();
     reloadCampaigns();
@@ -65,9 +94,14 @@ export function CampaignsTab() {
 
   const handleApplyFilters = () => {
     const newQueries: string[] = [];
-    if (filters.nombreApellido) newQueries.push(Query.search('nomcli', filters.nombreApellido));
+    if (filters.nombreApellido) {
+        newQueries.push(Query.search('nomcli', filters.nombreApellido));
+        newQueries.push(Query.search('ape1cli', filters.nombreApellido));
+    }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
     if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
+    if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
+    if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax));
     if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.sexo !== 'all') newQueries.push(Query.equal('sexo', filters.sexo));
@@ -79,15 +113,15 @@ export function CampaignsTab() {
         const interests = filters.intereses.split(',').map(i => i.trim());
         newQueries.push(Query.equal('intereses', interests));
     }
+    if(filters.codposcli) newQueries.push(Query.equal('codposcli', filters.codposcli));
+    if(filters.pobcli) newQueries.push(Query.search('pobcli', filters.pobcli));
+    if(filters.procli) newQueries.push(Query.search('procli', filters.procli));
 
-    if (newQueries.length > 0) {
-        localStorage.setItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values', JSON.stringify(filters));
-        applyClientQueries(newQueries);
-    } else {
-        toast({title: "Aplica al menos un filtro", variant: "destructive"})
-    }
+
+    localStorage.setItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values', JSON.stringify(filters));
+    applyClientQueries(newQueries);
   };
-  
+
   useEffect(() => {
     if (!activeCampaignId) return;
     const interval = setInterval(async () => {
@@ -109,20 +143,51 @@ export function CampaignsTab() {
     return () => clearInterval(interval);
   }, [activeCampaignId, progress.total, toast]);
 
-  const handleCreateTemplate = async () => {
-    if (!newTemplate.name || !newTemplate.message) return;
+  const handleSaveTemplate = async () => {
+    if (!newTemplate.name || newTemplate.messages.every(m => !m)) return;
     try {
-      await createTemplate(newTemplate);
-      setNewTemplate({ name: '', message: '' });
-      toast({ title: 'Plantilla creada' });
+      if (selectedTemplateId) {
+        await updateTemplate(selectedTemplateId, newTemplate);
+        toast({ title: 'Plantilla actualizada' });
+      } else {
+        await createTemplate(newTemplate);
+        toast({ title: 'Plantilla creada' });
+      }
+      setNewTemplate({ name: '', messages: ['', '', '', ''], imageUrls: ['', '', '', ''] });
+      setSelectedTemplateId('');
       reloadTemplates();
-    } catch(e) { toast({ title: 'Error al crear plantilla', variant: 'destructive' }); }
+    } catch(e) { toast({ title: 'Error al guardar plantilla', variant: 'destructive' }); }
   };
   
-  const getTemplateContent = (templateId: string) => {
-    return templates.find(t => t.$id === templateId)?.message || 'Selecciona una plantilla...';
+  const handleLoadTemplate = (templateId: string) => {
+    const template = templates.find(t => t.$id === templateId);
+    if (template) {
+      setSelectedTemplateId(template.$id!);
+      setNewTemplate({
+        name: template.name,
+        messages: template.messages,
+        imageUrls: template.imageUrls,
+      });
+    }
   };
   
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const response = await storage.createFile(IMPORT_BUCKET_ID, ID.unique(), file);
+      const url = `${import.meta.env.VITE_APPWRITE_PUBLIC_ENDPOINT}/storage/buckets/${IMPORT_BUCKET_ID}/files/${response.$id}/view?project=${import.meta.env.VITE_APPWRITE_PROJECT_ID}`;
+      const newImageUrls = [...newTemplate.imageUrls];
+      newImageUrls[index] = url;
+      setNewTemplate({ ...newTemplate, imageUrls: newImageUrls });
+      toast({ title: 'Imagen subida' });
+    } catch (error) {
+      toast({ title: 'Error al subir imagen', variant: 'destructive' });
+    }
+  };
+
+
   const handleSelectClient = (client: Client, isSelected: boolean) => {
     setSelectedClients(prev => {
       const newMap = new Map(prev);
@@ -139,7 +204,7 @@ export function CampaignsTab() {
     }
     setSelectedClients(newMap);
   };
-  
+
   const areAllFilteredSelected = clients.length > 0 && clients.every(client => selectedClients.has(client.$id!));
 
   const startCampaign = async () => {
@@ -155,14 +220,18 @@ export function CampaignsTab() {
     try {
       const campaignDoc = await createCampaign({
         name: `Campaña: ${selectedTemplate.name}`, templateId: selectedTemplateId,
-        status: 'pending', audienceCount: finalAudience.length, createdAt: new Date().toISOString()
+        status: scheduledDate && scheduledTime ? 'scheduled' : 'pending',
+        audienceCount: finalAudience.length, createdAt: new Date().toISOString(),
+        scheduledDate, scheduledTime, startTime, endTime, 
+        selectedMessageIndex: selectedMessageIndex !== null ? selectedMessageIndex : undefined,
+        selectedImageIndex: selectedImageIndex !== null ? selectedImageIndex : undefined
       });
       const campaignId = campaignDoc.$id;
       setActiveCampaignId(campaignId);
       setProgress({ sent: 0, failed: 0, skipped: 0, total: finalAudience.length });
-      
+
       toast({ title: 'Iniciando Campaña...', description: `Enviando a ${finalAudience.length} clientes.` });
-      
+
       await functions.createExecution(
         'sendWhatsAppFunction',
         JSON.stringify({
@@ -171,7 +240,7 @@ export function CampaignsTab() {
         }),
         true
       );
-      
+
       reloadCampaigns();
 
     } catch (error) {
@@ -191,12 +260,12 @@ export function CampaignsTab() {
     link.click();
     toast({ title: 'Exportación completada' });
   };
-  
+
   if (loadingTemplates || loadingCampaigns) return <div className="p-6">Cargando...</div>;
 
   const processedCount = progress.sent + progress.failed + progress.skipped;
   const progressPercentage = progress.total > 0 ? (processedCount / progress.total) * 100 : 0;
-  
+
   return (
     <div className="space-y-6">
       {activeCampaignId && (
@@ -215,25 +284,36 @@ export function CampaignsTab() {
       )}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card>
+        <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Filter className="w-5 h-5" />Segmentación de Audiencia</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Nombre o Apellido</Label><Input value={filters.nombreApellido} onChange={(e) => setFilters({ ...filters, nombreApellido: e.target.value })}/></div>
+              <div><Label>Nombre o Apellido</Label><Input value={filters.nombreApellido} onChange={(e) => setFilters({ ...filters, nombreApellido: e.target.value })}/></div>
                 <div><Label>Email</Label><Input type="email" value={filters.email} onChange={(e) => setFilters({ ...filters, email: e.target.value })}/></div>
                 <div><Label>Cód. Cliente</Label><Input value={filters.codcli} onChange={(e) => setFilters({ ...filters, codcli: e.target.value })}/></div>
+                <div><Label>Cód. Cliente (Desde)</Label><Input value={filters.codcliMin} onChange={(e) => setFilters({ ...filters, codcliMin: e.target.value })}/></div>
+                <div><Label>Cód. Cliente (Hasta)</Label><Input value={filters.codcliMax} onChange={(e) => setFilters({ ...filters, codcliMax: e.target.value })}/></div>
                 <div><Label>DNI/NIE</Label><Input value={filters.dnicli} onChange={(e) => setFilters({ ...filters, dnicli: e.target.value })}/></div>
                 <div><Label>Teléfono</Label><Input type="tel" value={filters.telefono} onChange={(e) => setFilters({ ...filters, telefono: e.target.value })}/></div>
                 <div><Label>Sexo</Label><Select value={filters.sexo} onValueChange={(value) => setFilters({ ...filters, sexo: value })}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem><SelectItem value="H">Hombre</SelectItem><SelectItem value="M">Mujer</SelectItem><SelectItem value="Otro">Otro</SelectItem></SelectContent></Select></div>
+                <div><Label>Edad (Mín)</Label><Input type="number" value={filters.edadMin} onChange={(e) => setFilters({ ...filters, edadMin: e.target.value })}/></div>
+                <div><Label>Edad (Máx)</Label><Input type="number" value={filters.edadMax} onChange={(e) => setFilters({ ...filters, edadMax: e.target.value })}/></div>
+                <div><Label>Facturación (Mín)</Label><Input type="number" value={filters.facturacionMin} onChange={(e) => setFilters({ ...filters, facturacionMin: e.target.value })}/></div>
+                <div><Label>Facturación (Máx)</Label><Input type="number" value={filters.facturacionMax} onChange={(e) => setFilters({ ...filters, facturacionMax: e.target.value })}/></div>
+                <div><Label>Código Postal</Label><Input value={filters.codposcli} onChange={(e) => setFilters({ ...filters, codposcli: e.target.value })}/></div>
+                <div><Label>Población</Label><Input value={filters.pobcli} onChange={(e) => setFilters({ ...filters, pobcli: e.target.value })}/></div>
+                <div><Label>Provincia</Label><Input value={filters.procli} onChange={(e) => setFilters({ ...filters, procli: e.target.value })}/></div>
+                <div><Label>Intereses</Label><Input value={filters.intereses} onChange={(e) => setFilters({ ...filters, intereses: e.target.value })}/></div>
               </div>
               <Button onClick={handleApplyFilters} className="w-full"><Search className="w-4 h-4 mr-2" />Aplicar Filtros</Button>
             </CardContent>
           </Card>
-          
+
+
           <Card>
-            <CardHeader><CardTitle>Previsualización y Selección ({clients.length} visibles, {selectedClients.size} seleccionados)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Previsualización y Selección ({total} visibles, {selectedClients.size} seleccionados)</CardTitle></CardHeader>
             <CardContent>
-               <Button variant="outline" onClick={handleExport} disabled={selectedClients.size === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
+               <Button variant="outline" onClick={handleExport} disabled={clients.length === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
                <ScrollArea className="h-72 w-full rounded-md border">
                 <Table>
                   <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre</TableHead><TableHead>Teléfono</TableHead></TableRow></TableHeader>
@@ -257,23 +337,57 @@ export function CampaignsTab() {
         </div>
 
         <div className="space-y-6">
-          <Card>
+        <Card>
             <CardHeader><CardTitle>Plantillas de Mensaje</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Nombre</Label><Input value={newTemplate.name} onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}/></div>
-              <div><Label>Mensaje</Label><Textarea value={newTemplate.message} onChange={(e) => setNewTemplate({ ...newTemplate, message: e.target.value })} placeholder="Hola [nombre]..."/></div>
-              <Button onClick={handleCreateTemplate} className="w-full">Guardar Plantilla</Button>
-              <hr />
-              <Label>Seleccionar Plantilla Existente</Label>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{templates.map((t) => (<SelectItem key={t.$id} value={t.$id!}>{t.name}</SelectItem>))}</SelectContent></Select>
-              <div className="text-sm p-2 border rounded bg-muted break-words whitespace-pre-wrap">{getTemplateContent(selectedTemplateId)}</div>
+              <div className="flex justify-between items-center">
+                <Label>Cargar Plantilla Existente</Label>
+                <Select onValueChange={handleLoadTemplate}>
+                  <SelectTrigger className="w-1/2"><SelectValue /></SelectTrigger>
+                  <SelectContent>{templates.map((t) => (<SelectItem key={t.$id} value={t.$id!}>{t.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Nombre de la Plantilla</Label><Input value={newTemplate.name} onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}/></div>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-2">
+                  <Checkbox id={`msg-check-${i}`} checked={selectedMessageIndex === i} onCheckedChange={() => setSelectedMessageIndex(selectedMessageIndex === i ? null : i)} />
+                  <Textarea value={newTemplate.messages[i] || ''} onChange={(e) => {
+                    const newMessages = [...newTemplate.messages];
+                    newMessages[i] = e.target.value;
+                    setNewTemplate({ ...newTemplate, messages: newMessages });
+                  }} placeholder={`Hola [nombre], este es el mensaje ${i+1}`}/>
+                </div>
+              ))}
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-2">
+                  <Checkbox id={`img-check-${i}`} checked={selectedImageIndex === i} onCheckedChange={() => setSelectedImageIndex(selectedImageIndex === i ? null : i)} />
+                  <Input value={newTemplate.imageUrls[i] || ''} onChange={(e) => {
+                    const newImageUrls = [...newTemplate.imageUrls];
+                    newImageUrls[i] = e.target.value;
+                    setNewTemplate({ ...newTemplate, imageUrls: newImageUrls });
+                  }} placeholder={`URL de la Imagen ${i+1}`}/>
+                  <Label htmlFor={`image-upload-${i}`} className="cursor-pointer"><ImagePlus className="w-6 h-6" /></Label>
+                  <Input id={`image-upload-${i}`} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, i)} />
+                </div>
+              ))}
+              <Button onClick={handleSaveTemplate} className="w-full"><Save className="w-4 h-4 mr-2" />{selectedTemplateId ? 'Actualizar Plantilla' : 'Guardar Nueva Plantilla'}</Button>
             </CardContent>
           </Card>
-          
+
+
           <Card>
             <CardHeader><CardTitle>Iniciar Campaña</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
+            <CardContent className="space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Fecha de inicio</Label><Input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} /></div>
+                    <div><Label>Hora de inicio</Label><Input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Horas hábiles (desde)</Label><Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} /></div>
+                    <div><Label>Horas hábiles (hasta)</Label><Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
+                </div>
+              <p className="text-sm text-muted-foreground">Se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
+              <p className="text-sm text-muted-foreground">Duración estimada: <strong className="text-primary">{estimatedDuration}</strong></p>
               <Button onClick={startCampaign} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
                 {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
@@ -282,7 +396,7 @@ export function CampaignsTab() {
           </Card>
         </div>
       </div>
-      <Card>
+       <Card>
         <CardHeader><CardTitle>Historial de Campañas</CardTitle></CardHeader>
         <CardContent>
           <Table>

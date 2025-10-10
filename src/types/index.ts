@@ -36,8 +36,8 @@ export interface WhatsAppFunctionResponse {
 export interface Template {
   $id?: string;
   name: string;
-  message: string;
-  imageUrls?: string[];
+  messages: string[];
+  imageUrls: string[];
 }
 
 export interface Campaign {
@@ -52,6 +52,11 @@ export interface Campaign {
     intereses?: string[];
   };
   scheduledDate?: string;
+  scheduledTime?: string;
+  startTime?: string;
+  endTime?: string;
+  selectedMessageIndex?: number;
+  selectedImageIndex?: number;
   status: 'pending' | 'sent' | 'scheduled' | 'failed';
   audienceCount: number;
   createdAt: string;
@@ -67,6 +72,6 @@ export interface WahaConfig {
   batchSizeMax?: number;
   batchDelayMsMin?: number;
   batchDelayMsMax?: number;
-  adminPhoneNumbers?: string[]; // <-- CORRECCIÓN: Cambiado a un array de strings
+  adminPhoneNumbers?: string[];
   notificationInterval?: number;
 }

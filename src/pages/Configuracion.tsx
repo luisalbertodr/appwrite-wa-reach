@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { validateClient, calculateAge } from '@/lib/validators';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ImportLog extends Models.Document {
   timestamp: string;
@@ -38,11 +39,11 @@ const Configuracion = () => {
   const { data: configs, loading: loadingConfig, create: createConfig, update: updateConfig, reload: reloadConfig } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
   const { toast } = useToast();
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
-  
-  const { data: clients, total, loading: loadingClients, create: createClient, update: updateClient, remove: removeClient, applyQueries, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY);
-  
+
+  const { data: clients, total, loading: loadingClients, create: createClient, update: updateClient, remove: removeClient, applyQueries, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY, true);
+
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
-  
+
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & Models.Document) | null>(null);
   const [clientLoading, setClientLoading] = useState(false);
@@ -58,8 +59,9 @@ const Configuracion = () => {
   const [isLocalImporting, setIsLocalImporting] = useState(false);
 
   const [filters, setFilters] = useState({
-      codcli: '', codcliMin: '', codcliMax: '', nomcli: '', email: '', dnicli: '',
-      telefono: '', fecaltaMin: '', fecaltaMax: ''
+      codcli: '', codcliMin: '', codcliMax: '', nomcli: '', ape1cli: '', email: '', dnicli: '',
+      telefono: '', fecaltaMin: '', fecaltaMax: '', dircli: '', codposcli: '', pobcli: '', procli: '',
+      sexo: 'all', edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: ''
   });
   const [isFiltered, setIsFiltered] = useState(false);
 
@@ -79,7 +81,7 @@ const Configuracion = () => {
       });
     }
   }, [configs]);
-  
+
   useEffect(() => {
     const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY + '_values');
     if (savedFiltersJSON) {
@@ -107,7 +109,7 @@ const Configuracion = () => {
   const handleSubmitClient = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors = validateClient(newClient);
-    
+
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast({ title: 'Errores de validación', variant: 'destructive' });
@@ -150,7 +152,7 @@ const Configuracion = () => {
       toast({ title: 'Error al subir archivo', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setClientLoading(false);
-      event.target.value = ''; 
+      event.target.value = '';
     }
   };
 
@@ -174,12 +176,12 @@ const Configuracion = () => {
             facturacion: Number(clientData.facturacion) || 0,
             enviar: clientData.enviar == 1 ? 1 : 0,
           };
-          
+
           const errors = validateClient(clientToSave, false);
           if (Object.keys(errors).length > 0) {
             return { status: 'rejected', reason: `Cliente ${clientData.codcli}: ${Object.values(errors).join(', ')}` };
           }
-          
+
           try {
             const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [
               Query.equal('codcli', clientData.codcli),
@@ -228,7 +230,7 @@ const Configuracion = () => {
 
     event.target.value = '';
   };
-  
+
   const handleDeleteClient = async (id: string) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
     try {
@@ -252,27 +254,27 @@ const Configuracion = () => {
   };
   const handleFilter = () => {
     const newQueries: string[] = [];
-    if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
-    if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax));
+    if (filters.nomcli) {
+        newQueries.push(Query.search('nomcli', filters.nomcli));
+        newQueries.push(Query.search('ape1cli', filters.nomcli));
+    }
     if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
-    if (filters.nomcli) newQueries.push(Query.search('nomcli', filters.nomcli));
     if (filters.email) newQueries.push(Query.search('email', filters.email));
     if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.fecaltaMin) newQueries.push(Query.greaterThanEqual('fecalta', filters.fecaltaMin));
     if (filters.fecaltaMax) newQueries.push(Query.lessThanEqual('fecalta', filters.fecaltaMax));
     
-    if (newQueries.length === 0) {
-      toast({ title: 'Sin filtros', description: 'Por favor, introduce al menos un criterio de búsqueda.', variant: 'destructive' });
-      return;
-    }
-    
     localStorage.setItem(FILTERS_STORAGE_KEY + '_values', JSON.stringify(filters));
     applyQueries(newQueries);
     setIsFiltered(true);
   };
   const handleClearFilters = () => {
-    setFilters({ codcli: '', codcliMin: '', codcliMax: '', nomcli: '', email: '', dnicli: '', telefono: '', fecaltaMin: '', fecaltaMax: ''});
+    setFilters({
+      codcli: '', codcliMin: '', codcliMax: '', nomcli: '', ape1cli: '', email: '', dnicli: '',
+      telefono: '', fecaltaMin: '', fecaltaMax: '', dircli: '', codposcli: '', pobcli: '', procli: '',
+      sexo: 'all', edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: ''
+    });
     localStorage.removeItem(FILTERS_STORAGE_KEY);
     localStorage.removeItem(FILTERS_STORAGE_KEY + '_values');
     applyQueries([]);
@@ -291,11 +293,11 @@ const Configuracion = () => {
     link.click();
     toast({ title: 'Exportación completada' });
   };
-  
+
   if (loadingConfig) {
     return <div className="p-6">Cargando...</div>;
   }
-  
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card">
@@ -351,11 +353,11 @@ const Configuracion = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Button onClick={handleSaveConfig} className="w-full"><Save className="w-4 h-4 mr-2" />Guardar Configuración del Sistema</Button>
-          
+
           <hr className="my-8" />
-          
+
           <div className="flex items-center gap-2">
             <Users className="w-6 h-6" />
             <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
@@ -365,18 +367,51 @@ const Configuracion = () => {
             <Card>
               <CardHeader><CardTitle>{editingClient ? 'Editar Cliente' : 'Agregar Nuevo Cliente'}</CardTitle></CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmitClient} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={handleSubmitClient} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div><Label>Código Cliente</Label><Input value={newClient.codcli} onChange={(e) => setNewClient({ ...newClient, codcli: e.target.value })} required disabled={!!editingClient}/>{validationErrors.codcli && <p className="text-red-500 text-xs mt-1">{validationErrors.codcli}</p>}</div>
-                  <div><Label>Nombre</Label><Input value={newClient.nomcli} onChange={(e) => setNewClient({ ...newClient, nomcli: e.target.value })} required/>{validationErrors.nomcli && <p className="text-red-500 text-xs mt-1">{validationErrors.nomcli}</p>}</div>
-                  <div><Label>Teléfono Principal</Label><Input value={newClient.tel2cli} onChange={(e) => setNewClient({ ...newClient, tel2cli: e.target.value })} required/>{validationErrors.tel2cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel2cli}</p>}</div>
-                  <div className="md:col-span-2 flex gap-2"><Button type="submit" disabled={clientLoading}>{clientLoading ? 'Guardando...' : 'Guardar'}</Button><Button type="button" variant="outline" onClick={() => {setIsAddingClient(false); setEditingClient(null);}}>Cancelar</Button></div>
+                  <div><Label>Nombre</Label><Input value={newClient.nomcli} onChange={(e) => setNewClient({ ...newClient, nomcli: e.target.value })} />{validationErrors.nomcli && <p className="text-red-500 text-xs mt-1">{validationErrors.nomcli}</p>}</div>
+                  <div><Label>Apellidos</Label><Input value={newClient.ape1cli} onChange={(e) => setNewClient({ ...newClient, ape1cli: e.target.value })} />{validationErrors.ape1cli && <p className="text-red-500 text-xs mt-1">{validationErrors.ape1cli}</p>}</div>
+                  <div><Label>Email</Label><Input type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />{validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}</div>
+                  <div><Label>DNI/NIE</Label><Input value={newClient.dnicli} onChange={(e) => setNewClient({ ...newClient, dnicli: e.target.value })} />{validationErrors.dnicli && <p className="text-red-500 text-xs mt-1">{validationErrors.dnicli}</p>}</div>
+                  <div><Label>Teléfono Principal</Label><Input value={newClient.tel2cli} onChange={(e) => setNewClient({ ...newClient, tel2cli: e.target.value })} />{validationErrors.tel2cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel2cli}</p>}</div>
+                  <div><Label>Teléfono Secundario</Label><Input value={newClient.tel1cli} onChange={(e) => setNewClient({ ...newClient, tel1cli: e.target.value })} />{validationErrors.tel1cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel1cli}</p>}</div>
+                  <div><Label>Dirección</Label><Input value={newClient.dircli} onChange={(e) => setNewClient({ ...newClient, dircli: e.target.value })} />{validationErrors.dircli && <p className="text-red-500 text-xs mt-1">{validationErrors.dircli}</p>}</div>
+                  <div><Label>Código Postal</Label><Input value={newClient.codposcli} onChange={(e) => setNewClient({ ...newClient, codposcli: e.target.value })} />{validationErrors.codposcli && <p className="text-red-500 text-xs mt-1">{validationErrors.codposcli}</p>}</div>
+                  <div><Label>Población</Label><Input value={newClient.pobcli} onChange={(e) => setNewClient({ ...newClient, pobcli: e.target.value })} />{validationErrors.pobcli && <p className="text-red-500 text-xs mt-1">{validationErrors.pobcli}</p>}</div>
+                  <div><Label>Provincia</Label><Input value={newClient.procli} onChange={(e) => setNewClient({ ...newClient, procli: e.target.value })} />{validationErrors.procli && <p className="text-red-500 text-xs mt-1">{validationErrors.procli}</p>}</div>
+                  <div><Label>Fecha de Nacimiento</Label><Input type="date" value={newClient.fecnac} onChange={(e) => setNewClient({ ...newClient, fecnac: e.target.value })} />{validationErrors.fecnac && <p className="text-red-500 text-xs mt-1">{validationErrors.fecnac}</p>}</div>
+                  <div><Label>Fecha de Alta</Label><Input type="date" value={newClient.fecalta} onChange={(e) => setNewClient({ ...newClient, fecalta: e.target.value })} />{validationErrors.fecalta && <p className="text-red-500 text-xs mt-1">{validationErrors.fecalta}</p>}</div>
+                  <div><Label>Sexo</Label>
+                    <Select value={newClient.sexo} onValueChange={(value) => setNewClient({ ...newClient, sexo: value as 'H' | 'M' | 'Otro' })}>
+                      <SelectTrigger><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="H">Hombre</SelectItem>
+                        <SelectItem value="M">Mujer</SelectItem>
+                        <SelectItem value="Otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.sexo && <p className="text-red-500 text-xs mt-1">{validationErrors.sexo}</p>}
+                  </div>
+                   <div><Label>Enviar Publicidad</Label>
+                    <Select value={newClient.enviar?.toString()} onValueChange={(value) => setNewClient({ ...newClient, enviar: Number(value) as 0 | 1 })}>
+                      <SelectTrigger><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Sí</SelectItem>
+                        <SelectItem value="0">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.enviar && <p className="text-red-500 text-xs mt-1">{validationErrors.enviar}</p>}
+                  </div>
+                  <div><Label>Facturación</Label><Input type="number" value={newClient.facturacion} onChange={(e) => setNewClient({ ...newClient, facturacion: Number(e.target.value) })} /></div>
+                  <div className="md:col-span-3"><Label>Intereses (separados por comas)</Label><Input value={newClient.intereses?.join(', ')} onChange={(e) => setNewClient({ ...newClient, intereses: e.target.value.split(',').map(i => i.trim()) })} /></div>
+                  <div className="md:col-span-3 flex gap-2"><Button type="submit" disabled={clientLoading}>{clientLoading ? 'Guardando...' : 'Guardar'}</Button><Button type="button" variant="outline" onClick={() => {setIsAddingClient(false); setEditingClient(null);}}>Cancelar</Button></div>
                 </form>
               </CardContent>
             </Card>
           )}
 
           <Card>
-            <CardHeader><CardTitle>Base de Datos de Clientes ({isFiltered ? total : 'N/A'})</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Base de Datos de Clientes ({total})</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-4">
                 <Label htmlFor="csv-upload-server" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><Upload className="w-4 h-4" />Importar (Servidor)<Input id="csv-upload-server" type="file" accept=".csv" onChange={handleImport} className="sr-only" disabled={clientLoading} /></Label>
@@ -386,8 +421,8 @@ const Configuracion = () => {
               <div className="space-y-2 mb-4 border-t pt-4">
                 <h3 className="text-md font-medium">Filtrar Clientes</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <Input value={filters.nomcli} onChange={(e) => setFilters({...filters, nomcli: e.target.value})} placeholder="Nombre y Apellidos"/>
                   <Input value={filters.codcli} onChange={(e) => setFilters({...filters, codcli: e.target.value})} placeholder="Cód. Cliente"/>
-                  <Input value={filters.nomcli} onChange={(e) => setFilters({...filters, nomcli: e.target.value})} placeholder="Nombre"/>
                   <Input value={filters.email} onChange={(e) => setFilters({...filters, email: e.target.value})} placeholder="Email"/>
                   <Input value={filters.dnicli} onChange={(e) => setFilters({...filters, dnicli: e.target.value})} placeholder="DNI"/>
                 </div>
@@ -397,9 +432,9 @@ const Configuracion = () => {
                   <Button variant="outline" onClick={handleExport} disabled={clients.length === 0}><Download className="w-4 h-4 mr-2" />Exportar</Button>
                 </div>
               </div>
-              
+
               {loadingClients && <p>Buscando clientes...</p>}
-              {!loadingClients && (isFiltered || clients.length > 0) && (
+              {!loadingClients && (
                 <Table>
                   <TableHeader><TableRow><TableHead>Cód.</TableHead><TableHead>Nombre</TableHead><TableHead>Teléfono</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
                   <TableBody>
@@ -412,11 +447,9 @@ const Configuracion = () => {
                   </TableBody>
                 </Table>
               )}
-              {!loadingClients && !isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">Introduce un criterio de búsqueda y pulsa "Filtrar" para ver los clientes.</p>}
-              {!loadingClients && isFiltered && clients.length === 0 && <p className="text-center text-muted-foreground p-4 border rounded-md">No se encontraron clientes con los filtros aplicados.</p>}
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader><CardTitle>Historial de Importaciones</CardTitle></CardHeader>
             <CardContent>

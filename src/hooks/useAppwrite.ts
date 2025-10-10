@@ -1,32 +1,41 @@
 import { useState, useEffect, useCallback } from 'react';
 import { databases, DATABASE_ID } from '@/lib/appwrite';
-import { ID, Models } from 'appwrite';
+import { ID, Models, Query } from 'appwrite';
 import { getAppwriteErrorMessage } from '@/lib/appwriteErrors';
 
-export function useAppwriteCollection<T>(collectionId: string, storageKey?: string) {
+export function useAppwriteCollection<T>(collectionId: string, storageKey?: string, manual: boolean = false) {
   const [data, setData] = useState<(T & Models.Document)[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!manual);
   const [error, setError] = useState<string | null>(null);
   const [queries, setQueries] = useState<string[]>([]);
+  const [hasBeenTriggered, setHasBeenTriggered] = useState(false);
 
   const loadData = useCallback(async (currentQueries: string[]) => {
-    if (storageKey && currentQueries.length === 0) {
-      setData([]);
-      setTotal(0);
-      setLoading(false);
-      return;
+    if (manual && !hasBeenTriggered) {
+        setData([]);
+        setTotal(0);
+        setLoading(false);
+        return;
     }
     
     setLoading(true);
     setError(null);
     try {
-      const response = await databases.listDocuments<T & Models.Document>(
-        DATABASE_ID,
-        collectionId,
-        currentQueries.length > 0 ? currentQueries : undefined
-      );
-      setData(response.documents);
+      let allDocuments: (T & Models.Document)[] = [];
+      let offset = 0;
+      let response;
+      do {
+        response = await databases.listDocuments<T & Models.Document>(
+          DATABASE_ID,
+          collectionId,
+          [...currentQueries, Query.limit(100), Query.offset(offset)]
+        );
+        allDocuments = allDocuments.concat(response.documents);
+        offset += response.documents.length;
+      } while (offset < response.total);
+
+      setData(allDocuments);
       setTotal(response.total);
     } catch (err) {
       console.error('Error loading data:', err);
@@ -36,32 +45,17 @@ export function useAppwriteCollection<T>(collectionId: string, storageKey?: stri
     } finally {
       setLoading(false);
     }
-  }, [collectionId, storageKey]);
+  }, [collectionId, manual, hasBeenTriggered]);
 
   useEffect(() => {
-    if (storageKey) {
-      const savedQueriesJSON = localStorage.getItem(storageKey);
-      if (savedQueriesJSON) {
-        try {
-            const savedQueries = JSON.parse(savedQueriesJSON);
-            if (savedQueries && Array.isArray(savedQueries) && savedQueries.length > 0) {
-                setQueries(savedQueries);
-                loadData(savedQueries);
-                return;
-            }
-        } catch (e) {
-            console.error("Failed to parse saved queries from localStorage", e);
-            localStorage.removeItem(storageKey);
-        }
-      }
-      setLoading(false);
-    } else {
+    if (!manual) {
       loadData([]);
     }
-  }, [collectionId, storageKey, loadData]);
+  }, [collectionId, loadData, manual]);
 
   const applyQueries = useCallback((newQueries: string[]) => {
     setQueries(newQueries);
+    setHasBeenTriggered(true);
     if (storageKey) {
       localStorage.setItem(storageKey, JSON.stringify(newQueries));
     }
