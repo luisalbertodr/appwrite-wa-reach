@@ -122,28 +122,6 @@
             "entrypoint": "src/main.js",
             "commands": "npm install",
             "path": "functions/sendWhatsAppFunction"
-        },
-        {
-            "$id": "migrateFullName",
-            "execute": [
-                "users"
-            ],
-            "name": "migrateFullName",
-            "enabled": true,
-            "logging": true,
-            "runtime": "node-16.0",
-            "scopes": [
-                "databases.read",
-                "databases.write",
-                "documents.read",
-                "documents.write"
-            ],
-            "events": [],
-            "schedule": "",
-            "timeout": 600,
-            "entrypoint": "src/main.js",
-            "commands": "npm install",
-            "path": "functions/migrateFullName"
         }
     ],
     "tablesDB": [

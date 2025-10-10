@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Shield, Bot, Plus, Upload, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download, Users, ArrowLeft } from 'lucide-react';
+import { Save, Shield, Bot, Plus, Edit, Trash2, XCircle, Search, RotateCcw, HardDriveUpload, Download, Users, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CONFIG_COLLECTION_ID, CLIENTS_COLLECTION_ID, DATABASE_ID, databases, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { ID, Query, Models } from 'appwrite';
@@ -47,7 +47,7 @@ const Configuracion = () => {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editingClient, setEditingClient] = useState<(Client & Models.Document) | null>(null);
   const [clientLoading, setClientLoading] = useState(false);
-  const [newClient, setNewClient] = useState<Omit<Client, '$id' | 'edad' | 'importErrors'>>({
+  const [newClient, setNewClient] = useState<Omit<Client, '$id' | 'edad' | 'importErrors' | 'nombre_completo'>>({
     codcli: '', nomcli: '', ape1cli: '', email: '', dnicli: '', dircli: '',
     codposcli: '', pobcli: '', procli: '', tel1cli: '', tel2cli: '', fecnac: '',
     enviar: 1, sexo: 'Otro', fecalta: new Date().toISOString().split('T')[0],
@@ -120,6 +120,7 @@ const Configuracion = () => {
     try {
       const clientToSave: Omit<Client, '$id'> = {
         ...newClient,
+        nombre_completo: `${newClient.nomcli || ''} ${newClient.ape1cli || ''}`.trim(),
         edad: calculateAge(newClient.fecnac || ''),
         facturacion: newClient.facturacion || 0,
       };
@@ -140,22 +141,6 @@ const Configuracion = () => {
     }
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setClientLoading(true);
-    try {
-      await storage.createFile(IMPORT_BUCKET_ID, ID.unique(), file);
-      toast({ title: 'Archivo CSV subido', description: 'Procesando en el servidor...' });
-      setTimeout(reloadImportLogs, 3000);
-    } catch (error) {
-      toast({ title: 'Error al subir archivo', description: (error as Error).message, variant: 'destructive' });
-    } finally {
-      setClientLoading(false);
-      event.target.value = '';
-    }
-  };
-
   const handleLocalImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -172,6 +157,7 @@ const Configuracion = () => {
         const importPromises = clientsToImport.map(async (clientData) => {
           const clientToSave: Partial<Client> = {
             ...clientData,
+            nombre_completo: clientData.nombre_completo,
             edad: calculateAge(clientData.fecnac || ''),
             facturacion: Number(clientData.facturacion) || 0,
             enviar: clientData.enviar == 1 ? 1 : 0,
@@ -254,10 +240,7 @@ const Configuracion = () => {
   };
   const handleFilter = () => {
     const newQueries: string[] = [];
-    if (filters.nomcli) {
-        newQueries.push(Query.search('nomcli', filters.nomcli));
-        newQueries.push(Query.search('ape1cli', filters.nomcli));
-    }
+    if (filters.nomcli) newQueries.push(Query.search('nombre_completo', filters.nomcli));
     if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
     if (filters.email) newQueries.push(Query.search('email', filters.email));
     if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
@@ -414,7 +397,6 @@ const Configuracion = () => {
             <CardHeader><CardTitle>Base de Datos de Clientes ({total})</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-4">
-                <Label htmlFor="csv-upload-server" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><Upload className="w-4 h-4" />Importar (Servidor)<Input id="csv-upload-server" type="file" accept=".csv" onChange={handleImport} className="sr-only" disabled={clientLoading} /></Label>
                 <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><HardDriveUpload className="w-4 h-4" />Importar (Local)<Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" disabled={isLocalImporting} /></Label>
                 <Button onClick={() => setIsAddingClient(true)} disabled={isAddingClient}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
               </div>
