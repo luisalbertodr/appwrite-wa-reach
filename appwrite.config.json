@@ -102,27 +102,49 @@
             "path": "functions/ImportCsvFunction"
         },
         {
-        "$id": "sendWhatsAppFunction",
-        "execute": [
-            "users"
-        ],
-        "name": "sendWhatsAppFunction",
-        "enabled": true,
-        "logging": true,
-        "runtime": "node-16.0",
-        "scopes": [
-            "databases.read",
-            "databases.write",
-            "documents.read",
-            "documents.write"
-        ],
-        "events": [],
-        "schedule": "",
-        "timeout": 300,
-        "entrypoint": "src/main.js",
-        "commands": "npm install",
-        "path": "functions/sendWhatsAppFunction"
-    }
+            "$id": "sendWhatsAppFunction",
+            "execute": [
+                "users"
+            ],
+            "name": "sendWhatsAppFunction",
+            "enabled": true,
+            "logging": true,
+            "runtime": "node-16.0",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "documents.read",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 300,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "path": "functions/sendWhatsAppFunction"
+        },
+        {
+            "$id": "migrateFullName",
+            "execute": [
+                "users"
+            ],
+            "name": "migrateFullName",
+            "enabled": true,
+            "logging": true,
+            "runtime": "node-16.0",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "documents.read",
+                "documents.write"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 600,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "path": "functions/migrateFullName"
+        }
     ],
     "tablesDB": [
         {
@@ -209,8 +231,8 @@
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -250,8 +272,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -259,8 +281,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -268,8 +290,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -277,8 +299,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -286,8 +308,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -295,8 +317,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -313,8 +335,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 }
             ],
@@ -469,8 +491,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -478,8 +500,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": 1
                 },
                 {
@@ -541,8 +563,8 @@
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -550,8 +572,8 @@
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {

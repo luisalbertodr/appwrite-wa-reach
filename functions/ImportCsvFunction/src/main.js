@@ -4,11 +4,12 @@ const Papa = require('papaparse');
 // Initialize Appwrite SDK
 const client = new Client();
 
-// Usar variables de entorno internas de Appwrite para la conexión
-client
-    .setEndpoint(process.env.APPWRITE_FUNCTION_ENDPOINT ?? 'http://appwrite/v1') 
-    .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(process.env.APPWRITE_API_KEY);
+// ***************************************************************
+// *** CONEXIÓN FINAL: Usamos el Gateway de Docker y Project ID fijo ***
+// ***************************************************************
+client.setEndpoint('http://172.19.0.1/v1'); // IP del Gateway de la red 'appwrite'
+client.setProject('68d6d4060020e39899f6'); // Project ID fijo
+client.setKey(process.env.APPWRITE_API_KEY); // API Key de entorno
 
 const databases = new Databases(client);
 const storage = new Storage(client);
@@ -254,7 +255,8 @@ module.exports = async ({ req, res, log, error }) => {
 
             try {
                 const clientToSave = { 
-                    ...newClientRecord, 
+                    ...newClientRecord,
+                      nombre_completo: `${newClientRecord.nomcli || ''} ${newClientRecord.ape1cli || ''}`.trim(),
                     edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
                 };
                 

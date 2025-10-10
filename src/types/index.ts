@@ -3,6 +3,7 @@ export interface Client {
   codcli: string; 
   nomcli?: string;
   ape1cli?: string;
+  nombre_completo?: string; // <--- AÑADIDO
   email?: string;
   dnicli?: string; 
   dircli?: string;
