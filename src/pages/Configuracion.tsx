@@ -191,9 +191,9 @@ const Configuracion = () => {
   const handleFilter = () => {
     const newQueries: string[] = [];
     if (filters.nomcli) newQueries.push(Query.search('nombre_completo', filters.nomcli));
-    if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
+    if (filters.codcli) newQueries.push(Query.search('codcli', filters.codcli));
     if (filters.email) newQueries.push(Query.search('email', filters.email));
-    if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
+    if (filters.dnicli) newQueries.push(Query.search('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.fecaltaMin) newQueries.push(Query.greaterThanEqual('fecalta', filters.fecaltaMin));
     if (filters.fecaltaMax) newQueries.push(Query.lessThanEqual('fecalta', filters.fecaltaMax));
@@ -291,100 +291,14 @@ const Configuracion = () => {
 
           <hr className="my-8" />
 
-          <div className="flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
-          </div>
-
-          {isAddingClient && (
-            <Card>
-              <CardHeader><CardTitle>{editingClient ? 'Editar Cliente' : 'Agregar Nuevo Cliente'}</CardTitle></CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitClient} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><Label>Código Cliente</Label><Input value={newClient.codcli} onChange={(e) => setNewClient({ ...newClient, codcli: e.target.value })} required disabled={!!editingClient}/>{validationErrors.codcli && <p className="text-red-500 text-xs mt-1">{validationErrors.codcli}</p>}</div>
-                  <div><Label>Nombre</Label><Input value={newClient.nomcli} onChange={(e) => setNewClient({ ...newClient, nomcli: e.target.value })} />{validationErrors.nomcli && <p className="text-red-500 text-xs mt-1">{validationErrors.nomcli}</p>}</div>
-                  <div><Label>Apellidos</Label><Input value={newClient.ape1cli} onChange={(e) => setNewClient({ ...newClient, ape1cli: e.target.value })} />{validationErrors.ape1cli && <p className="text-red-500 text-xs mt-1">{validationErrors.ape1cli}</p>}</div>
-                  <div><Label>Email</Label><Input type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />{validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}</div>
-                  <div><Label>DNI/NIE</Label><Input value={newClient.dnicli} onChange={(e) => setNewClient({ ...newClient, dnicli: e.target.value })} />{validationErrors.dnicli && <p className="text-red-500 text-xs mt-1">{validationErrors.dnicli}</p>}</div>
-                  <div><Label>Teléfono Principal</Label><Input value={newClient.tel2cli} onChange={(e) => setNewClient({ ...newClient, tel2cli: e.target.value })} />{validationErrors.tel2cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel2cli}</p>}</div>
-                  <div><Label>Teléfono Secundario</Label><Input value={newClient.tel1cli} onChange={(e) => setNewClient({ ...newClient, tel1cli: e.target.value })} />{validationErrors.tel1cli && <p className="text-red-500 text-xs mt-1">{validationErrors.tel1cli}</p>}</div>
-                  <div><Label>Dirección</Label><Input value={newClient.dircli} onChange={(e) => setNewClient({ ...newClient, dircli: e.target.value })} />{validationErrors.dircli && <p className="text-red-500 text-xs mt-1">{validationErrors.dircli}</p>}</div>
-                  <div><Label>Código Postal</Label><Input value={newClient.codposcli} onChange={(e) => setNewClient({ ...newClient, codposcli: e.target.value })} />{validationErrors.codposcli && <p className="text-red-500 text-xs mt-1">{validationErrors.codposcli}</p>}</div>
-                  <div><Label>Población</Label><Input value={newClient.pobcli} onChange={(e) => setNewClient({ ...newClient, pobcli: e.target.value })} />{validationErrors.pobcli && <p className="text-red-500 text-xs mt-1">{validationErrors.pobcli}</p>}</div>
-                  <div><Label>Provincia</Label><Input value={newClient.procli} onChange={(e) => setNewClient({ ...newClient, procli: e.target.value })} />{validationErrors.procli && <p className="text-red-500 text-xs mt-1">{validationErrors.procli}</p>}</div>
-                  <div><Label>Fecha de Nacimiento</Label><Input type="date" value={newClient.fecnac} onChange={(e) => setNewClient({ ...newClient, fecnac: e.target.value })} />{validationErrors.fecnac && <p className="text-red-500 text-xs mt-1">{validationErrors.fecnac}</p>}</div>
-                  <div><Label>Fecha de Alta</Label><Input type="date" value={newClient.fecalta} onChange={(e) => setNewClient({ ...newClient, fecalta: e.target.value })} />{validationErrors.fecalta && <p className="text-red-500 text-xs mt-1">{validationErrors.fecalta}</p>}</div>
-                  <div><Label>Sexo</Label>
-                    <Select value={newClient.sexo} onValueChange={(value) => setNewClient({ ...newClient, sexo: value as 'H' | 'M' | 'Otro' })}>
-                      <SelectTrigger><SelectValue/></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="H">Hombre</SelectItem>
-                        <SelectItem value="M">Mujer</SelectItem>
-                        <SelectItem value="Otro">Otro</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.sexo && <p className="text-red-500 text-xs mt-1">{validationErrors.sexo}</p>}
-                  </div>
-                   <div><Label>Enviar Publicidad</Label>
-                    <Select value={newClient.enviar?.toString()} onValueChange={(value) => setNewClient({ ...newClient, enviar: Number(value) as 0 | 1 })}>
-                      <SelectTrigger><SelectValue/></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Sí</SelectItem>
-                        <SelectItem value="0">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.enviar && <p className="text-red-500 text-xs mt-1">{validationErrors.enviar}</p>}
-                  </div>
-                  <div><Label>Facturación</Label><Input type="number" value={newClient.facturacion} onChange={(e) => setNewClient({ ...newClient, facturacion: Number(e.target.value) })} /></div>
-                  <div className="md:col-span-3"><Label>Intereses (separados por comas)</Label><Input value={newClient.intereses?.join(', ')} onChange={(e) => setNewClient({ ...newClient, intereses: e.target.value.split(',').map(i => i.trim()) })} /></div>
-                  <div className="md:col-span-3 flex gap-2"><Button type="submit" disabled={clientLoading}>{clientLoading ? 'Guardando...' : 'Guardar'}</Button><Button type="button" variant="outline" onClick={() => {setIsAddingClient(false); setEditingClient(null);}}>Cancelar</Button></div>
-                </form>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader><CardTitle>Base de Datos de Clientes ({total})</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2 mb-4">
-                <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><HardDriveUpload className="w-4 h-4" />Importar (Local)<Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" disabled={isLocalImporting} /></Label>
-                <Button onClick={() => setIsAddingClient(true)} disabled={isAddingClient}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
-              </div>
-              <div className="space-y-2 mb-4 border-t pt-4">
-                <h3 className="text-md font-medium">Filtrar Clientes</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Input value={filters.nomcli} onChange={(e) => setFilters({...filters, nomcli: e.target.value})} placeholder="Nombre y Apellidos"/>
-                  <Input value={filters.codcli} onChange={(e) => setFilters({...filters, codcli: e.target.value})} placeholder="Cód. Cliente"/>
-                  <Input value={filters.email} onChange={(e) => setFilters({...filters, email: e.target.value})} placeholder="Email"/>
-                  <Input value={filters.dnicli} onChange={(e) => setFilters({...filters, dnicli: e.target.value})} placeholder="DNI"/>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handleFilter}><Search className="w-4 h-4 mr-2" />Filtrar</Button>
-                  <Button variant="outline" onClick={handleClearFilters}><RotateCcw className="w-4 h-4 mr-2" />Limpiar</Button>
-                  <Button variant="outline" onClick={handleExport} disabled={clients.length === 0}><Download className="w-4 h-4 mr-2" />Exportar</Button>
-                </div>
-              </div>
-
-              {loadingClients && <p>Buscando clientes...</p>}
-              {!loadingClients && (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Cód.</TableHead><TableHead>Nombre</TableHead><TableHead>Teléfono</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {clients.map((client) => (
-                      <TableRow key={client.$id}>
-                        <TableCell>{client.codcli}</TableCell><TableCell>{client.nomcli}</TableCell><TableCell>{client.tel2cli}</TableCell>
-                        <TableCell className="flex gap-2"><Button variant="outline" size="sm" onClick={() => handleEditClient(client)}><Edit className="w-4 h-4" /></Button><Button variant="destructive" size="sm" onClick={() => client.$id && handleDeleteClient(client.$id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader><CardTitle>Historial de Importaciones</CardTitle></CardHeader>
             <CardContent>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer"><HardDriveUpload className="w-4 h-4" />Importar<Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" disabled={isLocalImporting} /></Label>
+                <Button onClick={() => setIsAddingClient(true)} disabled={isAddingClient}><Plus className="w-4 h-4 mr-2" />Nuevo Cliente</Button>
+              </div>
               {loadingImportLogs ? <p>Cargando historial...</p> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Archivo</TableHead><TableHead>Resultado</TableHead><TableHead>Estado</TableHead><TableHead>Errores</TableHead></TableRow></TableHeader>

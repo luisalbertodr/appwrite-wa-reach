@@ -95,8 +95,11 @@ export function CampaignsTab() {
   const handleApplyFilters = () => {
     const newQueries: string[] = [];
     if (filters.nombreApellido) {
-        newQueries.push(Query.search('nomcli', filters.nombreApellido));
-        newQueries.push(Query.search('ape1cli', filters.nombreApellido));
+        const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
+        if (searchWords.length > 0) {
+            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
+            newQueries.push(Query.and(searchConditions));
+        }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
     if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
@@ -316,14 +319,14 @@ export function CampaignsTab() {
                <Button variant="outline" onClick={handleExport} disabled={clients.length === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
                <ScrollArea className="h-72 w-full rounded-md border">
                 <Table>
-                  <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre</TableHead><TableHead>Teléfono</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre Completo</TableHead><TableHead>Teléfono</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {loadingClients ? <TableRow><TableCell colSpan={4} className="text-center">Cargando...</TableCell></TableRow> :
                     clients.length > 0 ? (
                       clients.map((client) => (
                         <TableRow key={client.$id} data-state={selectedClients.has(client.$id!) && 'selected'}>
                           <TableCell><Checkbox checked={selectedClients.has(client.$id!)} onCheckedChange={(c) => handleSelectClient(client, Boolean(c))}/></TableCell>
-                          <TableCell>{client.codcli}</TableCell><TableCell>{client.nomcli}</TableCell><TableCell>{client.tel2cli}</TableCell>
+                          <TableCell>{client.codcli}</TableCell><TableCell>{client.nombre_completo}</TableCell><TableCell>{client.tel2cli}</TableCell>
                         </TableRow>
                       ))
                     ) : (

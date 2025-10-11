@@ -149,10 +149,11 @@ module.exports = async ({ req, res, log, error }) => {
                 fecalta: convertDate(clientData.fecalta),
             };
 
+            const clientSpecificErrors = [];
             const errors = validateClient(newClientRecord, false);
             if (Object.keys(errors).length > 0) {
-                importErrors.push(`Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${Object.values(errors).join(', ')}`);
-                continue;
+                clientSpecificErrors.push(...Object.values(errors));
+                importErrors.push(`Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${clientSpecificErrors.join(', ')}`);
             }
 
             try {
@@ -160,6 +161,7 @@ module.exports = async ({ req, res, log, error }) => {
                     ...newClientRecord,
                     nombre_completo: `${newClientRecord.nomcli || ''} ${newClientRecord.ape1cli || ''}`.trim(),
                     edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
+                    importErrors: clientSpecificErrors,
                 };
                 
                 const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [Query.equal('codcli', newClientRecord.codcli)]);
