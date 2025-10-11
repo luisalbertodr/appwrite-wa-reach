@@ -141,78 +141,28 @@ const Configuracion = () => {
     }
   };
 
-  const handleLocalImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocalImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsLocalImporting(true);
     setClientLoading(true);
-    toast({ title: 'Iniciando importación local...' });
+    toast({ title: 'Subiendo archivo para importación...', description: 'El proceso de importación continuará en segundo plano.' });
 
-    Papa.parse<Client>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        const clientsToImport = results.data;
-        const importPromises = clientsToImport.map(async (clientData) => {
-          const clientToSave: Partial<Client> = {
-            ...clientData,
-            nombre_completo: clientData.nombre_completo,
-            edad: calculateAge(clientData.fecnac || ''),
-            facturacion: Number(clientData.facturacion) || 0,
-            enviar: clientData.enviar == 1 ? 1 : 0,
-          };
-
-          const errors = validateClient(clientToSave, false);
-          if (Object.keys(errors).length > 0) {
-            return { status: 'rejected', reason: `Cliente ${clientData.codcli}: ${Object.values(errors).join(', ')}` };
-          }
-
-          try {
-            const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [
-              Query.equal('codcli', clientData.codcli),
-            ]);
-
-            if (existing.documents.length > 0) {
-              return updateClient(existing.documents[0].$id, clientToSave);
-            } else {
-              return createClient(clientToSave as Client, clientData.codcli);
-            }
-          } catch (error: any) {
-            return { status: 'rejected', reason: `Error al importar cliente ${clientData.codcli}: ${error.message}` };
-          }
-        });
-
-        const outcomes = await Promise.allSettled(importPromises);
-        const successfulImports = outcomes.filter(o => o.status === 'fulfilled').length;
-        const importErrors = outcomes
-            .filter((o): o is PromiseRejectedResult => o.status === 'rejected')
-            .map(o => o.reason);
-
-        toast({
-          title: 'Importación Local Completada',
-          description: `${successfulImports} clientes importados, ${importErrors.length} errores.`,
-        });
-
-        if (importErrors.length > 0) {
-          setImportErrorLogs(importErrors);
-          setShowImportErrorsDialog(true);
-        }
-
-        setIsLocalImporting(false);
-        setClientLoading(false);
-        reloadClients();
-      },
-      error: (error: any) => {
-        toast({
-          title: 'Error al parsear el archivo CSV',
-          description: error.message,
-          variant: 'destructive',
-        });
-        setIsLocalImporting(false);
-        setClientLoading(false);
-      },
-    });
+    try {
+      await storage.createFile(IMPORT_BUCKET_ID, ID.unique(), file);
+      toast({ title: 'Archivo subido con éxito', description: 'La importación de clientes ha comenzado en el servidor.' });
+      reloadImportLogs(); // Reload logs to show the new import status
+    } catch (error: any) {
+      toast({
+        title: 'Error al subir el archivo CSV',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLocalImporting(false);
+      setClientLoading(false);
+    }
 
     event.target.value = '';
   };
