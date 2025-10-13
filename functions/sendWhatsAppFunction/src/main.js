@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-const MESSAGE_LOGS_COLLECTION_ID = 'message_logs'; 
+const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
 
 module.exports = async ({ req, res, log, error }) => {
   if (req.method !== 'POST') {
@@ -24,13 +24,13 @@ module.exports = async ({ req, res, log, error }) => {
       return res.json({ success: false, error: 'Server configuration is incomplete.' }, 500);
   }
 
-  const { clients, template, config, campaignId, selectedMessageIndex, selectedImageIndex } = JSON.parse(req.body);
+  const { clients, template, config, campaignId } = JSON.parse(req.body);
 
   if (!clients || !Array.isArray(clients) || !template || !config || !campaignId) {
     error('Payload inválido.');
     return res.json({ success: false, error: 'Invalid payload.' }, 400);
   }
-  
+
   const {
     minDelayMs = 2000, maxDelayMs = 5000,
     batchSizeMin = 15, batchSizeMax = 25,
@@ -42,7 +42,7 @@ module.exports = async ({ req, res, log, error }) => {
   res.json({ success: true, message: 'Campaign process started in the background.' });
 
   log(`Campaña ${campaignId} iniciada para ${clients.length} clientes.`);
-  
+
   const WAHA_API_URL = process.env.WAHA_API_URL;
   const WAHA_API_KEY = process.env.WAHA_API_KEY;
 
@@ -59,7 +59,7 @@ module.exports = async ({ req, res, log, error }) => {
             ID.unique(),
             {
                 campaignId: campaignId,
-                clientId: clientId,
+                clientId: String(clientId),
                 status: status,
                 timestamp: new Date().toISOString(),
                 error: errorMsg,
@@ -83,7 +83,7 @@ module.exports = async ({ req, res, log, error }) => {
         formattedAdminPhoneNumber = `34${formattedAdminPhoneNumber}`;
       }
       formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
-      
+
       try {
           await fetch(`${WAHA_API_URL}/api/sendText`, {
               method: 'POST',
@@ -102,14 +102,9 @@ module.exports = async ({ req, res, log, error }) => {
   let totalSent = 0;
   let totalSkipped = 0;
   let totalFailed = 0;
-  
-  const messageToSend = selectedMessageIndex !== null && template.messages[selectedMessageIndex] 
-    ? template.messages[selectedMessageIndex] 
-    : template.messages[0] || '';
-    
-  const imageUrlToSend = selectedImageIndex !== null && template.imageUrls[selectedImageIndex]
-    ? template.imageUrls[selectedImageIndex]
-    : undefined;
+
+  const validMessages = template.messages.filter(m => m && m.trim() !== '');
+  const validImageUrls = template.imageUrls.filter(url => url && url.trim() !== '');
 
   for (const [index, c] of clients.entries()) {
     if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
@@ -118,33 +113,49 @@ module.exports = async ({ req, res, log, error }) => {
       continue;
     }
 
+    let messageToSend = '';
+    if (validMessages.length > 0) {
+        const randomIndex = Math.floor(Math.random() * validMessages.length);
+        messageToSend = validMessages[randomIndex];
+    }
+
+    let imageUrlToSend = '';
+    if (validImageUrls.length > 0) {
+        const randomIndex = Math.floor(Math.random() * validImageUrls.length);
+        imageUrlToSend = validImageUrls[randomIndex];
+    }
+
+    if (!messageToSend && !imageUrlToSend) {
+        totalSkipped++;
+        await logStatus(c.codcli, 'skipped', 'No hay contenido de plantilla para enviar.');
+        continue;
+    }
+
     const phoneNumber = c.tel2cli;
     let formattedPhoneNumber = phoneNumber;
     if (!formattedPhoneNumber.startsWith('34') && !formattedPhoneNumber.startsWith('+34')) {
       formattedPhoneNumber = `34${formattedPhoneNumber}`;
     }
     formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
-    
+
     let messageContent = messageToSend.replace(/\[nombre\]/g, c.nomcli || '');
-    
+
     log(`Attempting to send message to ${formattedPhoneNumber}`);
 
     try {
       let response;
-      if (imageUrlToSend) {
-        // Enviar imagen con texto
+      if (imageUrlToSend && imageUrlToSend.trim() !== '') {
         response = await fetch(`${WAHA_API_URL}/api/sendImage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
-            body: JSON.stringify({ 
-                chatId: formattedPhoneNumber, 
-                image: imageUrlToSend,
+            body: JSON.stringify({
+                chatId: formattedPhoneNumber,
+                image: { url: imageUrlToSend },
                 caption: messageContent,
-                session: "default" 
+                session: "default"
             }),
         });
       } else {
-        // Enviar solo texto
         response = await fetch(`${WAHA_API_URL}/api/sendText`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
@@ -162,6 +173,7 @@ module.exports = async ({ req, res, log, error }) => {
       }
     } catch (e) {
       totalFailed++;
+      // CORRECCIÓN: Eliminado el type casting (as Error)
       await logStatus(c.codcli, 'failed', `Network error: ${e.message}`);
     }
 
@@ -178,7 +190,7 @@ module.exports = async ({ req, res, log, error }) => {
       await sleep(batchDelay);
     }
   }
-  
+
   log(`Campaña ${campaignId} finalizada.`);
   await sendAdminNotification(`✅ *Campaña Finalizada*\n\n- ID: ${campaignId}\n- Total: ${clients.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
 

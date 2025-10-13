@@ -15,22 +15,27 @@ module.exports = async ({ req, res, log, error }) => {
 
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
     const CLIENTS_COLLECTION_ID = process.env.APPWRITE_CLIENTS_COLLECTION_ID;
-    const IMPORT_LOGS_COLLECTION_ID = process.env.APPWRITE_IMPORT_LOGS_COLLECTION_ID;
+    const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
     const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
 
     let successfulImports = 0;
     let totalProcessed = 0;
     const importErrors = [];
     const importWarnings = [];
-    let errorSummary = {}; // Objeto para contar los tipos de errores
+    let errorSummary = {};
     const timestamp = new Date().toISOString();
     let fileName = 'unknown-file.csv';
 
-    // Función para añadir y contar errores/advertencias
+    // Función para añadir y contar errores/advertencias de forma segura
     const addIssue = (issueList, message) => {
-        issueList.push(message);
-        const errorType = message.split(':')[1]?.split('(')[0].trim() || 'Desconocido';
-        errorSummary[errorType] = (errorSummary[errorType] || 0) + 1;
+        const messageStr = String(message); // Asegura que el mensaje sea siempre un string
+        issueList.push(messageStr);
+        try {
+            const errorType = messageStr.split(':')[1]?.split('(')[0].trim() || 'Desconocido';
+            errorSummary[errorType] = (errorSummary[errorType] || 0) + 1;
+        } catch (e) {
+            errorSummary['Error no categorizado'] = (errorSummary['Error no categorizado'] || 0) + 1;
+        }
     };
 
 
@@ -193,7 +198,7 @@ module.exports = async ({ req, res, log, error }) => {
 
             if (Object.keys(errors).length > 0) {
                 Object.values(errors).forEach(msg => addIssue(importErrors, `Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${msg}`));
-                continue; // Saltar este registro por errores críticos
+                continue;
             }
 
             try {
@@ -201,7 +206,7 @@ module.exports = async ({ req, res, log, error }) => {
                     ...newClientRecord,
                     nombre_completo: `${newClientRecord.nomcli || ''} ${newClientRecord.ape1cli || ''}`.trim(),
                     edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
-                    importErrors: Object.values(warnings), // Guardar advertencias en el registro
+                    importErrors: Object.values(warnings),
                 };
                 
                 const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [Query.equal('codcli', newClientRecord.codcli)]);
@@ -227,14 +232,12 @@ module.exports = async ({ req, res, log, error }) => {
             logStatus = 'completed_with_errors';
         }
         
-        const summaryText = Object.entries(errorSummary).map(([key, value]) => `- Total de ${key}: ${value}`).join('\n');
-        const combinedLog = [
-            '--- RESUMEN ---',
-            summaryText,
-            '--- DETALLES ---',
-            ...importErrors, 
-            ...importWarnings
-        ];
+        const summaryLines = Object.entries(errorSummary).map(([key, value]) => String(`- Total de ${key}: ${value}`));
+        const combinedLog = ['--- RESUMEN ---']
+            .concat(summaryLines)
+            .concat(['--- DETALLES ---'])
+            .concat(importWarnings.map(String))
+            .concat(importErrors.map(String));
 
         const logDoc = { 
             timestamp, 
@@ -252,14 +255,15 @@ module.exports = async ({ req, res, log, error }) => {
 
     } catch (err) {
         error(`Unhandled error during import: ${err.message}`);
+        const errorMessage = (err instanceof AppwriteException) ? `${err.message} (Type: ${err.type})` : err.message;
         try {
             await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), {
                 timestamp, filename: fileName, successfulImports: 0, totalProcessed,
-                errors: [`Error no controlado: ${err.message}`], status: 'failed',
+                errors: [`Error no controlado: ${errorMessage}`], status: 'failed',
             });
         } catch (logError) {
             error(`Failed to save failure log: ${logError.message}`);
         }
-        return res.json({ ok: false, message: `Error interno del servidor: ${err.message}` }, 500);
+        return res.json({ ok: false, message: `Error interno del servidor: ${errorMessage}` }, 500);
     }
 };

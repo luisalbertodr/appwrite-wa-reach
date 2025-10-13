@@ -51,8 +51,6 @@ export function CampaignsTab() {
   const [progress, setProgress] = useState<Progress>({ sent: 0, failed: 0, skipped: 0, total: 0 });
   const [selectedClients, setSelectedClients] = useState<Map<string, Client>>(new Map());
 
-  const [selectedMessageIndex, setSelectedMessageIndex] = useState<number | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -141,13 +139,23 @@ export function CampaignsTab() {
   }, [activeCampaignId, progress.total, toast]);
 
   const handleSaveTemplate = async () => {
-    if (!newTemplate.name || newTemplate.messages.every(m => !m)) return;
+    const finalTemplate = {
+      ...newTemplate,
+      messages: newTemplate.messages.filter(m => m.trim() !== ''),
+      imageUrls: newTemplate.imageUrls.filter(u => u.trim() !== '')
+    };
+
+    if (!finalTemplate.name || (finalTemplate.messages.length === 0 && finalTemplate.imageUrls.length === 0)) {
+      toast({ title: 'Error', description: 'La plantilla debe tener un nombre y al menos un mensaje o imagen.', variant: 'destructive'});
+      return;
+    }
+
     try {
       if (selectedTemplateId) {
-        await updateTemplate(selectedTemplateId, newTemplate);
+        await updateTemplate(selectedTemplateId, finalTemplate);
         toast({ title: 'Plantilla actualizada' });
       } else {
-        await createTemplate(newTemplate);
+        await createTemplate(finalTemplate);
         toast({ title: 'Plantilla creada' });
       }
       setNewTemplate({ name: '', messages: ['', '', '', ''], imageUrls: ['', '', '', ''] });
@@ -162,8 +170,8 @@ export function CampaignsTab() {
       setSelectedTemplateId(template.$id!);
       setNewTemplate({
         name: template.name,
-        messages: template.messages,
-        imageUrls: template.imageUrls,
+        messages: [...template.messages, '', '', '', ''].slice(0, 4), // Asegura que siempre haya 4 campos
+        imageUrls: [...template.imageUrls, '', '', '', ''].slice(0, 4), // Asegura que siempre haya 4 campos
       });
     }
   };
@@ -218,9 +226,7 @@ export function CampaignsTab() {
         name: `Campaña: ${selectedTemplate.name}`, templateId: selectedTemplateId,
         status: scheduledDate && scheduledTime ? 'scheduled' : 'pending',
         audienceCount: finalAudience.length, createdAt: new Date().toISOString(),
-        scheduledDate, scheduledTime, startTime, endTime, 
-        selectedMessageIndex: selectedMessageIndex !== null ? selectedMessageIndex : undefined,
-        selectedImageIndex: selectedImageIndex !== null ? selectedImageIndex : undefined
+        scheduledDate, scheduledTime, startTime, endTime
       });
       const campaignId = campaignDoc.$id;
       setActiveCampaignId(campaignId);
@@ -235,8 +241,6 @@ export function CampaignsTab() {
           template: selectedTemplate,
           config: wahaConfig, 
           campaignId: campaignId,
-          selectedMessageIndex: selectedMessageIndex,
-          selectedImageIndex: selectedImageIndex,
         }),
         true
       );
@@ -399,7 +403,6 @@ export function CampaignsTab() {
               <div><Label>Nombre de la Plantilla</Label><Input value={newTemplate.name} onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}/></div>
               {[0, 1, 2, 3].map(i => (
                 <div key={i} className="flex items-center gap-2">
-                  <Checkbox id={`msg-check-${i}`} checked={selectedMessageIndex === i} onCheckedChange={() => setSelectedMessageIndex(selectedMessageIndex === i ? null : i)} />
                   <Textarea value={newTemplate.messages[i] || ''} onChange={(e) => {
                     const newMessages = [...newTemplate.messages];
                     newMessages[i] = e.target.value;
@@ -409,7 +412,6 @@ export function CampaignsTab() {
               ))}
               {[0, 1, 2, 3].map(i => (
                 <div key={i} className="flex items-center gap-2">
-                  <Checkbox id={`img-check-${i}`} checked={selectedImageIndex === i} onCheckedChange={() => setSelectedImageIndex(selectedImageIndex === i ? null : i)} />
                   <Input value={newTemplate.imageUrls[i] || ''} onChange={(e) => {
                     const newImageUrls = [...newTemplate.imageUrls];
                     newImageUrls[i] = e.target.value;
