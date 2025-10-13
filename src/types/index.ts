@@ -3,7 +3,7 @@ export interface Client {
   codcli: string; 
   nomcli?: string;
   ape1cli?: string;
-  nombre_completo?: string; // <--- AÑADIDO
+  nombre_completo?: string;
   email?: string;
   dnicli?: string; 
   dircli?: string;
@@ -75,4 +75,13 @@ export interface WahaConfig {
   batchDelayMsMax?: number;
   adminPhoneNumbers?: string[];
   notificationInterval?: number;
+}
+
+export interface MessageLog {
+  $id?: string;
+  campaignId: string;
+  clientId: string;
+  status: 'sent' | 'failed' | 'skipped';
+  timestamp: string;
+  error?: string;
 }

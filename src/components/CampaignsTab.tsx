@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { Client, Template, Campaign, WahaConfig } from '@/types';
+import { Client, Template, Campaign, WahaConfig, MessageLog } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Filter, Download, Loader2, Search, Clock, ImagePlus, Save } from 'lucide-react';
+import { Send, Filter, Download, Loader2, Search, Clock, ImagePlus, Save, FileText, Shuffle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { Functions, Query, ID, Models } from 'appwrite';
@@ -17,6 +17,8 @@ import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 const functions = new Functions(client);
 
@@ -65,6 +67,10 @@ export function CampaignsTab() {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
 
+  const [showLogDialog, setShowLogDialog] = useState(false);
+  const [logData, setLogData] = useState<MessageLog[]>([]);
+  const [loadingLog, setLoadingLog] = useState(false);
+
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
 
   const estimatedDuration = useMemo(() => {
@@ -84,6 +90,9 @@ export function CampaignsTab() {
     if (savedFiltersJSON) {
         const savedFilters = JSON.parse(savedFiltersJSON);
         setFilters(savedFilters);
+    } else {
+        // Sin filtros guardados, cargar todos los clientes inicialmente
+        applyClientQueries([]);
     }
   }, []);
 
@@ -95,10 +104,14 @@ export function CampaignsTab() {
   const handleApplyFilters = () => {
     const newQueries: string[] = [];
     if (filters.nombreApellido) {
-        const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
-        if (searchWords.length > 0) {
-            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
-            newQueries.push(Query.and(searchConditions));
+        // Para búsqueda con múltiple palabras, crear queries separadas con AND
+        const searchWords = filters.nombreApellido.trim().split(/\s+/).filter(word => word.length > 0);
+        if (searchWords.length === 1) {
+          // Una sola palabra: usar search normal
+          newQueries.push(Query.search('nombre_completo', filters.nombreApellido));
+        } else {
+          // Múltiples palabras: crear un array con todas las búsquedas individuales
+          newQueries.push(Query.and(searchWords.map(word => Query.search('nombre_completo', word))));
         }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
@@ -210,12 +223,17 @@ export function CampaignsTab() {
 
   const areAllFilteredSelected = clients.length > 0 && clients.every(client => selectedClients.has(client.$id!));
 
-  const startCampaign = async () => {
+  const startCampaign = async (isRandomMode = false) => {
     const selectedTemplate = templates.find(t => t.$id === selectedTemplateId);
     const finalAudience = Array.from(selectedClients.values());
 
     if (!selectedTemplate || finalAudience.length === 0 || !wahaConfig) {
       toast({ title: 'Error', description: 'Selecciona una plantilla y al menos un cliente.', variant: 'destructive' });
+      return;
+    }
+    
+    if (selectedMessageIndex === null && !isRandomMode) {
+      toast({ title: 'Error', description: 'Debes seleccionar un mensaje para enviar o usar el modo aleatorio.', variant: 'destructive' });
       return;
     }
 
@@ -226,8 +244,8 @@ export function CampaignsTab() {
         status: scheduledDate && scheduledTime ? 'scheduled' : 'pending',
         audienceCount: finalAudience.length, createdAt: new Date().toISOString(),
         scheduledDate, scheduledTime, startTime, endTime, 
-        selectedMessageIndex: selectedMessageIndex !== null ? selectedMessageIndex : undefined,
-        selectedImageIndex: selectedImageIndex !== null ? selectedImageIndex : undefined
+        selectedMessageIndex: isRandomMode ? undefined : (selectedMessageIndex ?? undefined),
+        selectedImageIndex: isRandomMode ? undefined : (selectedImageIndex ?? undefined),
       });
       const campaignId = campaignDoc.$id;
       setActiveCampaignId(campaignId);
@@ -238,10 +256,15 @@ export function CampaignsTab() {
       await functions.createExecution(
         'sendWhatsAppFunction',
         JSON.stringify({
-          clients: finalAudience, template: selectedTemplate,
-          config: wahaConfig, campaignId: campaignId,
+          clients: finalAudience, 
+          template: selectedTemplate,
+          config: wahaConfig, 
+          campaignId: campaignId,
+          isRandom: isRandomMode, // Flag para el modo aleatorio
+          selectedMessageIndex: isRandomMode ? null : selectedMessageIndex,
+          selectedImageIndex: isRandomMode ? null : selectedImageIndex,
         }),
-        true
+        false
       );
 
       reloadCampaigns();
@@ -263,6 +286,24 @@ export function CampaignsTab() {
     link.click();
     toast({ title: 'Exportación completada' });
   };
+  
+  const handleViewLog = async (campaignId: string) => {
+    setLoadingLog(true);
+    setShowLogDialog(true);
+    try {
+      const response = await databases.listDocuments<MessageLog & Models.Document>(
+        DATABASE_ID,
+        MESSAGE_LOGS_COLLECTION_ID,
+        [Query.equal('campaignId', campaignId), Query.limit(5000)]
+      );
+      setLogData(response.documents);
+    } catch (error) {
+      toast({ title: 'Error al cargar el log', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      setLoadingLog(false);
+    }
+  };
+
 
   if (loadingTemplates || loadingCampaigns) return <div className="p-6">Cargando...</div>;
 
@@ -316,7 +357,7 @@ export function CampaignsTab() {
           <Card>
             <CardHeader><CardTitle>Previsualización y Selección ({total} visibles, {selectedClients.size} seleccionados)</CardTitle></CardHeader>
             <CardContent>
-               <Button variant="outline" onClick={handleExport} disabled={clients.length === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
+               <Button variant="outline" onClick={handleExport} disabled={selectedClients.size === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
                <ScrollArea className="h-72 w-full rounded-md border">
                 <Table>
                   <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre Completo</TableHead><TableHead>Teléfono</TableHead></TableRow></TableHeader>
@@ -391,10 +432,16 @@ export function CampaignsTab() {
                 </div>
               <p className="text-sm text-muted-foreground">Se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
               <p className="text-sm text-muted-foreground">Duración estimada: <strong className="text-primary">{estimatedDuration}</strong></p>
-              <Button onClick={startCampaign} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
-                {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => startCampaign(false)} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
+                  {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                  {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
+                </Button>
+                <Button onClick={() => startCampaign(true)} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full" variant="secondary">
+                  <Shuffle className="w-4 h-4 mr-2" />
+                  Combinar y Enviar
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -403,7 +450,7 @@ export function CampaignsTab() {
         <CardHeader><CardTitle>Historial de Campañas</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Campaña</TableHead><TableHead>Fecha</TableHead><TableHead>Audiencia</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Campaña</TableHead><TableHead>Fecha</TableHead><TableHead>Audiencia</TableHead><TableHead>Estado</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
             <TableBody>
               {campaigns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((campaign) => (
                 <TableRow key={campaign.$id}>
@@ -411,12 +458,46 @@ export function CampaignsTab() {
                   <TableCell>{new Date(campaign.createdAt).toLocaleString()}</TableCell>
                   <TableCell>{campaign.audienceCount}</TableCell>
                   <TableCell><Badge>{campaign.status}</Badge></TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" onClick={() => handleViewLog(campaign.$id!)}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Ver Log
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={showLogDialog} onOpenChange={setShowLogDialog}>
+        <AlertDialogContent className="max-w-4xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log de la Campaña</AlertDialogTitle>
+            <AlertDialogDescription>Detalles del envío para cada cliente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <ScrollArea className="max-h-[60vh] overflow-y-auto">
+            {loadingLog ? <p>Cargando log...</p> : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Cód. Cliente</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead><TableHead>Error</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {logData.map(log => (
+                  <TableRow key={log.$id}>
+                    <TableCell>{log.clientId}</TableCell>
+                    <TableCell><Badge variant={log.status === 'sent' ? 'default' : log.status === 'failed' ? 'destructive' : 'secondary'}>{log.status}</Badge></TableCell>
+                    <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                    <TableCell className="text-xs">{log.error}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            )}
+          </ScrollArea>
+          <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

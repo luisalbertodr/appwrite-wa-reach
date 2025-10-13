@@ -3,7 +3,12 @@ import { databases, DATABASE_ID } from '@/lib/appwrite';
 import { ID, Models, Query } from 'appwrite';
 import { getAppwriteErrorMessage } from '@/lib/appwriteErrors';
 
-export function useAppwriteCollection<T>(collectionId: string, storageKey?: string, manual: boolean = false) {
+export function useAppwriteCollection<T>(
+  collectionId: string,
+  storageKey?: string,
+  manual: boolean = false,
+  postFilter?: (items: (T & Models.Document)[], queries: string[]) => (T & Models.Document)[]
+) {
   const [data, setData] = useState<(T & Models.Document)[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(!manual);
@@ -18,7 +23,7 @@ export function useAppwriteCollection<T>(collectionId: string, storageKey?: stri
         setLoading(false);
         return;
     }
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -35,8 +40,13 @@ export function useAppwriteCollection<T>(collectionId: string, storageKey?: stri
         offset += response.documents.length;
       } while (offset < response.total);
 
+      // Apply post-filter if provided
+      if (postFilter) {
+        allDocuments = postFilter(allDocuments, currentQueries);
+      }
+
       setData(allDocuments);
-      setTotal(response.total);
+      setTotal(allDocuments.length); // Update total to reflect filtered count
     } catch (err) {
       console.error('Error loading data:', err);
       setError(getAppwriteErrorMessage(err));
@@ -45,13 +55,20 @@ export function useAppwriteCollection<T>(collectionId: string, storageKey?: stri
     } finally {
       setLoading(false);
     }
-  }, [collectionId, manual, hasBeenTriggered]);
+  }, [collectionId, manual, hasBeenTriggered, postFilter]);
 
   useEffect(() => {
     if (!manual) {
       loadData([]);
     }
   }, [collectionId, loadData, manual]);
+
+  // Load initial data for CampaignsTab to show all clients when no filters applied
+  useEffect(() => {
+    if (manual && collectionId === 'clients' && !hasBeenTriggered) {
+      loadData([]);
+    }
+  }, [collectionId, manual, hasBeenTriggered, loadData]);
 
   const applyQueries = useCallback((newQueries: string[]) => {
     setQueries(newQueries);

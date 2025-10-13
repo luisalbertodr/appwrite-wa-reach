@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-const MESSAGE_LOGS_COLLECTION_ID = 'message_logs'; 
+const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
 
 module.exports = async ({ req, res, log, error }) => {
   if (req.method !== 'POST') {
@@ -24,10 +24,10 @@ module.exports = async ({ req, res, log, error }) => {
       return res.json({ success: false, error: 'Server configuration is incomplete.' }, 500);
   }
 
-  const { clients, template, config, campaignId } = JSON.parse(req.body);
+  const { clients, template, config, campaignId, isRandom, selectedMessageIndex, selectedImageIndex } = JSON.parse(req.body);
 
   if (!clients || !Array.isArray(clients) || !template || !config || !campaignId) {
-    error('Payload inválido.');
+    error('Payload inválido. Faltan datos esenciales.');
     return res.json({ success: false, error: 'Invalid payload.' }, 400);
   }
   
@@ -35,7 +35,7 @@ module.exports = async ({ req, res, log, error }) => {
     minDelayMs = 2000, maxDelayMs = 5000,
     batchSizeMin = 15, batchSizeMax = 25,
     batchDelayMsMin = 60000, batchDelayMsMax = 120000,
-    adminPhoneNumbers, // <-- CORRECCIÓN: Usar la nueva variable
+    adminPhoneNumbers,
     notificationInterval = 50
   } = config;
 
@@ -47,22 +47,31 @@ module.exports = async ({ req, res, log, error }) => {
   const WAHA_API_KEY = process.env.WAHA_API_KEY;
 
   if (!WAHA_API_URL || !WAHA_API_KEY) {
-    error('Variables de entorno de Waha no configuradas.');
+    error('Variables de entorno de Waha (WAHA_API_URL o WAHA_API_KEY) no configuradas.');
     return;
   }
 
   const logStatus = async (clientId, status, errorMsg = '') => {
-    // ... (sin cambios aquí)
+      try {
+          await databases.createDocument(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, ID.unique(), {
+              campaignId: campaignId,
+              clientId: clientId,
+              status: status,
+              timestamp: new Date().toISOString(),
+              error: errorMsg || undefined
+          });
+      } catch (e) {
+          error(`Fallo al guardar log para cliente ${clientId}: ${e.message}`);
+      }
   };
 
   const sendAdminNotification = async (text) => {
-    // CORRECCIÓN: Iterar sobre la lista de números de administrador
     if (!adminPhoneNumbers || !Array.isArray(adminPhoneNumbers) || adminPhoneNumbers.length === 0) {
       return;
     }
 
     for (const adminPhoneNumber of adminPhoneNumbers) {
-      if (!adminPhoneNumber) continue; // Saltar si hay una entrada vacía
+      if (!adminPhoneNumber) continue;
 
       let formattedAdminPhoneNumber = adminPhoneNumber.trim();
       if (!formattedAdminPhoneNumber.startsWith('34') && !formattedAdminPhoneNumber.startsWith('+34')) {
@@ -89,11 +98,39 @@ module.exports = async ({ req, res, log, error }) => {
   let totalSkipped = 0;
   let totalFailed = 0;
   
-  for (const [index, c] of clients.entries()) { // Renombrada variable 'client' para evitar conflicto de scope
+  const validMessages = template.messages.map((msg, i) => msg ? i : -1).filter(i => i !== -1);
+  const validImages = template.imageUrls.map((url, i) => url ? i : -1).filter(i => i !== -1);
+
+  for (const [index, c] of clients.entries()) {
     if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
       totalSkipped++;
       await logStatus(c.codcli, 'skipped', 'Opt-out o teléfono inválido');
       continue;
+    }
+
+    let messageToSend;
+    let imageUrlToSend;
+
+    if (isRandom) {
+        const randomMsgIndex = validMessages.length > 0 ? validMessages[getRandomNumber(0, validMessages.length - 1)] : -1;
+        const randomImgIndex = validImages.length > 0 ? validImages[getRandomNumber(0, validImages.length - 1)] : -1;
+        
+        messageToSend = randomMsgIndex !== -1 ? template.messages[randomMsgIndex] : null;
+        imageUrlToSend = randomImgIndex !== -1 ? template.imageUrls[randomImgIndex] : null;
+    } else {
+        messageToSend = (template.messages && typeof selectedMessageIndex === 'number' && template.messages[selectedMessageIndex]) 
+        ? template.messages[selectedMessageIndex]
+        : null;
+        
+        imageUrlToSend = (template.imageUrls && typeof selectedImageIndex === 'number' && template.imageUrls[selectedImageIndex])
+        ? template.imageUrls[selectedImageIndex]
+        : null;
+    }
+
+    if (!messageToSend) {
+        totalSkipped++;
+        await logStatus(c.codcli, 'skipped', 'No se pudo determinar un mensaje válido para enviar.');
+        continue;
     }
 
     const phoneNumber = c.tel2cli;
@@ -103,15 +140,20 @@ module.exports = async ({ req, res, log, error }) => {
     }
     formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
     
-    let messageContent = template.message.replace(/\[nombre\]/g, c.nomcli || '');
+    const messageContent = (messageToSend || '').replace(/\[nombre\]/g, c.nomcli || '');
     
     log(`Attempting to send message to ${formattedPhoneNumber}`);
 
     try {
-      const response = await fetch(`${WAHA_API_URL}/api/sendText`, {
+      const endpoint = imageUrlToSend ? `${WAHA_API_URL}/api/sendImage` : `${WAHA_API_URL}/api/sendText`;
+      const body = imageUrlToSend 
+        ? { chatId: formattedPhoneNumber, file: imageUrlToSend, caption: messageContent, session: "default" }
+        : { chatId: formattedPhoneNumber, text: messageContent, session: "default" };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
-        body: JSON.stringify({ chatId: formattedPhoneNumber, text: messageContent, session: "default" }),
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
@@ -134,7 +176,7 @@ module.exports = async ({ req, res, log, error }) => {
     const delay = getRandomNumber(minDelayMs, maxDelayMs);
     await sleep(delay);
 
-    if ((index + 1) % getRandomNumber(batchSizeMin, batchSizeMax) === 0) {
+    if ((index + 1) % getRandomNumber(batchSizeMin, batchSizeMax) === 0 && index + 1 < clients.length) {
       const batchDelay = getRandomNumber(batchDelayMsMin, batchDelayMsMax);
       log(`Pausa de lote de ${batchDelay / 1000}s`);
       await sleep(batchDelay);
