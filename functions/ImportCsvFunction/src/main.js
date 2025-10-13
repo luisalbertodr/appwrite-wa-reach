@@ -16,13 +16,23 @@ module.exports = async ({ req, res, log, error }) => {
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
     const CLIENTS_COLLECTION_ID = process.env.APPWRITE_CLIENTS_COLLECTION_ID;
     const IMPORT_LOGS_COLLECTION_ID = process.env.APPWRITE_IMPORT_LOGS_COLLECTION_ID;
-    const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b'; // ID de tu bucket de importación
+    const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
 
     let successfulImports = 0;
     let totalProcessed = 0;
     const importErrors = [];
+    const importWarnings = [];
+    let errorSummary = {}; // Objeto para contar los tipos de errores
     const timestamp = new Date().toISOString();
     let fileName = 'unknown-file.csv';
+
+    // Función para añadir y contar errores/advertencias
+    const addIssue = (issueList, message) => {
+        issueList.push(message);
+        const errorType = message.split(':')[1]?.split('(')[0].trim() || 'Desconocido';
+        errorSummary[errorType] = (errorSummary[errorType] || 0) + 1;
+    };
+
 
     // Helper functions
     const calculateAge = (dob) => {
@@ -38,7 +48,7 @@ module.exports = async ({ req, res, log, error }) => {
     };
 
     const validateDniNie = (dni) => {
-        if (!dni) return { isValid: false, message: 'DNI/NIE no proporcionado.' };
+        if (!dni) return { isValid: true, message: 'DNI/NIE no proporcionado (advertencia).', isWarning: true };
         dni = dni.toUpperCase().trim();
         const dniRegex = /^(\d{8})([A-Z])$/;
         const nieRegex = /^[XYZ]\d{7}[A-Z]$/;
@@ -47,36 +57,62 @@ module.exports = async ({ req, res, log, error }) => {
         if (dniRegex.test(dni)) {
             const [, num, letter] = dni.match(dniRegex);
             const expectedLetter = letterMap[parseInt(num) % 23];
-            return { isValid: letter === expectedLetter, message: letter === expectedLetter ? 'DNI válido.' : `Letra de DNI incorrecta. La correcta es ${expectedLetter}.` };
+            if (letter !== expectedLetter) {
+                return { isValid: true, message: `DNI con letra incorrecta. Se esperaba ${expectedLetter} (advertencia).`, isWarning: true };
+            }
+            return { isValid: true, message: 'DNI válido.' };
         } else if (nieRegex.test(dni)) {
             const niePrefix = dni.charAt(0);
             const nieNum = (niePrefix === 'X' ? '0' : niePrefix === 'Y' ? '1' : '2') + dni.substring(1, 8);
             const letter = dni.charAt(8);
             const expectedLetter = letterMap[parseInt(nieNum) % 23];
-            return { isValid: letter === expectedLetter, message: letter === expectedLetter ? 'NIE válido.' : `Letra de NIE incorrecta. La correcta es ${expectedLetter}.` };
+            if (letter !== expectedLetter) {
+                return { isValid: true, message: `NIE con letra incorrecta. Se esperaba ${expectedLetter} (advertencia).`, isWarning: true };
+            }
+            return { isValid: true, message: 'NIE válido.' };
         } else {
             return { isValid: false, message: 'Formato de DNI/NIE inválido.' };
         }
     };
     
     const validateMobilePhone = (phone) => {
-        if (!phone) return { isValid: false, message: 'Teléfono no proporcionado.' };
+        if (!phone || phone.trim() === '0' || phone.trim() === '') {
+            return { isValid: true, message: 'Teléfono no proporcionado o es cero (omitido).', isWarning: true };
+        }
         const mobileRegex = /^[67]\d{8}$/;
         return { isValid: mobileRegex.test(phone), message: mobileRegex.test(phone) ? 'Teléfono móvil válido.' : 'Teléfono principal inválido (debe empezar por 6 o 7 y tener 9 dígitos).' };
     };
     
     const validateClient = (clientData, isStrict = true) => {
         const errors = {};
+        const warnings = {};
+    
         if (!clientData.codcli || !/^\d{6}$/.test(clientData.codcli)) errors.codcli = 'El código de cliente es requerido y debe tener 6 dígitos.';
         if ((isStrict || clientData.nomcli) && !clientData.nomcli) errors.nomcli = 'El nombre es requerido.';
-        if (clientData.email && !/\S+@\S+\.\S+/.test(clientData.email)) errors.email = 'Email inválido.';
-        else if (isStrict && !clientData.email) errors.email = 'Email requerido.';
-        if (clientData.dnicli) { const dniValidation = validateDniNie(clientData.dnicli); if (!dniValidation.isValid) errors.dnicli = dniValidation.message; }
-        else if (isStrict) errors.dnicli = 'DNI/NIE requerido.';
-        if (clientData.tel2cli) { const tel2Validation = validateMobilePhone(clientData.tel2cli); if (!tel2Validation.isValid) errors.tel2cli = tel2Validation.message; }
-        else if (isStrict) errors.tel2cli = 'Teléfono móvil principal requerido.';
+        
+        if (clientData.email && !/\S+@\S+\.\S+/.test(clientData.email)) {
+            errors.email = 'Email inválido.';
+        } else if (isStrict && !clientData.email) {
+            errors.email = 'Email requerido.';
+        }
+      
+        const dniValidation = validateDniNie(clientData.dnicli);
+        if (!dniValidation.isValid) {
+            errors.dnicli = dniValidation.message;
+        } else if (dniValidation.isWarning) {
+            warnings.dnicli = dniValidation.message;
+        }
+    
+        const tel2Validation = validateMobilePhone(clientData.tel2cli);
+        if (!tel2Validation.isValid) {
+            errors.tel2cli = tel2Validation.message;
+        } else if (tel2Validation.isWarning) {
+            warnings.tel2cli = tel2Validation.message;
+        }
+    
         if (clientData.fecnac && calculateAge(clientData.fecnac) < 0) errors.fecnac = 'La fecha de nacimiento no puede ser futura.';
-        return errors;
+    
+        return { errors, warnings };
     };
     
     const convertDate = (dateStr) => {
@@ -119,12 +155,12 @@ module.exports = async ({ req, res, log, error }) => {
         const fileBuffer = await storage.getFileDownload(IMPORT_BUCKET_ID, fileId);
         const fileContent = fileBuffer.toString('utf8');
 
-        const results = Papa.parse(fileContent, { header: true, skipEmptyLines: true, delimiter: ',' }); // <-- AQUÍ ESTÁ EL CAMBIO
+        const results = Papa.parse(fileContent, { header: true, skipEmptyLines: true, delimiter: ',' });
         totalProcessed = results.data.length;
 
         if (results.errors.length > 0) {
             results.errors.forEach(err => error(`CSV Parsing Error: ${err.message}`));
-            importErrors.push(...results.errors.map(e => `Error de parseo: ${e.message} en fila ${e.row}`));
+            results.errors.forEach(e => addIssue(importErrors, `Error de parseo: ${e.message} en fila ${e.row}`));
         }
 
         for (const [index, row] of results.data.entries()) {
@@ -149,11 +185,15 @@ module.exports = async ({ req, res, log, error }) => {
                 fecalta: convertDate(clientData.fecalta),
             };
 
-            const clientSpecificErrors = [];
-            const errors = validateClient(newClientRecord, false);
+            const { errors, warnings } = validateClient(newClientRecord, false);
+
+            if (Object.keys(warnings).length > 0) {
+                 Object.values(warnings).forEach(msg => addIssue(importWarnings, `Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${msg}`));
+            }
+
             if (Object.keys(errors).length > 0) {
-                clientSpecificErrors.push(...Object.values(errors));
-                importErrors.push(`Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${clientSpecificErrors.join(', ')}`);
+                Object.values(errors).forEach(msg => addIssue(importErrors, `Fila ${rowNumber} (Cod: ${newClientRecord.codcli || 'N/A'}): ${msg}`));
+                continue; // Saltar este registro por errores críticos
             }
 
             try {
@@ -161,7 +201,7 @@ module.exports = async ({ req, res, log, error }) => {
                     ...newClientRecord,
                     nombre_completo: `${newClientRecord.nomcli || ''} ${newClientRecord.ape1cli || ''}`.trim(),
                     edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
-                    importErrors: clientSpecificErrors,
+                    importErrors: Object.values(warnings), // Guardar advertencias en el registro
                 };
                 
                 const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [Query.equal('codcli', newClientRecord.codcli)]);
@@ -176,12 +216,34 @@ module.exports = async ({ req, res, log, error }) => {
             } catch (dbError) {
                 const msg = (dbError instanceof AppwriteException) ? `${dbError.message} (Type: ${dbError.type})` : dbError.message;
                 error(`DB Error for client ${newClientRecord.codcli}: ${msg}`);
-                importErrors.push(`Fila ${rowNumber} (Cod: ${newClientRecord.codcli}): ${msg}`);
+                addIssue(importErrors, `Fila ${rowNumber} (Cod: ${newClientRecord.codcli}): ${msg}`);
             }
         }
         
-        const logStatus = importErrors.length > 0 ? 'completed_with_errors' : 'completed';
-        const logDoc = { timestamp, filename: fileName, successfulImports, totalProcessed, errors: importErrors.length > 0 ? importErrors : ['Ninguno'], status: logStatus };
+        let logStatus = 'completed';
+        if (importErrors.length > 0) {
+            logStatus = 'failed';
+        } else if (importWarnings.length > 0) {
+            logStatus = 'completed_with_errors';
+        }
+        
+        const summaryText = Object.entries(errorSummary).map(([key, value]) => `- Total de ${key}: ${value}`).join('\n');
+        const combinedLog = [
+            '--- RESUMEN ---',
+            summaryText,
+            '--- DETALLES ---',
+            ...importErrors, 
+            ...importWarnings
+        ];
+
+        const logDoc = { 
+            timestamp, 
+            filename: fileName, 
+            successfulImports, 
+            totalProcessed, 
+            errors: combinedLog.length > 3 ? combinedLog : ['Ninguno'], 
+            status: logStatus 
+        };
 
         await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), logDoc);
         log(`Import log saved for ${fileName}. Status: ${logStatus}`);

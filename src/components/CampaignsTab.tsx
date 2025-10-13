@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, ChangeEvent } from 'react';
+import { useState, useMemo, useEffect, ChangeEvent, useCallback } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { Client, Template, Campaign, WahaConfig, MessageLog } from '@/types';
+import { Client, Template, Campaign, WahaConfig } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,16 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Filter, Download, Loader2, Search, Clock, ImagePlus, Save, FileText, Shuffle } from 'lucide-react';
+import { Send, Filter, Download, Loader2, Search, ImagePlus, Save, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
+import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID } from '@/lib/appwrite';
 import { Functions, Query, ID, Models } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { calculateAge } from '@/lib/validators';
 
 const functions = new Functions(client);
 
@@ -28,23 +28,14 @@ interface Progress {
   skipped: number;
   total: number;
 }
-interface ImportLog extends Models.Document {
-  timestamp: string;
-  filename: string;
-  successfulImports: number;
-  totalProcessed: number;
-  errors: string[];
-  status: 'completed' | 'completed_with_errors' | 'failed';
-}
 
 const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
 
 export function CampaignsTab() {
-  const { data: clients, total, loading: loadingClients, applyQueries: applyClientQueries } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_CAMPAIGNS, true);
+  const { data: clients, total, loading: loadingClients, applyQueries: applyClientQueries, update: updateClient, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_CAMPAIGNS, true);
   const { data: templates, create: createTemplate, update: updateTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
   const { data: campaigns, create: createCampaign, loading: loadingCampaigns, reload: reloadCampaigns } = useAppwriteCollection<Campaign>(CAMPAIGNS_COLLECTION_ID);
   const { data: configs } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
-  const { data: importLogs, loading: loadingImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   const { toast } = useToast();
 
   const [filters, setFilters] = useState({
@@ -66,10 +57,7 @@ export function CampaignsTab() {
   const [scheduledTime, setScheduledTime] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-
-  const [showLogDialog, setShowLogDialog] = useState(false);
-  const [logData, setLogData] = useState<MessageLog[]>([]);
-  const [loadingLog, setLoadingLog] = useState(false);
+  const [editingClient, setEditingClient] = useState<(Client & Models.Document) | null>(null);
 
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
 
@@ -84,34 +72,13 @@ export function CampaignsTab() {
     return `${hours}h ${minutes}m`;
   }, [wahaConfig, selectedClients.size]);
 
-
-  useEffect(() => {
-    const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values');
-    if (savedFiltersJSON) {
-        const savedFilters = JSON.parse(savedFiltersJSON);
-        setFilters(savedFilters);
-    } else {
-        // Sin filtros guardados, cargar todos los clientes inicialmente
-        applyClientQueries([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    reloadTemplates();
-    reloadCampaigns();
-  }, [reloadTemplates, reloadCampaigns]);
-
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     const newQueries: string[] = [];
     if (filters.nombreApellido) {
-        // Para búsqueda con múltiple palabras, crear queries separadas con AND
-        const searchWords = filters.nombreApellido.trim().split(/\s+/).filter(word => word.length > 0);
-        if (searchWords.length === 1) {
-          // Una sola palabra: usar search normal
-          newQueries.push(Query.search('nombre_completo', filters.nombreApellido));
-        } else {
-          // Múltiples palabras: crear un array con todas las búsquedas individuales
-          newQueries.push(Query.and(searchWords.map(word => Query.search('nombre_completo', word))));
+        const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
+        if (searchWords.length > 0) {
+            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
+            newQueries.push(...searchConditions);
         }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
@@ -121,8 +88,8 @@ export function CampaignsTab() {
     if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.sexo !== 'all') newQueries.push(Query.equal('sexo', filters.sexo));
-    if (filters.edadMin) newQueries.push(Query.greaterThanEqual('edad', parseInt(filters.edadMin)));
-    if (filters.edadMax) newQueries.push(Query.lessThanEqual('edad', parseInt(filters.edadMax)));
+    if (filters.edadMin) newQueries.push(Query.greaterThanEqual('edad', parseInt(filters.edadMin, 10)));
+    if (filters.edadMax) newQueries.push(Query.lessThanEqual('edad', parseInt(filters.edadMax, 10)));
     if (filters.facturacionMin) newQueries.push(Query.greaterThanEqual('facturacion', parseFloat(filters.facturacionMin)));
     if (filters.facturacionMax) newQueries.push(Query.lessThanEqual('facturacion', parseFloat(filters.facturacionMax)));
     if (filters.intereses) {
@@ -133,10 +100,24 @@ export function CampaignsTab() {
     if(filters.pobcli) newQueries.push(Query.search('pobcli', filters.pobcli));
     if(filters.procli) newQueries.push(Query.search('procli', filters.procli));
 
-
     localStorage.setItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values', JSON.stringify(filters));
     applyClientQueries(newQueries);
-  };
+  }, [filters, applyClientQueries]);
+
+  useEffect(() => {
+    const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values');
+    if (savedFiltersJSON) {
+        const savedFilters = JSON.parse(savedFiltersJSON);
+        setFilters(savedFilters);
+    }
+    handleApplyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    reloadTemplates();
+    reloadCampaigns();
+  }, [reloadTemplates, reloadCampaigns]);
 
   useEffect(() => {
     if (!activeCampaignId) return;
@@ -203,7 +184,6 @@ export function CampaignsTab() {
     }
   };
 
-
   const handleSelectClient = (client: Client, isSelected: boolean) => {
     setSelectedClients(prev => {
       const newMap = new Map(prev);
@@ -223,17 +203,12 @@ export function CampaignsTab() {
 
   const areAllFilteredSelected = clients.length > 0 && clients.every(client => selectedClients.has(client.$id!));
 
-  const startCampaign = async (isRandomMode = false) => {
+  const startCampaign = async () => {
     const selectedTemplate = templates.find(t => t.$id === selectedTemplateId);
     const finalAudience = Array.from(selectedClients.values());
 
     if (!selectedTemplate || finalAudience.length === 0 || !wahaConfig) {
       toast({ title: 'Error', description: 'Selecciona una plantilla y al menos un cliente.', variant: 'destructive' });
-      return;
-    }
-    
-    if (selectedMessageIndex === null && !isRandomMode) {
-      toast({ title: 'Error', description: 'Debes seleccionar un mensaje para enviar o usar el modo aleatorio.', variant: 'destructive' });
       return;
     }
 
@@ -244,8 +219,8 @@ export function CampaignsTab() {
         status: scheduledDate && scheduledTime ? 'scheduled' : 'pending',
         audienceCount: finalAudience.length, createdAt: new Date().toISOString(),
         scheduledDate, scheduledTime, startTime, endTime, 
-        selectedMessageIndex: isRandomMode ? undefined : (selectedMessageIndex ?? undefined),
-        selectedImageIndex: isRandomMode ? undefined : (selectedImageIndex ?? undefined),
+        selectedMessageIndex: selectedMessageIndex !== null ? selectedMessageIndex : undefined,
+        selectedImageIndex: selectedImageIndex !== null ? selectedImageIndex : undefined
       });
       const campaignId = campaignDoc.$id;
       setActiveCampaignId(campaignId);
@@ -256,15 +231,10 @@ export function CampaignsTab() {
       await functions.createExecution(
         'sendWhatsAppFunction',
         JSON.stringify({
-          clients: finalAudience, 
-          template: selectedTemplate,
-          config: wahaConfig, 
-          campaignId: campaignId,
-          isRandom: isRandomMode, // Flag para el modo aleatorio
-          selectedMessageIndex: isRandomMode ? null : selectedMessageIndex,
-          selectedImageIndex: isRandomMode ? null : selectedImageIndex,
+          clients: finalAudience, template: selectedTemplate,
+          config: wahaConfig, campaignId: campaignId,
         }),
-        false
+        true
       );
 
       reloadCampaigns();
@@ -286,24 +256,52 @@ export function CampaignsTab() {
     link.click();
     toast({ title: 'Exportación completada' });
   };
-  
-  const handleViewLog = async (campaignId: string) => {
-    setLoadingLog(true);
-    setShowLogDialog(true);
+    
+  const handleDownloadCampaignLog = async (campaignId: string) => {
     try {
-      const response = await databases.listDocuments<MessageLog & Models.Document>(
-        DATABASE_ID,
-        MESSAGE_LOGS_COLLECTION_ID,
-        [Query.equal('campaignId', campaignId), Query.limit(5000)]
-      );
-      setLogData(response.documents);
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            MESSAGE_LOGS_COLLECTION_ID,
+            [Query.equal('campaignId', campaignId), Query.limit(5000)]
+        );
+        
+        const logContent = response.documents.map(log => 
+            `Cliente: ${log.clientId}, Estado: ${log.status}, Fecha: ${new Date(log.timestamp).toLocaleString()}` + (log.error ? `, Error: ${log.error}` : '')
+        ).join('\n');
+
+        const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `log_campaña_${campaignId}.txt`;
+        link.click();
+
     } catch (error) {
-      toast({ title: 'Error al cargar el log', description: (error as Error).message, variant: 'destructive' });
-    } finally {
-      setLoadingLog(false);
+        toast({ title: 'Error al descargar el log', variant: 'destructive' });
     }
   };
 
+  const handleUpdateClient = async () => {
+    if (!editingClient) return;
+
+    const clientToUpdate: Partial<Client> = {
+        ...editingClient,
+        nombre_completo: `${editingClient.nomcli || ''} ${editingClient.ape1cli || ''}`.trim(),
+        edad: calculateAge(editingClient.fecnac || ''),
+    };
+
+    // Eliminamos los campos de solo lectura de Appwrite
+    const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, $permissions, ...rest } = clientToUpdate as any;
+
+
+    try {
+        await updateClient(editingClient.$id, rest);
+        toast({ title: 'Cliente actualizado' });
+        setEditingClient(null);
+        reloadClients(); // Recarga la lista de clientes para reflejar los cambios
+    } catch (error) {
+        toast({ title: 'Error al actualizar el cliente', variant: 'destructive' });
+    }
+  };
 
   if (loadingTemplates || loadingCampaigns) return <div className="p-6">Cargando...</div>;
 
@@ -357,21 +355,26 @@ export function CampaignsTab() {
           <Card>
             <CardHeader><CardTitle>Previsualización y Selección ({total} visibles, {selectedClients.size} seleccionados)</CardTitle></CardHeader>
             <CardContent>
-               <Button variant="outline" onClick={handleExport} disabled={selectedClients.size === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
+               <Button variant="outline" onClick={handleExport} disabled={clients.length === 0} className="w-full mb-4"><Download className="w-4 h-4 mr-2" />Exportar Selección</Button>
                <ScrollArea className="h-72 w-full rounded-md border">
                 <Table>
-                  <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre Completo</TableHead><TableHead>Teléfono</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead><Checkbox checked={areAllFilteredSelected} onCheckedChange={(c) => handleSelectAll(Boolean(c))}/></TableHead><TableHead>Cód.</TableHead><TableHead>Nombre Completo</TableHead><TableHead>Teléfono</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {loadingClients ? <TableRow><TableCell colSpan={4} className="text-center">Cargando...</TableCell></TableRow> :
+                    {loadingClients ? <TableRow><TableCell colSpan={5} className="text-center">Cargando...</TableCell></TableRow> :
                     clients.length > 0 ? (
                       clients.map((client) => (
                         <TableRow key={client.$id} data-state={selectedClients.has(client.$id!) && 'selected'}>
                           <TableCell><Checkbox checked={selectedClients.has(client.$id!)} onCheckedChange={(c) => handleSelectClient(client, Boolean(c))}/></TableCell>
                           <TableCell>{client.codcli}</TableCell><TableCell>{client.nombre_completo}</TableCell><TableCell>{client.tel2cli}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => setEditingClient(client as Client & Models.Document)}>
+                                <Edit className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow><TableCell colSpan={4} className="text-center">No hay clientes que coincidan. Aplica un filtro.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center">No hay clientes que coincidan. Aplica un filtro.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -432,16 +435,10 @@ export function CampaignsTab() {
                 </div>
               <p className="text-sm text-muted-foreground">Se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
               <p className="text-sm text-muted-foreground">Duración estimada: <strong className="text-primary">{estimatedDuration}</strong></p>
-              <div className="flex gap-2">
-                <Button onClick={() => startCampaign(false)} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
-                  {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                  {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
-                </Button>
-                <Button onClick={() => startCampaign(true)} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full" variant="secondary">
-                  <Shuffle className="w-4 h-4 mr-2" />
-                  Combinar y Enviar
-                </Button>
-              </div>
+              <Button onClick={startCampaign} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
+                {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -450,7 +447,7 @@ export function CampaignsTab() {
         <CardHeader><CardTitle>Historial de Campañas</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Campaña</TableHead><TableHead>Fecha</TableHead><TableHead>Audiencia</TableHead><TableHead>Estado</TableHead><TableHead>Acciones</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Campaña</TableHead><TableHead>Fecha</TableHead><TableHead>Audiencia</TableHead><TableHead>Estado</TableHead><TableHead>Log</TableHead></TableRow></TableHeader>
             <TableBody>
               {campaigns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((campaign) => (
                 <TableRow key={campaign.$id}>
@@ -458,45 +455,46 @@ export function CampaignsTab() {
                   <TableCell>{new Date(campaign.createdAt).toLocaleString()}</TableCell>
                   <TableCell>{campaign.audienceCount}</TableCell>
                   <TableCell><Badge>{campaign.status}</Badge></TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => handleViewLog(campaign.$id!)}>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Ver Log
-                    </Button>
-                  </TableCell>
+                    <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => handleDownloadCampaignLog(campaign.$id!)}>
+                            <Download className="w-4 h-4" />
+                        </Button>
+                    </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      <AlertDialog open={showLogDialog} onOpenChange={setShowLogDialog}>
-        <AlertDialogContent className="max-w-4xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Log de la Campaña</AlertDialogTitle>
-            <AlertDialogDescription>Detalles del envío para cada cliente.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <ScrollArea className="max-h-[60vh] overflow-y-auto">
-            {loadingLog ? <p>Cargando log...</p> : (
-            <Table>
-              <TableHeader><TableRow><TableHead>Cód. Cliente</TableHead><TableHead>Estado</TableHead><TableHead>Fecha</TableHead><TableHead>Error</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {logData.map(log => (
-                  <TableRow key={log.$id}>
-                    <TableCell>{log.clientId}</TableCell>
-                    <TableCell><Badge variant={log.status === 'sent' ? 'default' : log.status === 'failed' ? 'destructive' : 'secondary'}>{log.status}</Badge></TableCell>
-                    <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                    <TableCell className="text-xs">{log.error}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </ScrollArea>
-          <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      
+      {editingClient && (
+        <Dialog open={!!editingClient} onOpenChange={() => setEditingClient(null)}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Editar Cliente: {editingClient.codcli}</DialogTitle></DialogHeader>
+                <div className="grid grid-cols-2 gap-4 py-4">
+                    <div><Label>Nombre</Label><Input value={editingClient.nomcli || ''} onChange={(e) => setEditingClient({ ...editingClient, nomcli: e.target.value })}/></div>
+                    <div><Label>Primer Apellido</Label><Input value={editingClient.ape1cli || ''} onChange={(e) => setEditingClient({ ...editingClient, ape1cli: e.target.value })}/></div>
+                    <div><Label>Email</Label><Input type="email" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}/></div>
+                    <div><Label>DNI/NIE</Label><Input value={editingClient.dnicli || ''} onChange={(e) => setEditingClient({ ...editingClient, dnicli: e.target.value })}/></div>
+                    <div><Label>Teléfono 1</Label><Input value={editingClient.tel1cli || ''} onChange={(e) => setEditingClient({ ...editingClient, tel1cli: e.target.value })} /></div>
+                    <div><Label>Teléfono 2 (Móvil)</Label><Input value={editingClient.tel2cli || ''} onChange={(e) => setEditingClient({ ...editingClient, tel2cli: e.target.value })}/></div>
+                    <div><Label>Dirección</Label><Input value={editingClient.dircli || ''} onChange={(e) => setEditingClient({ ...editingClient, dircli: e.target.value })} /></div>
+                    <div><Label>Código Postal</Label><Input value={editingClient.codposcli || ''} onChange={(e) => setEditingClient({ ...editingClient, codposcli: e.target.value })} /></div>
+                    <div><Label>Población</Label><Input value={editingClient.pobcli || ''} onChange={(e) => setEditingClient({ ...editingClient, pobcli: e.target.value })} /></div>
+                    <div><Label>Provincia</Label><Input value={editingClient.procli || ''} onChange={(e) => setEditingClient({ ...editingClient, procli: e.target.value })} /></div>
+                    <div><Label>Fecha Nacimiento</Label><Input type="date" value={editingClient.fecnac ? new Date(editingClient.fecnac).toISOString().split('T')[0] : ''} onChange={(e) => setEditingClient({ ...editingClient, fecnac: e.target.value })}/></div>
+                    <div><Label>Fecha Alta</Label><Input type="date" value={editingClient.fecalta ? new Date(editingClient.fecalta).toISOString().split('T')[0] : ''} onChange={(e) => setEditingClient({ ...editingClient, fecalta: e.target.value })} /></div>
+                    <div><Label>Sexo</Label><Select value={editingClient.sexo || 'Otro'} onValueChange={(v) => setEditingClient({ ...editingClient, sexo: v as 'H'|'M'|'Otro'})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="H">Hombre</SelectItem><SelectItem value="M">Mujer</SelectItem><SelectItem value="Otro">Otro</SelectItem></SelectContent></Select></div>
+                    <div><Label>Facturación</Label><Input type="number" step="0.01" value={editingClient.facturacion || 0} onChange={(e) => setEditingClient({ ...editingClient, facturacion: parseFloat(e.target.value) || 0 })}/></div>
+                    <div><Label>Intereses (separados por comas)</Label><Input value={editingClient.intereses?.join(', ') || ''} onChange={(e) => setEditingClient({ ...editingClient, intereses: e.target.value.split(',').map(i => i.trim()) })} /></div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="secondary">Cancelar</Button></DialogClose>
+                    <Button type="button" onClick={handleUpdateClient}>Guardar Cambios</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );
