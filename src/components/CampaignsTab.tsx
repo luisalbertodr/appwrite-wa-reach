@@ -77,15 +77,14 @@ export function CampaignsTab() {
     if (filters.nombreApellido) {
         const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
         if (searchWords.length > 0) {
-            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
-            newQueries.push(...searchConditions);
+            newQueries.push(Query.search('nombre_completo', searchWords.join(' ')));
         }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
-    if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli));
+    if (filters.codcli) newQueries.push(Query.search('codcli', filters.codcli));
     if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
     if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax));
-    if (filters.dnicli) newQueries.push(Query.equal('dnicli', filters.dnicli));
+    if (filters.dnicli) newQueries.push(Query.search('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.sexo !== 'all') newQueries.push(Query.equal('sexo', filters.sexo));
     if (filters.edadMin) newQueries.push(Query.greaterThanEqual('edad', parseInt(filters.edadMin, 10)));
@@ -94,9 +93,9 @@ export function CampaignsTab() {
     if (filters.facturacionMax) newQueries.push(Query.lessThanEqual('facturacion', parseFloat(filters.facturacionMax)));
     if (filters.intereses) {
         const interests = filters.intereses.split(',').map(i => i.trim());
-        newQueries.push(Query.equal('intereses', interests));
+        newQueries.push(Query.search('intereses', interests.join(' ')));
     }
-    if(filters.codposcli) newQueries.push(Query.equal('codposcli', filters.codposcli));
+    if(filters.codposcli) newQueries.push(Query.search('codposcli', filters.codposcli));
     if(filters.pobcli) newQueries.push(Query.search('pobcli', filters.pobcli));
     if(filters.procli) newQueries.push(Query.search('procli', filters.procli));
 
@@ -231,8 +230,12 @@ export function CampaignsTab() {
       await functions.createExecution(
         'sendWhatsAppFunction',
         JSON.stringify({
-          clients: finalAudience, template: selectedTemplate,
-          config: wahaConfig, campaignId: campaignId,
+          clients: finalAudience, 
+          template: selectedTemplate,
+          config: wahaConfig, 
+          campaignId: campaignId,
+          selectedMessageIndex: selectedMessageIndex,
+          selectedImageIndex: selectedImageIndex,
         }),
         true
       );
@@ -289,15 +292,13 @@ export function CampaignsTab() {
         edad: calculateAge(editingClient.fecnac || ''),
     };
 
-    // Eliminamos los campos de solo lectura de Appwrite
     const { $id, $collectionId, $databaseId, $createdAt, $updatedAt, $permissions, ...rest } = clientToUpdate as any;
-
 
     try {
         await updateClient(editingClient.$id, rest);
         toast({ title: 'Cliente actualizado' });
         setEditingClient(null);
-        reloadClients(); // Recarga la lista de clientes para reflejar los cambios
+        reloadClients();
     } catch (error) {
         toast({ title: 'Error al actualizar el cliente', variant: 'destructive' });
     }

@@ -50,21 +50,56 @@
             "logging": true,
             "runtime": "node-16.0",
             "scopes": [
+                "users.read",
                 "databases.read",
                 "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
                 "documents.read",
                 "documents.write",
-                "files.read"
+                "files.read",
+                "files.write",
+                "buckets.read",
+                "buckets.write",
+                "functions.read",
+                "functions.write",
+                "execution.read",
+                "execution.write",
+                "targets.read",
+                "targets.write",
+                "providers.read",
+                "providers.write",
+                "messages.read",
+                "messages.write",
+                "topics.read",
+                "topics.write",
+                "subscribers.read",
+                "subscribers.write",
+                "locale.read",
+                "avatars.read",
+                "health.read",
+                "migrations.read",
+                "migrations.write",
+                "tokens.read",
+                "tokens.write",
+                "sites.read",
+                "sites.write",
+                "log.read",
+                "log.write"
             ],
             "events": [
-                "buckets.68d7cd3a0019edb5703b.files.*.create"
+                "buckets.*.files.*.create"
             ],
             "schedule": "",
             "timeout": 600,
             "entrypoint": "src/main.js",
             "commands": "npm install",
-            "path": "functions/ImportCsvFunction",
-            "specification": "s-1vcpu-512mb"
+            "specification": "s-0.5vcpu-512mb",
+            "path": "functions/ImportCsvFunction"
         },
         {
             "$id": "sendWhatsAppFunction",
@@ -86,18 +121,17 @@
             "timeout": 300,
             "entrypoint": "src/main.js",
             "commands": "npm install",
-            "path": "functions/sendWhatsAppFunction",
-            "specification": "s-1vcpu-512mb"
+            "path": "functions/sendWhatsAppFunction"
         }
     ],
-    "databases": [
+    "tablesDB": [
         {
             "$id": "68d78cb20028fac621d4",
             "name": "Waha",
             "enabled": true
         }
     ],
-    "collections": [
+    "tables": [
         {
             "$id": "templates",
             "$permissions": [
@@ -109,16 +143,15 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "Plantillas",
             "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
+            "columns": [
                 {
                     "key": "name",
                     "type": "string",
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "messages",
@@ -126,8 +159,8 @@
                     "required": true,
                     "array": true,
                     "size": 10000,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "imageUrls",
@@ -135,8 +168,8 @@
                     "required": false,
                     "array": true,
                     "size": 2048,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 }
             ],
             "indexes": []
@@ -152,25 +185,15 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "Campanas",
             "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                {
-                    "key": "status",
-                    "type": "string",
-                    "required": true,
-                    "array": false,
-                    "size": 50,
-                    "encrypt": false,
-                    "default": null
-                },
+            "columns": [
                 {
                     "key": "name",
                     "type": "string",
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "templateId",
@@ -178,16 +201,25 @@
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "status",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "audienceCount",
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -195,60 +227,7 @@
                     "type": "datetime",
                     "required": true,
                     "array": false,
-                    "default": null
-                },
-                {
-                    "key": "scheduledDate",
-                    "type": "string",
-                    "size": 50,
-                    "required": false,
-                    "array": false,
-                    "encrypt": false,
-                    "default": null
-                },
-                {
-                    "key": "scheduledTime",
-                    "type": "string",
-                    "size": 10,
-                    "required": false,
-                    "array": false,
-                    "encrypt": false,
-                    "default": null
-                },
-                {
-                    "key": "startTime",
-                    "type": "string",
-                    "size": 10,
-                    "required": false,
-                    "array": false,
-                    "encrypt": false,
-                    "default": null
-                },
-                {
-                    "key": "endTime",
-                    "type": "string",
-                    "size": 10,
-                    "required": false,
-                    "array": false,
-                    "encrypt": false,
-                    "default": null
-                },
-                {
-                    "key": "selectedMessageIndex",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
-                    "default": null
-                },
-                {
-                    "key": "selectedImageIndex",
-                    "type": "integer",
-                    "required": false,
-                    "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "format": "",
                     "default": null
                 }
             ],
@@ -265,24 +244,23 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "Configuracion",
             "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
+            "columns": [
                 {
                     "key": "apiUrl",
                     "type": "string",
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "minDelayMs",
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -290,8 +268,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -299,8 +277,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -308,8 +286,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -317,8 +295,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -326,26 +304,26 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
-                    "key": "adminPhoneNumbers",
+                    "key": "adminPhoneNumber",
                     "type": "string",
                     "required": false,
-                    "array": true,
-                    "size": 30,
-                    "encrypt": false,
-                    "default": null
+                    "array": false,
+                    "size": 20,
+                    "default": "667435503",
+                    "encrypt": false
                 },
                 {
                     "key": "notificationInterval",
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 }
             ],
@@ -366,16 +344,15 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "Clientes_Import",
             "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
+            "columns": [
                 {
                     "key": "codcli",
                     "type": "string",
                     "required": true,
                     "array": false,
                     "size": 50,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "nomcli",
@@ -383,8 +360,8 @@
                     "required": false,
                     "array": false,
                     "size": 100,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "ape1cli",
@@ -392,17 +369,8 @@
                     "required": false,
                     "array": false,
                     "size": 200,
-                    "encrypt": false,
-                    "default": null
-                },
-                {
-                    "key": "nombre_completo",
-                    "type": "string",
-                    "required": false,
-                    "array": false,
-                    "size": 512,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "dnicli",
@@ -410,8 +378,8 @@
                     "required": false,
                     "array": false,
                     "size": 20,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "email",
@@ -419,8 +387,8 @@
                     "required": false,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "dircli",
@@ -428,8 +396,8 @@
                     "required": false,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "codposcli",
@@ -437,8 +405,8 @@
                     "required": false,
                     "array": false,
                     "size": 10,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "pobcli",
@@ -446,8 +414,8 @@
                     "required": false,
                     "array": false,
                     "size": 100,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "procli",
@@ -455,8 +423,8 @@
                     "required": false,
                     "array": false,
                     "size": 100,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "tel1cli",
@@ -464,8 +432,8 @@
                     "required": false,
                     "array": false,
                     "size": 20,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "tel2cli",
@@ -473,14 +441,15 @@
                     "required": false,
                     "array": false,
                     "size": 20,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "fecnac",
                     "type": "datetime",
                     "required": false,
                     "array": false,
+                    "format": "",
                     "default": null
                 },
                 {
@@ -488,6 +457,7 @@
                     "type": "datetime",
                     "required": false,
                     "array": false,
+                    "format": "",
                     "default": null
                 },
                 {
@@ -495,23 +465,21 @@
                     "type": "string",
                     "required": false,
                     "array": false,
-                    "size": 10,
-                    "encrypt": false,
-                    "default": null,
-                    "format": "enum",
                     "elements": [
                         "M",
                         "H",
                         "Otro"
-                    ]
+                    ],
+                    "format": "enum",
+                    "default": null
                 },
                 {
                     "key": "edad",
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -519,8 +487,8 @@
                     "type": "integer",
                     "required": false,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": 1
                 },
                 {
@@ -529,26 +497,17 @@
                     "required": false,
                     "array": true,
                     "size": 2000,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
-                    "key": "facturacion",
-                    "type": "double",
-                    "required": false,
-                    "array": false,
-                    "min": -1.7976931348623157e+308,
-                    "max": 1.7976931348623157e+308,
-                    "default": null
-                },
-                {
-                    "key": "intereses",
+                    "key": "nombre_completo",
                     "type": "string",
                     "required": false,
-                    "array": true,
-                    "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "array": false,
+                    "size": 512,
+                    "default": null,
+                    "encrypt": false
                 }
             ],
             "indexes": [
@@ -563,57 +522,7 @@
                     ]
                 },
                 {
-                    "key": "nomcliFullText",
-                    "type": "fulltext",
-                    "attributes": [
-                        "nomcli"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                },
-                {
-                    "key": "ape1cliFullText",
-                    "type": "fulltext",
-                    "attributes": [
-                        "ape1cli"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                },
-                {
-                    "key": "emailFullText",
-                    "type": "fulltext",
-                    "attributes": [
-                        "email"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                },
-                {
-                    "key": "provFT",
-                    "type": "fulltext",
-                    "attributes": [
-                        "procli"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                },
-                {
-                    "key": "pobFT",
-                    "type": "fulltext",
-                    "attributes": [
-                        "pobcli"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                },
-                {
-                    "key": "codigoFT",
+                    "key": "search_codcli",
                     "type": "fulltext",
                     "attributes": [
                         "codcli"
@@ -623,7 +532,17 @@
                     ]
                 },
                 {
-                    "key": "dniFT",
+                    "key": "search_email",
+                    "type": "fulltext",
+                    "attributes": [
+                        "email"
+                    ],
+                    "orders": [
+                        "ASC"
+                    ]
+                },
+                {
+                    "key": "search_dnicli",
                     "type": "fulltext",
                     "attributes": [
                         "dnicli"
@@ -633,27 +552,27 @@
                     ]
                 },
                 {
-                    "key": "dirFT",
+                    "key": "search_pobcli",
                     "type": "fulltext",
                     "attributes": [
-                        "dircli"
+                        "pobcli"
                     ],
                     "orders": [
                         "ASC"
                     ]
                 },
                 {
-                    "key": "cpFT",
+                    "key": "search_procli",
                     "type": "fulltext",
                     "attributes": [
-                        "codposcli"
+                        "procli"
                     ],
                     "orders": [
                         "ASC"
                     ]
                 },
                 {
-                    "key": "tfnoFT",
+                    "key": "search_tel2cli",
                     "type": "fulltext",
                     "attributes": [
                         "tel2cli"
@@ -667,8 +586,8 @@
         {
             "$id": "IMPORT_LOGS_COLLECTION_ID",
             "$permissions": [
-                "read(\"users\")",
                 "create(\"users\")",
+                "read(\"users\")",
                 "update(\"users\")",
                 "delete(\"users\")",
                 "create(\"any\")",
@@ -679,13 +598,13 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "import_logs",
             "enabled": true,
-            "documentSecurity": true,
-            "attributes": [
+            "columns": [
                 {
                     "key": "timestamp",
                     "type": "datetime",
                     "required": true,
                     "array": false,
+                    "format": "",
                     "default": null
                 },
                 {
@@ -694,16 +613,16 @@
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "successfulImports",
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -711,8 +630,8 @@
                     "type": "integer",
                     "required": true,
                     "array": false,
-                    "min": -9223372036854775808,
-                    "max": 9223372036854775807,
+                    "min": -9223372036854776000,
+                    "max": 9223372036854776000,
                     "default": null
                 },
                 {
@@ -721,8 +640,8 @@
                     "required": false,
                     "array": true,
                     "size": 2000,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "status",
@@ -730,8 +649,8 @@
                     "required": true,
                     "array": false,
                     "size": 50,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 }
             ],
             "indexes": []
@@ -745,16 +664,15 @@
             "databaseId": "68d78cb20028fac621d4",
             "name": "MessageLogs",
             "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
+            "columns": [
                 {
-                    "key": "campaignId",
+                    "key": "campaingId",
                     "type": "string",
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "clientId",
@@ -762,8 +680,8 @@
                     "required": true,
                     "array": false,
                     "size": 255,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "status",
@@ -771,14 +689,15 @@
                     "required": true,
                     "array": false,
                     "size": 50,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 },
                 {
                     "key": "timestamp",
                     "type": "datetime",
                     "required": true,
                     "array": false,
+                    "format": "",
                     "default": null
                 },
                 {
@@ -787,22 +706,11 @@
                     "required": false,
                     "array": false,
                     "size": 500,
-                    "encrypt": false,
-                    "default": null
+                    "default": null,
+                    "encrypt": false
                 }
             ],
-            "indexes": [
-                {
-                    "key": "campaingId_index",
-                    "type": "key",
-                    "attributes": [
-                        "campaignId"
-                    ],
-                    "orders": [
-                        "ASC"
-                    ]
-                }
-            ]
+            "indexes": []
         }
     ],
     "buckets": [
