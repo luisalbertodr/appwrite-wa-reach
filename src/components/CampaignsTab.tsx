@@ -332,7 +332,7 @@ export function CampaignsTab() {
       )}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="space-y-6">
-        <Card>
+          <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Filter className="w-5 h-5" />Segmentación de Audiencia</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -356,8 +356,8 @@ export function CampaignsTab() {
               <Button onClick={handleApplyFilters} className="w-full"><Search className="w-4 h-4 mr-2" />Aplicar Filtros</Button>
             </CardContent>
           </Card>
-
-
+        </div>
+        <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Previsualización y Selección ({total} visibles, {selectedClients.size} seleccionados)</CardTitle></CardHeader>
             <CardContent>
@@ -388,7 +388,8 @@ export function CampaignsTab() {
             </CardContent>
           </Card>
         </div>
-
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="space-y-6">
         <Card>
             <CardHeader><CardTitle>Plantillas de Mensaje</CardTitle></CardHeader>
@@ -430,8 +431,9 @@ export function CampaignsTab() {
               <Button onClick={handleSaveTemplate} className="w-full"><Save className="w-4 h-4 mr-2" />{selectedTemplateId ? 'Actualizar Plantilla' : 'Guardar Nueva Plantilla'}</Button>
             </CardContent>
           </Card>
+        </div>
 
-
+        <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Iniciar Campaña</CardTitle></CardHeader>
             <CardContent className="space-y-4">
