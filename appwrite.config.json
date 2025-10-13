@@ -347,6 +347,24 @@
                     "min": -9223372036854775808,
                     "max": 9223372036854775807,
                     "default": null
+                },
+                {
+                    "key": "startTime",
+                    "type": "string",
+                    "size": 10,
+                    "required": false,
+                    "array": false,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "endTime",
+                    "type": "string",
+                    "size": 10,
+                    "required": false,
+                    "array": false,
+                    "encrypt": false,
+                    "default": null
                 }
             ],
             "indexes": []

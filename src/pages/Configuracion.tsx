@@ -11,7 +11,7 @@ import { Save, Shield, Bot, HardDriveUpload, Download, ArrowLeft } from 'lucide-
 import { useToast } from '@/hooks/use-toast';
 import { CONFIG_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { ID, Models } from 'appwrite';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -28,6 +28,8 @@ const defaultConfig: Omit<WahaConfig, '$id' | 'apiKey'> = {
   apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api',
   minDelayMs: 2000, maxDelayMs: 5000, batchSizeMin: 15, batchSizeMax: 25,
   batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumbers: [], notificationInterval: 50,
+  startTime: '09:00',
+  endTime: '18:00',
 };
 
 const Configuracion = () => {
@@ -53,6 +55,8 @@ const Configuracion = () => {
         batchDelayMsMax: fetchedConfig.batchDelayMsMax ?? defaultConfig.batchDelayMsMax,
         adminPhoneNumbers: fetchedConfig.adminPhoneNumbers || defaultConfig.adminPhoneNumbers,
         notificationInterval: fetchedConfig.notificationInterval ?? defaultConfig.notificationInterval,
+        startTime: fetchedConfig.startTime || defaultConfig.startTime,
+        endTime: fetchedConfig.endTime || defaultConfig.endTime,
       });
     }
   }, [configs]);
@@ -164,6 +168,10 @@ ${log.errors.join('\n')}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5" />Políticas de Envío</CardTitle></CardHeader>
             <CardContent className="space-y-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><Label>Horas hábiles (desde)</Label><Input type="time" value={config.startTime || ''} onChange={(e) => setConfig({ ...config, startTime: e.target.value })}/></div>
+                    <div><Label>Horas hábiles (hasta)</Label><Input type="time" value={config.endTime || ''} onChange={(e) => setConfig({ ...config, endTime: e.target.value })}/></div>
+                </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div><Label>Retardo entre Mensajes (ms)</Label><div className="flex gap-2"><Input type="number" value={config.minDelayMs || ''} onChange={(e) => setConfig({ ...config, minDelayMs: Number(e.target.value) })} placeholder="Mín"/> <Input type="number" value={config.maxDelayMs || ''} onChange={(e) => setConfig({ ...config, maxDelayMs: Number(e.target.value) })} placeholder="Máx"/></div></div>
                 <div><Label>Tamaño de Lote</Label><div className="flex gap-2"><Input type="number" value={config.batchSizeMin || ''} onChange={(e) => setConfig({ ...config, batchSizeMin: Number(e.target.value) })} placeholder="Mín"/> <Input type="number" value={config.batchSizeMax || ''} onChange={(e) => setConfig({ ...config, batchSizeMax: Number(e.target.value) })} placeholder="Máx"/></div></div>
@@ -211,7 +219,11 @@ ${log.errors.join('\n')}
 
           <AlertDialog open={showImportLogDialog} onOpenChange={setShowImportLogDialog}>
             <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Log de Importación</AlertDialogTitle></AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Log de Importación</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Este es el registro de la importación de clientes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
               <div className="max-h-[60vh] overflow-y-auto rounded-md bg-slate-950 p-4"><code className="text-white whitespace-pre-wrap">{importLogContent.join('\n')}</code></div>
               <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>

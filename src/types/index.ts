@@ -54,8 +54,6 @@ export interface Campaign {
   };
   scheduledDate?: string;
   scheduledTime?: string;
-  startTime?: string;
-  endTime?: string;
   selectedMessageIndex?: number;
   selectedImageIndex?: number;
   status: 'pending' | 'sent' | 'scheduled' | 'failed';
@@ -75,4 +73,6 @@ export interface WahaConfig {
   batchDelayMsMax?: number;
   adminPhoneNumbers?: string[];
   notificationInterval?: number;
+  startTime?: string;
+  endTime?: string;
 }
