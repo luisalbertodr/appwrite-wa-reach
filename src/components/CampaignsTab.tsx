@@ -410,13 +410,19 @@ export function CampaignsTab() {
                   }} placeholder={`Hola [nombre], este es el mensaje ${i+1}`}/>
                 </div>
               ))}
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-amber-800">
+                  ⚠️ <strong>Requisito importante para URLs de imágenes:</strong> Las URLs deben apuntar directamente a archivos JPEG (.jpg o .jpeg).
+                  WAHA no convierte automáticamente otros formatos de imagen.
+                </p>
+              </div>
               {[0, 1, 2, 3].map(i => (
                 <div key={i} className="flex items-center gap-2">
                   <Input value={newTemplate.imageUrls[i] || ''} onChange={(e) => {
                     const newImageUrls = [...newTemplate.imageUrls];
                     newImageUrls[i] = e.target.value;
                     setNewTemplate({ ...newTemplate, imageUrls: newImageUrls });
-                  }} placeholder={`URL de la Imagen ${i+1}`}/>
+                  }} placeholder={`URL de la Imagen ${i+1} (.jpg/.jpeg)`}/>
                   <Label htmlFor={`image-upload-${i}`} className="cursor-pointer"><ImagePlus className="w-6 h-6" /></Label>
                   <Input id={`image-upload-${i}`} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, i)} />
                 </div>

@@ -1,4 +1,4 @@
-const { Client, Databases, ID } = require('node-appwrite');
+const { Client, Databases, ID, Storage } = require('node-appwrite');
 const fetch = require('node-fetch');
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,6 +16,7 @@ module.exports = async ({ req, res, log, error }) => {
     .setProject(process.env.APPWRITE_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
   const databases = new Databases(client);
+  const storage = new Storage(client);
 
   const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
 
@@ -145,12 +146,35 @@ module.exports = async ({ req, res, log, error }) => {
     try {
       let response;
       if (imageUrlToSend && imageUrlToSend.trim() !== '') {
+        // Extraer bucketId y fileId de la URL
+        const url = new URL(imageUrlToSend);
+        const pathParts = url.pathname.split('/');
+        const bucketId = pathParts[pathParts.indexOf('buckets') + 1];
+        const fileId = pathParts[pathParts.indexOf('files') + 1];
+
+        if (!bucketId || !fileId) {
+          throw new Error(`URL de Appwrite Storage no válida: ${imageUrlToSend}`);
+        }
+
+        // Descargar el archivo usando el SDK de Appwrite
+        const imageBuffer = await storage.getFileDownload(bucketId, fileId);
+        const imageBase64 = imageBuffer.toString('base64');
+        
+        // Obtener el mimetype del archivo
+        const fileMeta = await storage.getFile(bucketId, fileId);
+        const mimetype = fileMeta.mimeType || 'image/jpeg';
+
+
         response = await fetch(`${WAHA_API_URL}/api/sendImage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
             body: JSON.stringify({
                 chatId: formattedPhoneNumber,
-                image: { url: imageUrlToSend },
+                file: {
+                    mimetype: mimetype,
+                    data: imageBase64,
+                    filename: "image.jpg"
+                },
                 caption: messageContent,
                 session: "default"
             }),
@@ -173,7 +197,6 @@ module.exports = async ({ req, res, log, error }) => {
       }
     } catch (e) {
       totalFailed++;
-      // CORRECCIÓN: Eliminado el type casting (as Error)
       await logStatus(c.codcli, 'failed', `Network error: ${e.message}`);
     }
 
