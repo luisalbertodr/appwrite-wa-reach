@@ -77,13 +77,14 @@ export function CampaignsTab() {
     if (filters.nombreApellido) {
         const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
         if (searchWords.length > 0) {
-            newQueries.push(Query.search('nombre_completo', searchWords.join(' ')));
+            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
+            newQueries.push(...searchConditions);
         }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
-    if (filters.codcli) newQueries.push(Query.search('codcli', filters.codcli));
-    if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin));
-    if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax));
+    if (filters.codcli) newQueries.push(Query.equal('codcli', filters.codcli.padStart(6, '0')));
+    if (filters.codcliMin) newQueries.push(Query.greaterThanEqual('codcli', filters.codcliMin.padStart(6, '0')));
+    if (filters.codcliMax) newQueries.push(Query.lessThanEqual('codcli', filters.codcliMax.padStart(6, '0')));
     if (filters.dnicli) newQueries.push(Query.search('dnicli', filters.dnicli));
     if (filters.telefono) newQueries.push(Query.search('tel2cli', filters.telefono));
     if (filters.sexo !== 'all') newQueries.push(Query.equal('sexo', filters.sexo));

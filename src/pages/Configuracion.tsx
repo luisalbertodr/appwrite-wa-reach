@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { WahaConfig, Client } from '@/types';
+import { WahaConfig } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Shield, Bot, Plus, HardDriveUpload, Download, ArrowLeft } from 'lucide-react';
+import { Save, Shield, Bot, HardDriveUpload, Download, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CONFIG_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
 import { ID, Models } from 'appwrite';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -36,7 +36,6 @@ const Configuracion = () => {
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
 
-  const [clientLoading, setClientLoading] = useState(false);
   const [showImportLogDialog, setShowImportLogDialog] = useState(false);
   const [importLogContent, setImportLogContent] = useState<string[]>([]);
   const [isLocalImporting, setIsLocalImporting] = useState(false);
@@ -78,7 +77,6 @@ const Configuracion = () => {
     if (!file) return;
 
     setIsLocalImporting(true);
-    setClientLoading(true);
     toast({ title: 'Subiendo archivo para importación...', description: 'El proceso de importación continuará en segundo plano.' });
 
     try {
@@ -93,7 +91,6 @@ const Configuracion = () => {
       });
     } finally {
       setIsLocalImporting(false);
-      setClientLoading(false);
     }
 
     event.target.value = '';
