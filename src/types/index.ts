@@ -3,7 +3,7 @@ export interface Client {
   codcli: string; 
   nomcli?: string;
   ape1cli?: string;
-  nombre_completo?: string; // <--- AÑADIDO
+  nombre_completo?: string;
   email?: string;
   dnicli?: string; 
   dircli?: string;
@@ -56,15 +56,18 @@ export interface Campaign {
   scheduledTime?: string;
   selectedMessageIndex?: number;
   selectedImageIndex?: number;
-  status: 'pending' | 'sent' | 'scheduled' | 'failed';
+  status: 'pending' | 'sent' | 'scheduled' | 'failed' | 'sending' | 'completed_with_errors';
   audienceCount: number;
   createdAt: string;
+  startTime?: string; // <--- AÑADIDO
+  endTime?: string;   // <--- AÑADIDO
 }
 
 export interface WahaConfig {
   $id?: string;
   apiUrl: string;
   apiKey?: string;
+  session?: string;
   minDelayMs?: number; 
   maxDelayMs?: number; 
   batchSizeMin?: number;

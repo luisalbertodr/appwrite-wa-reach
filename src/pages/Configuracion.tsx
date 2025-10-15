@@ -9,11 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Save, Shield, Bot, HardDriveUpload, Download, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CONFIG_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID } from '@/lib/appwrite';
-import { ID, Models } from 'appwrite';
+import { CONFIG_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID, client } from '@/lib/appwrite';
+import { ID, Models, Functions } from 'appwrite';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+
 
 interface ImportLog extends Models.Document {
   timestamp: string;
@@ -26,6 +29,7 @@ interface ImportLog extends Models.Document {
 
 const defaultConfig: Omit<WahaConfig, '$id' | 'apiKey'> = {
   apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api',
+  session: 'default',
   minDelayMs: 2000, maxDelayMs: 5000, batchSizeMin: 15, batchSizeMax: 25,
   batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumbers: [], notificationInterval: 50,
   startTime: '09:00',
@@ -38,15 +42,66 @@ const Configuracion = () => {
   const [config, setConfig] = useState<Omit<WahaConfig, '$id' | 'apiKey'>>(defaultConfig);
   const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
 
+  const [wahaSessions, setWahaSessions] = useState<string[]>([]);
   const [showImportLogDialog, setShowImportLogDialog] = useState(false);
   const [importLogContent, setImportLogContent] = useState<string[]>([]);
   const [isLocalImporting, setIsLocalImporting] = useState(false);
+
+  useEffect(() => {
+    const functions = new Functions(client);
+
+    const fetchWahaSessions = async () => {
+      try {
+        // Solución: Usar async: false para esperar el resultado completo
+        const result = await functions.createExecution(
+          'getWahaSessionsFunction',
+          '',  // data vacío
+          false // async: false para esperar el resultado
+        );
+
+        let sessions: string[] = [];
+
+        try {
+          // Usar any para evitar errores de tipo y acceder a las propiedades dinámicamente
+          const resultAny = result as any;
+          const responseBody = resultAny.stdout || resultAny.responseBody || resultAny.response || '';
+
+          if (!responseBody) {
+            throw new Error("La función no devolvió ningún resultado.");
+          }
+
+          const parsed = JSON.parse(responseBody);
+
+          if (Array.isArray(parsed)) {
+            sessions = parsed;
+          } else {
+            throw new Error("Formato inesperado en la respuesta de la función.");
+          }
+        } catch (err) {
+          console.error("Error parseando respuesta de la función:", err, result);
+          throw new Error("La función devolvió un formato no válido o vacío.");
+        }
+
+        setWahaSessions(sessions);
+      } catch (error) {
+        console.error(error);
+        toast({
+          title: 'Error al obtener sesiones de Waha',
+          description: 'No se pudieron cargar las sesiones disponibles.',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    fetchWahaSessions();
+  }, [toast]);
 
   useEffect(() => {
     if (configs.length > 0) {
       const fetchedConfig = configs[0];
       setConfig({
         apiUrl: fetchedConfig.apiUrl || defaultConfig.apiUrl,
+        session: fetchedConfig.session || defaultConfig.session,
         minDelayMs: fetchedConfig.minDelayMs ?? defaultConfig.minDelayMs,
         maxDelayMs: fetchedConfig.maxDelayMs ?? defaultConfig.maxDelayMs,
         batchSizeMin: fetchedConfig.batchSizeMin ?? defaultConfig.batchSizeMin,
@@ -144,7 +199,25 @@ ${log.errors.join('\n')}
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" />Configuración General</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div><Label htmlFor="apiUrl">URL de la API de Waha</Label><Input id="apiUrl" value={config.apiUrl || ''} onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}/></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <Label htmlFor="apiUrl">URL de la API de Waha</Label>
+                      <Input id="apiUrl" value={config.apiUrl || ''} onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}/>
+                  </div>
+                  <div>
+                      <Label htmlFor="waha-session">Sesión de Waha</Label>
+                      <Select value={config.session} onValueChange={(value) => setConfig({ ...config, session: value })}>
+                          <SelectTrigger id="waha-session">
+                              <SelectValue placeholder="Selecciona una sesión" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {wahaSessions.map(session => (
+                                  <SelectItem key={session} value={session}>{session}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="adminPhoneNumbers">Nº de Teléfonos de Admin (separados por comas)</Label>

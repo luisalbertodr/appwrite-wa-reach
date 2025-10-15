@@ -88,6 +88,23 @@
             "commands": "npm install",
             "path": "functions/sendWhatsAppFunction",
             "specification": "s-1vcpu-512mb"
+        },
+        {
+            "$id": "getWahaSessionsFunction",
+            "name": "getWahaSessionsFunction",
+            "runtime": "node-18.0",
+            "path": "functions/getWahaSessionsFunction",
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "execute": [
+                "users"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "enabled": true,
+            "logging": true,
+            "scopes": []
         }
     ],
     "databases": [
