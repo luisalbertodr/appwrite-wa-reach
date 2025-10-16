@@ -5,7 +5,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
-const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress'; // ID de la colección de progreso
+const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress';
 const MAX_EXECUTION_TIME = 270000; // 4.5 minutos en milisegundos
 
 module.exports = async ({ req, res, log, error }) => {
@@ -27,13 +27,27 @@ module.exports = async ({ req, res, log, error }) => {
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
     const CAMPAIGNS_COLLECTION_ID = process.env.APPWRITE_CAMPAIGNS_COLLECTION_ID || 'campaigns';
 
-
     if (!DATABASE_ID) {
         error('Variable de entorno APPWRITE_DATABASE_ID no configurada.');
         return res.json({ success: false, error: 'Server configuration is incomplete.' }, 500);
     }
 
-    let { clients, template, config, campaignId, remainingClients } = JSON.parse(req.body);
+    let payload;
+    if (typeof req.body === 'string' && req.body.length > 0) {
+        try {
+            payload = JSON.parse(req.body);
+        } catch (e) {
+            error(`Error al parsear el cuerpo de la solicitud JSON: ${e.message}`);
+            return res.json({ success: false, error: 'Cuerpo de la solicitud JSON inválido.' }, 400);
+        }
+    } else if (typeof req.body === 'object' && req.body !== null) {
+        payload = req.body;
+    } else {
+        error('El cuerpo de la solicitud está vacío o tiene un formato no válido.');
+        return res.json({ success: false, error: 'El cuerpo de la solicitud está vacío o tiene un formato no válido.' }, 400);
+    }
+
+    let { clients, template, config, campaignId, remainingClients } = payload;
     const clientList = remainingClients || clients;
 
 
@@ -52,7 +66,7 @@ module.exports = async ({ req, res, log, error }) => {
         endTime = '18:00',
         session = 'default'
     } = config;
-    
+
     if (!remainingClients) {
         res.json({ success: true, message: 'Campaign process started in the background.' });
     }
@@ -64,12 +78,11 @@ module.exports = async ({ req, res, log, error }) => {
 
     if (!WAHA_API_URL || !WAHA_API_KEY) {
         error('Variables de entorno de Waha no configuradas.');
-        if(remainingClients) { return res.json({ success: false, error: 'Waha environment variables not configured.' }, 500); }
+        if (remainingClients) { return res.json({ success: false, error: 'Waha environment variables not configured.' }, 500); }
         return;
     }
-    
-    // MODIFICADO: Añadido clientName
-    const logStatus = async (clientId, clientName, status, errorMsg = '') => {
+
+    const logStatus = async (client, status, errorMsg = '') => {
         try {
             await databases.createDocument(
                 DATABASE_ID,
@@ -77,51 +90,50 @@ module.exports = async ({ req, res, log, error }) => {
                 ID.unique(),
                 {
                     campaignId: campaignId,
-                    clientId: String(clientId),
-                    clientName: clientName, // <-- AÑADIDO
+                    clientId: String(client.codcli),
+                    clientName: client.nombre_completo,
                     status: status,
                     timestamp: new Date().toISOString(),
                     error: errorMsg,
                 }
             );
         } catch (e) {
-            error(`Failed to log status for client ${clientId}: ${e.message}`);
+            error(`Failed to log status for client ${client.codcli}: ${e.message}`);
         }
     };
-    
-    // NUEVO: Función para actualizar el progreso en tiempo real
-    const updateRealtimeProgress = async (clientName, clientPhone) => {
+
+    const updateProgress = async (currentClient) => {
         try {
+            await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
             await databases.updateDocument(
                 DATABASE_ID,
                 CAMPAIGN_PROGRESS_COLLECTION_ID,
                 campaignId,
                 {
-                    currentClientName: clientName,
-                    currentClientPhone: clientPhone
+                    currentClientName: currentClient.nomcli,
+                    currentClientPhone: currentClient.tel2cli
                 }
             );
         } catch (e) {
-             if (e.code === 404) { // Si no existe, lo creamos
+            if (e.code === 404) {
                 try {
                     await databases.createDocument(
                         DATABASE_ID,
                         CAMPAIGN_PROGRESS_COLLECTION_ID,
                         campaignId,
                         {
-                            currentClientName: clientName,
-                            currentClientPhone: clientPhone
+                            currentClientName: currentClient.nomcli,
+                            currentClientPhone: currentClient.tel2cli
                         }
                     );
-                } catch (createError) {
-                    error(`Failed to create progress document for campaign ${campaignId}: ${createError.message}`);
+                } catch (e2) {
+                    error(`Failed to create progress for campaign ${campaignId}: ${e2.message}`);
                 }
             } else {
                 error(`Failed to update progress for campaign ${campaignId}: ${e.message}`);
             }
         }
     };
-
 
     const sendAdminNotification = async (text) => {
         if (!adminPhoneNumbers || !Array.isArray(adminPhoneNumbers) || adminPhoneNumbers.length === 0) {
@@ -149,15 +161,15 @@ module.exports = async ({ req, res, log, error }) => {
             }
         }
     };
-    
+
     if (!remainingClients) {
-      await databases.updateDocument(
-          DATABASE_ID,
-          CAMPAIGNS_COLLECTION_ID,
-          campaignId,
-          { status: 'sending' }
-      );
-      await sendAdminNotification(`🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${clientList.length} clientes.`);
+        await databases.updateDocument(
+            DATABASE_ID,
+            CAMPAIGNS_COLLECTION_ID,
+            campaignId,
+            { status: 'sending' }
+        );
+        await sendAdminNotification(`🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${clientList.length} clientes.`);
     }
 
     let totalSent = 0;
@@ -167,22 +179,27 @@ module.exports = async ({ req, res, log, error }) => {
     const validMessages = template.messages.filter(m => m && m.trim() !== '');
     const validImageUrls = template.imageUrls.filter(url => url && url.trim() !== '');
     
+    // --- FIX START: Correct batching logic ---
+    let currentBatchSize = getRandomNumber(batchSizeMin, batchSizeMax);
+    let messagesSinceLastBatchPause = 0;
+    // --- FIX END ---
+
     for (const [index, c] of clientList.entries()) {
         const elapsedTime = Date.now() - executionStartTime;
         if (elapsedTime > MAX_EXECUTION_TIME) {
             log('Tiempo de ejecución máximo casi alcanzado. Re-planificando la tarea.');
             const nextClients = clientList.slice(index);
+            await sleep(1000); // Pausa antes de re-lanzar
             await functions.createExecution(
                 'sendWhatsAppFunction',
-                JSON.stringify({ ...JSON.parse(req.body), remainingClients: nextClients }),
-                true 
+                JSON.stringify({ ...payload, remainingClients: nextClients }),
+                true
             );
             return;
         }
-        
-        // Actualizar progreso en tiempo real
-        await updateRealtimeProgress(c.nombre_completo, c.tel2cli);
-        
+
+        await updateProgress(c);
+
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
@@ -195,14 +212,15 @@ module.exports = async ({ req, res, log, error }) => {
         if (currentTimeInMinutes < startTimeInMinutes || currentTimeInMinutes >= endTimeInMinutes) {
             log('Fuera del horario de envío. Planificando para el siguiente día.');
             const nextClients = clientList.slice(index);
-            
+
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             tomorrow.setHours(startHour, startMinute, 0, 0);
-            
+
+            await sleep(1000); // Pausa antes de re-lanzar
             await functions.createExecution(
                 'sendWhatsAppFunction',
-                JSON.stringify({ ...JSON.parse(req.body), remainingClients: nextClients }),
+                JSON.stringify({ ...payload, remainingClients: nextClients }),
                 true,
                 undefined,
                 undefined,
@@ -213,8 +231,7 @@ module.exports = async ({ req, res, log, error }) => {
 
         if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
             totalSkipped++;
-            // MODIFICADO: Añadido c.nombre_completo
-            await logStatus(c.codcli, c.nombre_completo, 'skipped', 'Opt-out o teléfono inválido');
+            await logStatus(c, 'skipped', 'Opt-out o teléfono inválido');
             continue;
         }
 
@@ -232,8 +249,7 @@ module.exports = async ({ req, res, log, error }) => {
 
         if (!messageToSend && !imageUrlToSend) {
             totalSkipped++;
-            // MODIFICADO: Añadido c.nombre_completo
-            await logStatus(c.codcli, c.nombre_completo, 'skipped', 'No hay contenido de plantilla para enviar.');
+            await logStatus(c, 'skipped', 'No hay contenido de plantilla para enviar.');
             continue;
         }
 
@@ -262,7 +278,7 @@ module.exports = async ({ req, res, log, error }) => {
 
                 const imageBuffer = await storage.getFileDownload(bucketId, fileId);
                 const imageBase64 = imageBuffer.toString('base64');
-                
+
                 const fileMeta = await storage.getFile(bucketId, fileId);
                 const mimetype = fileMeta.mimeType || 'image/jpeg';
 
@@ -290,19 +306,18 @@ module.exports = async ({ req, res, log, error }) => {
 
             if (response.ok) {
                 totalSent++;
-                // MODIFICADO: Añadido c.nombre_completo
-                await logStatus(c.codcli, c.nombre_completo, 'sent');
+                await logStatus(c, 'sent');
             } else {
                 const errorData = await response.json();
                 totalFailed++;
-                // MODIFICADO: Añadido c.nombre_completo
-                await logStatus(c.codcli, c.nombre_completo, 'failed', `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
+                await logStatus(c, 'failed', `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
             }
         } catch (e) {
             totalFailed++;
-            // MODIFICADO: Añadido c.nombre_completo
-            await logStatus(c.codcli, c.nombre_completo, 'failed', `Network error: ${e.message}`);
+            await logStatus(c, 'failed', `Network error: ${e.message}`);
         }
+        
+        messagesSinceLastBatchPause++;
 
         if ((index + 1) % notificationInterval === 0) {
             await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados: ${index + 1}/${clientList.length}\n- Enviados: ${totalSent}\n- Fallidos: ${totalFailed}\n- Saltados: ${totalSkipped}`);
@@ -310,17 +325,28 @@ module.exports = async ({ req, res, log, error }) => {
 
         const delay = getRandomNumber(minDelayMs, maxDelayMs);
         await sleep(delay);
-
-        if ((index + 1) % getRandomNumber(batchSizeMin, batchSizeMax) === 0) {
+        
+        // --- FIX START: Correct batching logic ---
+        if (messagesSinceLastBatchPause >= currentBatchSize) {
             const batchDelay = getRandomNumber(batchDelayMsMin, batchDelayMsMax);
             log(`Pausa de lote de ${batchDelay / 1000}s`);
             await sleep(batchDelay);
+            // Reset for the next batch
+            messagesSinceLastBatchPause = 0;
+            currentBatchSize = getRandomNumber(batchSizeMin, batchSizeMax);
         }
+        // --- FIX END ---
     }
 
+    try {
+        await databases.deleteDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
+    } catch (e) {
+        error(`Could not delete progress document for campaign ${campaignId}: ${e.message}`);
+    }
+
+
     log(`Campaña ${campaignId} finalizada.`);
-    // MODIFICADO: Cambiado 'sent' por 'completed' para mayor claridad
-    const finalStatus = totalFailed > 0 ? 'completed_with_errors' : 'completed';
+    const finalStatus = totalFailed > 0 ? 'completed_with_errors' : 'sent';
 
     await databases.updateDocument(
         DATABASE_ID,
@@ -334,4 +360,6 @@ module.exports = async ({ req, res, log, error }) => {
     if (remainingClients) {
         return res.json({ success: true, message: 'Chunk processed successfully.' });
     }
+
+    return res.json({ success: true, message: 'Campaign finished successfully.' });
 };
