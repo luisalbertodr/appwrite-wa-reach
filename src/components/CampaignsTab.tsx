@@ -9,15 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Filter, Download, Loader2, Search, ImagePlus, Save, Edit } from 'lucide-react';
+import { Send, Filter, Download, Loader2, Search, ImagePlus, Save, Edit, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID } from '@/lib/appwrite';
+import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, CAMPAIGN_PROGRESS_COLLECTION_ID } from '@/lib/appwrite';
 import { Functions, Query, ID, Models } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { calculateAge } from '@/lib/validators';
 
 const functions = new Functions(client);
@@ -27,6 +27,11 @@ interface Progress {
   failed: number;
   skipped: number;
   total: number;
+}
+
+interface CampaignProgress extends Models.Document {
+    currentClientName: string;
+    currentClientPhone: string;
 }
 
 const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
@@ -56,6 +61,10 @@ export function CampaignsTab() {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [editingClient, setEditingClient] = useState<(Client & Models.Document) | null>(null);
+  
+  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
+  const [showLogDialog, setShowLogDialog] = useState(false);
+  const [logContent, setLogContent] = useState<Models.Document[]>([]);
 
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
 
@@ -111,6 +120,26 @@ export function CampaignsTab() {
     handleApplyFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  useEffect(() => {
+    const checkForActiveCampaigns = async () => {
+      try {
+        const response = await databases.listDocuments(
+          DATABASE_ID,
+          CAMPAIGNS_COLLECTION_ID,
+          [Query.equal('status', 'sending'), Query.limit(1)]
+        );
+        if (response.documents.length > 0) {
+          const activeCampaign = response.documents[0] as Campaign & Models.Document;
+          setActiveCampaignId(activeCampaign.$id);
+          setProgress(prev => ({ ...prev, total: activeCampaign.audienceCount }));
+        }
+      } catch (error) {
+        console.error("Error checking for active campaigns:", error);
+      }
+    };
+    checkForActiveCampaigns();
+  }, []);
 
   useEffect(() => {
     reloadTemplates();
@@ -119,6 +148,11 @@ export function CampaignsTab() {
 
   useEffect(() => {
     if (!activeCampaignId) return;
+
+    const unsubscribeProgress = client.subscribe(`databases.${DATABASE_ID}.collections.${CAMPAIGN_PROGRESS_COLLECTION_ID}.documents.${activeCampaignId}`, response => {
+        setCampaignProgress(response.payload as CampaignProgress);
+    });
+
     const interval = setInterval(async () => {
       try {
         const response = await databases.listDocuments(
@@ -132,10 +166,15 @@ export function CampaignsTab() {
         if (sent + failed + skipped >= progress.total) {
           toast({ title: 'Campaña Completada' });
           setActiveCampaignId(null);
+          setCampaignProgress(null);
         }
       } catch (error) { clearInterval(interval); }
     }, 5000);
-    return () => clearInterval(interval);
+
+    return () => {
+        clearInterval(interval);
+        unsubscribeProgress();
+    };
   }, [activeCampaignId, progress.total, toast]);
 
   const handleSaveTemplate = async () => {
@@ -265,23 +304,15 @@ export function CampaignsTab() {
     toast({ title: 'Exportación completada' });
   };
     
-  const handleDownloadCampaignLog = async (campaignId: string) => {
+  const handleShowCampaignLog = async (campaignId: string) => {
     try {
         const response = await databases.listDocuments(
             DATABASE_ID,
             MESSAGE_LOGS_COLLECTION_ID,
             [Query.equal('campaignId', campaignId), Query.limit(5000)]
         );
-        
-        const logContent = response.documents.map(log => 
-            `Cliente: ${log.clientId}, Estado: ${log.status}, Fecha: ${new Date(log.timestamp).toLocaleString()}` + (log.error ? `, Error: ${log.error}` : '')
-        ).join('\n');
-
-        const blob = new Blob([logContent], { type: 'text/plain;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `log_campaña_${campaignId}.txt`;
-        link.click();
+        setLogContent(response.documents);
+        setShowLogDialog(true);
 
     } catch (error) {
         toast({ title: 'Error al descargar el log', variant: 'destructive' });
@@ -323,6 +354,9 @@ export function CampaignsTab() {
             <Progress value={progressPercentage} className="w-full" />
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{`Procesados: ${processedCount} de ${progress.total}`}</span>
+              {campaignProgress && (
+                <span>Enviando a: {campaignProgress.currentClientName} ({campaignProgress.currentClientPhone})</span>
+              )}
               <div className="flex gap-4">
                 <span>Éxitos: {progress.sent}</span><span>Fallos: {progress.failed}</span><span>Saltados: {progress.skipped}</span>
               </div>
@@ -468,8 +502,8 @@ export function CampaignsTab() {
                   <TableCell>{campaign.audienceCount}</TableCell>
                   <TableCell><Badge>{campaign.status}</Badge></TableCell>
                     <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => handleDownloadCampaignLog(campaign.$id!)}>
-                            <Download className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" onClick={() => handleShowCampaignLog(campaign.$id!)}>
+                            <FileText className="w-4 h-4" />
                         </Button>
                     </TableCell>
                 </TableRow>
@@ -507,6 +541,42 @@ export function CampaignsTab() {
             </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={showLogDialog} onOpenChange={setShowLogDialog}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                  <DialogTitle>Log de la Campaña</DialogTitle>
+                  <DialogDescription>
+                    Aquí puedes ver el detalle de los envíos de la campaña.
+                  </DialogDescription>
+              </DialogHeader>
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                          <TableHead>Cliente ID</TableHead>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Hora de Envío</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Error</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {logContent.map(log => (
+                          <TableRow key={log.$id}>
+                              <TableCell>{log.clientId}</TableCell>
+                              <TableCell>{log.clientName}</TableCell>
+                              <TableCell>{new Date(log.timestamp).toLocaleTimeString()}</TableCell>
+                              <TableCell>{log.status}</TableCell>
+                              <TableCell>{log.error}</TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+              <DialogFooter>
+                  <Button onClick={() => setShowLogDialog(false)}>Cerrar</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
 
     </div>
   );
