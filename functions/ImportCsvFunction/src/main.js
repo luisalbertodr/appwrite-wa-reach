@@ -24,11 +24,10 @@ module.exports = async ({ req, res, log, error }) => {
     const importWarnings = [];
     let errorSummary = {};
     const timestamp = new Date().toISOString();
-    let fileName = 'unknown-file.csv';
+    let fileName = 'unknown-file';
 
-    // Función para añadir y contar errores/advertencias de forma segura
     const addIssue = (issueList, message) => {
-        const messageStr = String(message); // Asegura que el mensaje sea siempre un string
+        const messageStr = String(message);
         issueList.push(messageStr);
         try {
             const errorType = messageStr.split(':')[1]?.split('(')[0].trim() || 'Desconocido';
@@ -38,8 +37,6 @@ module.exports = async ({ req, res, log, error }) => {
         }
     };
 
-
-    // Helper functions
     const calculateAge = (dob) => {
         if (!dob) return 0;
         const birthDate = new Date(dob);
@@ -155,7 +152,15 @@ module.exports = async ({ req, res, log, error }) => {
         const fileId = latestFile.$id;
         fileName = latestFile.name;
 
-        log(`Processing latest file: ${fileName} (ID: ${fileId}) from bucket: ${IMPORT_BUCKET_ID}`);
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Comprobar si el archivo es un CSV, si no, ignorarlo y salir.
+        if (!fileName.toLowerCase().endsWith('.csv')) {
+            log(`Ignoring non-CSV file: ${fileName}.`);
+            return res.json({ ok: true, message: `Archivo ${fileName} ignorado por no ser CSV.` }, 200);
+        }
+        // --- FIN DE LA MODIFICACIÓN ---
+
+        log(`Processing CSV file: ${fileName} (ID: ${fileId}) from bucket: ${IMPORT_BUCKET_ID}`);
 
         const fileBuffer = await storage.getFileDownload(IMPORT_BUCKET_ID, fileId);
         const fileContent = fileBuffer.toString('utf8');
