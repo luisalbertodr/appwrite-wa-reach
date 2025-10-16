@@ -226,9 +226,9 @@ module.exports = async ({ req, res, log, error }) => {
         }
         
         let logStatus = 'completed';
-        if (importErrors.length > 0) {
+        if (importErrors.length > 0 && successfulImports === 0) {
             logStatus = 'failed';
-        } else if (importWarnings.length > 0) {
+        } else if (importErrors.length > 0 || importWarnings.length > 0) {
             logStatus = 'completed_with_errors';
         }
         
