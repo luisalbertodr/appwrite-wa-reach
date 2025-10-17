@@ -1,46 +1,23 @@
-import { useState, useEffect } from 'react';
 import { CampaignsTab } from '@/components/CampaignsTab';
 import { Settings, LogOut } from 'lucide-react';
-import AuthForm from '@/components/AuthForm';
-import { account } from '../lib/appwrite';
+// AuthForm ya no es necesario aquí
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useLogout } from '@/hooks/useAuth'; // <-- MODIFICADO
 
 const Index = () => {
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // Ya no necesitamos currentUser, loading o useEffect.
+  // App.tsx garantiza que esta página solo se renderiza si el usuario está logueado.
 
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const user = await account.get();
-        setCurrentUser(user);
-      } catch (error) {
-        setCurrentUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkUser();
-  }, []);
+  // Usamos el hook de mutación para el logout
+  const { mutate: logoutUser, isPending: isLoggingOut } = useLogout();
 
-  const handleLogout = async () => {
-    try {
-      await account.deleteSession('current');
-      setCurrentUser(null);
-      alert('Sesión cerrada correctamente');
-    } catch (error: any) {
-      alert('Error al cerrar sesión: ' + error.message);
-    }
+  const handleLogout = () => {
+    logoutUser();
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
-  }
-
-  if (!currentUser) {
-    return <AuthForm onLoginSuccess={setCurrentUser} />;
-  }
+  // El estado de carga (loading) y el chequeo de currentUser
+  // han sido eliminados porque App.tsx ya los maneja.
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,9 +36,14 @@ const Index = () => {
                 Configuración y Clientes
               </Button>
             </Link>
-            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              disabled={isLoggingOut} // Deshabilitar mientras cierra sesión
+              className="flex items-center gap-2"
+            >
               <LogOut className="w-4 h-4" />
-              Cerrar Sesión
+              {isLoggingOut ? "Cerrando..." : "Cerrar Sesión"}
             </Button>
           </div>
         </div>
