@@ -6,7 +6,8 @@ export interface LipooutDocument extends Models.Document {
 }
 
 // Helper type to remove Appwrite metadata for creation/update inputs
-export type LipooutUserInput<T extends LipooutDocument> = Omit<T, keyof Models.Document>;
+// Adjusted the helper type to be more flexible
+export type LipooutUserInput<T> = Omit<T, keyof Models.Document>;
 
 
 // --- Tipos Core Lipoout ---
@@ -15,23 +16,25 @@ export * from './articulo.types';
 export * from './familia.types';
 export * from './empleado.types';
 export * from './cita.types';
-// (Próximamente se añadirán: Factura, Proveedor, Recurso)
+export * from './factura.types'; // <-- Añadido
+// (Próximamente se añadirán: Proveedor, Recurso)
 
-// Exportar tipos Input específicos
-export type { CitaInput } from './cita.types';
-export type { ArticuloInput } from './articulo.types';
+// Exportar tipos Input específicos (Si se definen en los archivos correspondientes)
+// export type { CitaInput } from './cita.types'; // Example if defined
+// export type { ArticuloInput } from './articulo.types'; // Example if defined
+// export type { CreateFacturaInput, UpdateFacturaInput } from './factura.types'; // Example if defined
 
 
 // --- Tipos Módulo WhatsApp (Migrados de la PoC) ---
 
-// Definimos MessageLog aquí si no existe en otro sitio
-export interface MessageLog extends Models.Document {
+// Definimos MessageLog aquí
+export interface MessageLog extends LipooutDocument { // Inherit from LipooutDocument
   clientId: string;
   clientName?: string;
   timestamp: string;
   status: 'sent' | 'failed' | 'skipped';
   error?: string;
-  campaignId?: string; // Asumiendo que existe este campo
+  campaignId?: string;
 }
 
 
