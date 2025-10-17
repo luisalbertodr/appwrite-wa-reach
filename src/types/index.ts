@@ -1,26 +1,20 @@
-export interface Client {
-  $id?: string;
-  codcli: string; 
-  nomcli?: string;
-  ape1cli?: string;
-  nombre_completo?: string;
-  email?: string;
-  dnicli?: string; 
-  dircli?: string;
-  codposcli?: string;
-  pobcli?: string;
-  procli?: string;
-  tel1cli?: string; 
-  tel2cli?: string; 
-  fecnac?: string;
-  enviar?: 0 | 1; 
-  sexo?: 'H' | 'M' | 'Otro';
-  fecalta?: string; 
-  edad?: number; 
-  facturacion: number; 
-  intereses?: string[]; 
-  importErrors?: string[];
+import { Models } from 'appwrite';
+
+// Interfaz base para todos los documentos de Lipoout
+export interface LipooutDocument extends Models.Document {
+  // Aquí podemos añadir campos comunes si los hubiera
 }
+
+// --- Tipos Core Lipoout ---
+export * from './cliente.types';
+export * from './articulo.types';
+export * from './familia.types';
+export * from './empleado.types'; // Añadido
+export * from './cita.types'; // Añadido
+// (Próximamente se añadirán: Factura, Proveedor, Recurso)
+
+
+// --- Tipos Módulo WhatsApp (Migrados de la PoC) ---
 
 export interface WhatsAppFunctionPayload {
   recipient: string;
@@ -34,15 +28,13 @@ export interface WhatsAppFunctionResponse {
   error?: string;
 }
 
-export interface Template {
-  $id?: string;
+export interface Template extends LipooutDocument {
   name: string;
   messages: string[];
   imageUrls: string[];
 }
 
-export interface Campaign {
-  $id?: string;
+export interface Campaign extends LipooutDocument {
   name: string;
   templateId: string;
   filters?: {
@@ -59,12 +51,11 @@ export interface Campaign {
   status: 'pending' | 'sent' | 'scheduled' | 'failed' | 'sending' | 'completed_with_errors';
   audienceCount: number;
   createdAt: string;
-  startTime?: string; // <--- AÑADIDO
-  endTime?: string;   // <--- AÑADIDO
+  startTime?: string;
+  endTime?: string;
 }
 
-export interface WahaConfig {
-  $id?: string;
+export interface WahaConfig extends LipooutDocument {
   apiUrl: string;
   apiKey?: string;
   session?: string;

@@ -14,7 +14,12 @@ module.exports = async ({ req, res, log, error }) => {
     const storage = new Storage(client);
 
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
-    const CLIENTS_COLLECTION_ID = process.env.APPWRITE_CLIENTS_COLLECTION_ID;
+    
+    // --- MODIFICACIÓN DEL PLAN ---
+    // Apuntamos explícitamente a la nueva colección de Lipoout 'clientes'.
+    const CLIENTS_COLLECTION_ID = 'clientes'; // (Anteriormente: process.env.APPWRITE_CLIENTS_COLLECTION_ID)
+    // ---------------------------
+
     const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
     const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
 
@@ -152,13 +157,10 @@ module.exports = async ({ req, res, log, error }) => {
         const fileId = latestFile.$id;
         fileName = latestFile.name;
 
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Comprobar si el archivo es un CSV, si no, ignorarlo y salir.
         if (!fileName.toLowerCase().endsWith('.csv')) {
             log(`Ignoring non-CSV file: ${fileName}.`);
             return res.json({ ok: true, message: `Archivo ${fileName} ignorado por no ser CSV.` }, 200);
         }
-        // --- FIN DE LA MODIFICACIÓN ---
 
         log(`Processing CSV file: ${fileName} (ID: ${fileId}) from bucket: ${IMPORT_BUCKET_ID}`);
 
@@ -212,8 +214,12 @@ module.exports = async ({ req, res, log, error }) => {
                     nombre_completo: `${newClientRecord.nomcli || ''} ${newClientRecord.ape1cli || ''}`.trim(),
                     edad: newClientRecord.fecnac ? calculateAge(newClientRecord.fecnac) : undefined,
                     importErrors: Object.values(warnings),
+                    // Añadimos campos que falten en el tipo Cliente si es necesario
+                    facturacion: parseFloat(clientData.facturacion) || 0,
+                    intereses: clientData.intereses ? clientData.intereses.split(',').map(i => i.trim()) : [],
                 };
                 
+                // Aseguramos que la búsqueda se hace contra la colección correcta
                 const existing = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, [Query.equal('codcli', newClientRecord.codcli)]);
 
                 if (existing.documents.length > 0) {

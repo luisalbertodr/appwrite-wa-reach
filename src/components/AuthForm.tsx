@@ -1,104 +1,174 @@
-import React, { useState } from 'react';
-import { account } from '../lib/appwrite';
-import { OAuthProvider } from 'appwrite';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
-import { Label } from './ui/label';
-import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from './ui/card';
+import { useState } from 'react';
+import { account } from '@/lib/appwrite';
+import { AppwriteException, ID } from 'appwrite';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMutation, useQueryClient } from '@tanstack/react-query'; // <-- Import useQueryClient
 
-const AuthForm: React.FC<{ onLoginSuccess: (user: any) => void }> = ({ onLoginSuccess }) => {
+// Eliminamos la prop 'onLoginSuccess' de la interfaz
+interface AuthFormProps {
+  // onLoginSuccess: (user: any) => void; // <-- ELIMINADO
+}
+
+// Eliminamos 'onLoginSuccess' de los props del componente
+const AuthForm = (/*{ onLoginSuccess }: AuthFormProps*/) => { // <-- ELIMINADO
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(''); // Para registro
+  const { toast } = useToast();
+  const queryClient = useQueryClient(); // <-- Obtener el queryClient
 
-  const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+  // --- Mutación para Login ---
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string, password: string }) =>
+      account.createEmailPasswordSession(email, password),
+    onSuccess: (/*session*/) => {
+      toast({ title: 'Inicio de sesión exitoso' });
+      // En lugar de llamar a onLoginSuccess, invalidamos la query del usuario
+      queryClient.invalidateQueries({ queryKey: ['user'] }); // <-- MODIFICADO
+      // App.tsx detectará el cambio y redirigirá
+    },
+    onError: (error: AppwriteException) => {
+      toast({
+        title: 'Error al iniciar sesión',
+        description: error.message || 'Credenciales incorrectas.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // --- Mutación para Registro ---
+  const registerMutation = useMutation({
+    mutationFn: ({ email, password, name }: { email: string, password: string, name: string }) =>
+      account.create(ID.unique(), email, password, name),
+    onSuccess: async (/*user*/) => {
+      toast({ title: 'Registro exitoso', description: 'Por favor, inicia sesión.' });
+      // Podríamos intentar iniciar sesión automáticamente aquí si quisiéramos
+      // await loginMutation.mutateAsync({ email, password });
+      // O simplemente dejar que el usuario inicie sesión manualmente
+    },
+    onError: (error: AppwriteException) => {
+      toast({
+        title: 'Error en el registro',
+        description: error.message || 'No se pudo crear la cuenta.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await account.createEmailPasswordSession(email, password);
-      const user = await account.get();
-      onLoginSuccess(user);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during authentication.');
-    } finally {
-      setLoading(false);
-    }
+    loginMutation.mutate({ email, password });
   };
 
-  const handleGoogleAuth = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      // --- INICIO DE LA MODIFICACIÓN ---
-      // Reemplaza "https://tu-dominio.com/" con la URL de tu aplicación desplegada
-      const successUrl = 'https://wasap.lipoout.com/';
-      const failureUrl = 'https://wasap.lipoout.com/login';
-      await account.createOAuth2Session(OAuthProvider.Google, successUrl, failureUrl);
-      // --- FIN DE LA MODIFICACIÓN ---
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during Google authentication.');
-    } finally {
-      setLoading(false);
-    }
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    registerMutation.mutate({ email, password, name });
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">
-            Login
-          </CardTitle>
-          <CardDescription className="text-center">
-            Introduce tu email y contraseña o usa Google
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {error && <p className="text-red-500 text-center">{error}</p>}
-          <form onSubmit={handleEmailPasswordAuth} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Iniciando...' : 'Iniciar Sesión'}
-            </Button>
-          </form>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                O continuar con
-              </span>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full" onClick={handleGoogleAuth} disabled={loading}>
-            Google
-          </Button>
-        </CardContent>
-        <CardFooter className="flex justify-center" />
-      </Card>
+    <div className="flex justify-center items-center min-h-screen bg-muted/40">
+      <Tabs defaultValue="login" className="w-[400px]">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+          <TabsTrigger value="register">Registrarse</TabsTrigger>
+        </TabsList>
+
+        {/* Pestaña de Login */}
+        <TabsContent value="login">
+          <Card>
+            <CardHeader>
+              <CardTitle>Iniciar Sesión</CardTitle>
+              <CardDescription>Accede a tu cuenta de Lipoout.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleLogin}>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="tu@email.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Contraseña</Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                  {loginMutation.isPending ? 'Accediendo...' : 'Acceder'}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </TabsContent>
+
+        {/* Pestaña de Registro */}
+        <TabsContent value="register">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registrarse</CardTitle>
+              <CardDescription>Crea una nueva cuenta para acceder.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleRegister}>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-name">Nombre</Label>
+                  <Input
+                    id="register-name"
+                    type="text"
+                    placeholder="Tu Nombre"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email</Label>
+                  <Input
+                    id="register-email"
+                    type="email"
+                    placeholder="tu@email.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">Contraseña</Label>
+                  <Input
+                    id="register-password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
+                  {registerMutation.isPending ? 'Registrando...' : 'Crear Cuenta'}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
