@@ -48,23 +48,23 @@ export const createArticulo = (articuloInput: CreateArticuloInput) => {
    }
 
 
-  return databases.createDocument<Articulo & Models.Document>( // Añadimos Models.Document para el retorno
+  return databases.createDocument( // Añadimos Models.Document para el retorno
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,
     ID.unique(),
     articuloToSave // Enviamos el objeto sin 'familia' anidada
-  );
+  ) as Promise<Articulo & Models.Document>;
 };
 
 export const updateArticulo = (id: string, articuloInput: UpdateArticuloInput) => {
    // Similar a create, quitamos 'familia' si está presente
    const articuloToUpdate = { ...articuloInput };
-  return databases.updateDocument<Articulo & Models.Document>( // Añadimos Models.Document para el retorno
+  return databases.updateDocument( // Añadimos Models.Document para el retorno
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,
     id,
     articuloToUpdate
-  );
+  ) as Promise<Articulo & Models.Document>;
 };
 
 export const deleteArticulo = (id: string) => {

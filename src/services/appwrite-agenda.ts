@@ -45,12 +45,12 @@ export const createCita = (cita: CreateCitaInput) => {
     duracion_minutos: duracionMinutos,
   };
 
-  return databases.createDocument<Cita & Models.Document>( // Añadimos Models.Document
+  return databases.createDocument( // Añadimos Models.Document
     DATABASE_ID,
     CITAS_COLLECTION_ID,
     ID.unique(),
     citaToSave // Enviamos el objeto compatible
-  );
+  ) as Promise<Cita & Models.Document>;
 };
 
 // Actualizar una cita existente
@@ -73,12 +73,12 @@ export const updateCita = (id: string, cita: UpdateCitaInput) => {
        }
    }
 
-  return databases.updateDocument<Cita & Models.Document>( // Añadimos Models.Document
+  return databases.updateDocument( // Añadimos Models.Document
     DATABASE_ID,
     CITAS_COLLECTION_ID,
     id,
     citaToUpdate // Enviamos el objeto parcial compatible
-  );
+  ) as Promise<Cita & Models.Document>;
 };
 
 // Eliminar una cita
