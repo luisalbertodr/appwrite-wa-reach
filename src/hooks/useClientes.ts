@@ -1,35 +1,32 @@
 import { databases, DATABASE_ID, CLIENTES_COLLECTION_ID } from '@/lib/appwrite';
-import { Cliente } from '@/types';
+import { Cliente, LipooutUserInput } from '@/types'; // Import Cliente y LipooutUserInput
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ID, Query } from 'appwrite';
+import { ID, Query, Models } from 'appwrite'; // Import Models
 
 const CLIENTES_QUERY_KEY = 'clientes';
 
-// Tipado para la creación (omitimos campos de Appwrite)
-type CreateClienteInput = Omit<Cliente, '$id' | '$collectionId' | '$databaseId' | '$createdAt' | '$updatedAt' | '$permissions'>;
-// Tipado para la actualización (hacemos todo opcional)
+// Usamos el helper LipooutUserInput
+type CreateClienteInput = LipooutUserInput<Cliente>;
 type UpdateClienteInput = Partial<CreateClienteInput>;
 
 // Hook para OBTENER todos los clientes
 export const useGetClientes = (searchQuery: string = "") => {
-  return useQuery<Cliente[]>({
+  return useQuery<Cliente[]>({ // El tipo de retorno es Cliente[]
     queryKey: [CLIENTES_QUERY_KEY, searchQuery],
     queryFn: async () => {
-      const queries = [Query.limit(100)]; // Ajustar límite según necesidad
+      const queries = [Query.limit(100)];
       if (searchQuery) {
-        // Asumimos búsqueda por nombre completo o email
         queries.push(Query.search('nombre_completo', searchQuery));
-        // Nota: Appwrite necesita índices para las búsquedas
       }
 
-      const response = await databases.listDocuments<Cliente>(
+      const response = await databases.listDocuments<Cliente>( // Especificar Cliente
         DATABASE_ID,
         CLIENTES_COLLECTION_ID,
         queries
       );
       return response.documents;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -38,15 +35,17 @@ export const useCreateCliente = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (newCliente: CreateClienteInput) => {
-      return databases.createDocument<Cliente>(
+      // Aseguramos que los campos requeridos por Appwrite/tipo estén
+      const clienteToSave = { ...newCliente };
+      // Podríamos añadir validación aquí si es necesario
+      return databases.createDocument<Cliente & Models.Document>( // Añadir Models.Document
         DATABASE_ID,
         CLIENTES_COLLECTION_ID,
         ID.unique(),
-        newCliente
+        clienteToSave
       );
     },
     onSuccess: () => {
-      // Invalidar la cache de clientes para que se actualice la lista
       queryClient.invalidateQueries({ queryKey: [CLIENTES_QUERY_KEY] });
     },
   });
@@ -56,8 +55,9 @@ export const useCreateCliente = () => {
 export const useUpdateCliente = () => {
   const queryClient = useQueryClient();
   return useMutation({
+    // La data ya es Partial<CreateClienteInput>, compatible con LipooutUserInput<Cliente>
     mutationFn: ({ $id, data }: { $id: string, data: UpdateClienteInput }) => {
-      return databases.updateDocument<Cliente>(
+      return databases.updateDocument<Cliente & Models.Document>( // Añadir Models.Document
         DATABASE_ID,
         CLIENTES_COLLECTION_ID,
         $id,

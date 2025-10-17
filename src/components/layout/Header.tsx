@@ -38,7 +38,7 @@ const Header = () => {
           <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-             <Link to="/configuracion" className="flex items-center cursor-pointer">
+             <Link to="/configuracion" className="flex items-center cursor-pointer w-full"> {/* Añadido w-full para asegurar click */}
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configuración</span>
              </Link>

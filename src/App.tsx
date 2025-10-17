@@ -1,22 +1,18 @@
-import { Suspense, lazy } from 'react';
+// import { Suspense, lazy } from 'react'; // <-- Mantenemos comentado
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import AuthForm from './components/AuthForm';
 import { useUser } from './hooks/useAuth';
-import LoadingSpinner from './components/LoadingSpinner';
-import AppLayout from './components/layout/AppLayout'; // <-- 1. IMPORTAR LAYOUT
+import LoadingSpinner from './components/LoadingSpinner'; // Verificado
+import AppLayout from './components/layout/AppLayout'; // Verificado
 
-// --- Carga diferida (Lazy Loading) para las páginas de Lipoout ---
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const Agenda = lazy(() => import('@/pages/Agenda'));
-const Clientes = lazy(() => import('@/pages/Clientes'));
-const Articulos = lazy(() => import('@/pages/Articulos'));
-const Empleados = lazy(() => import('@/pages/Empleados'));
-const TPV = lazy(() => import('@/pages/TPV'));
-const Facturacion = lazy(() => import('@/pages/Facturacion'));
-const Marketing = lazy(() => import('@/pages/Marketing'));
-const Configuracion = lazy(() => import('@/pages/Configuracion'));
-const NotFound = lazy(() => import('@/pages/NotFound'));
+// --- Importamos Dashboard directamente ---
+import Dashboard from '@/pages/Dashboard'; // Verificado
+// Comentamos las otras importaciones lazy por ahora
+// import Agenda from '@/pages/Agenda'; // etc.
+import Configuracion from '@/pages/Configuracion'; // Mantenemos esta si es necesaria directa
+import NotFound from '@/pages/NotFound'; // Mantenemos esta si es necesaria directa
+
 
 function App() {
   const { data: user, isLoading } = useUser();
@@ -30,35 +26,32 @@ function App() {
     );
   }
 
-  // Define las rutas protegidas, AHORA ENVUELTAS EN AppLayout
+  // Define las rutas protegidas (SIN Suspense)
   const ProtectedRoutes = (
-    <AppLayout> {/* <-- 2. ENVOLVER RUTAS */}
-      <Suspense fallback={<LoadingSpinner />}>
+    <AppLayout>
+      {/* <Suspense fallback={<LoadingSpinner />}> */}
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/agenda" element={<Agenda />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/articulos" element={<Articulos />} />
-          <Route path="/empleados" element={<Empleados />} />
-          <Route path="/tpv" element={<TPV />} />
-          <Route path="/facturacion" element={<Facturacion />} />
-          <Route path="/marketing" element={<Marketing />} />
+          {/* Comentamos las otras rutas lazy temporalmente */}
+          {/* <Route path="/agenda" element={<Agenda />} /> */}
+          {/* <Route path="/clientes" element={<Clientes />} /> */}
+          {/* ... */}
           <Route path="/configuracion" element={<Configuracion />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </Suspense>
+      {/* </Suspense> */}
     </AppLayout>
   );
 
-  // Define las rutas públicas
+  // Define las rutas públicas (SIN Suspense)
   const PublicRoutes = (
-    <Suspense fallback={<LoadingSpinner />}>
+    // <Suspense fallback={<LoadingSpinner />}>
       <Routes>
         <Route path="/login" element={<AuthForm />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
-    </Suspense>
+    // </Suspense>
   );
 
   return (

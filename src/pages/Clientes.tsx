@@ -1,11 +1,11 @@
 import { useGetClientes } from '@/hooks/useClientes';
-import { Cliente } from '@/types';
+import { Cliente } from '@/types'; // Verificado
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import LoadingSpinner from '@/components/LoadingSpinner'; // Verificado
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const Clientes = () => {
-  // Usamos el nuevo hook para obtener los clientes
   const { data: clientes, isLoading, error } = useGetClientes();
 
   const renderContent = () => {
@@ -48,7 +47,7 @@ const Clientes = () => {
               <TableCell>
                 <Badge variant="outline">{cliente.codcli}</Badge>
               </TableCell>
-              <TableCell className="font-medium">{cliente.nombre_completo || `${cliente.nomcli} ${cliente.ape1cli}`}</TableCell>
+              <TableCell className="font-medium">{cliente.nombre_completo || `${cliente.nomcli || ''} ${cliente.ape1cli || ''}`.trim()}</TableCell> {/* Fallback si nombre_completo falta */}
               <TableCell>{cliente.email}</TableCell>
               <TableCell>{cliente.tel2cli || cliente.tel1cli}</TableCell>
               <TableCell>{cliente.dnicli}</TableCell>
@@ -61,7 +60,8 @@ const Clientes = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">Eliminar</Boton>
+                    {/* Corregido el cierre de tag */}
+                    <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
@@ -84,7 +84,7 @@ const Clientes = () => {
           Crear Cliente
         </Button>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Lista de Clientes</CardTitle>

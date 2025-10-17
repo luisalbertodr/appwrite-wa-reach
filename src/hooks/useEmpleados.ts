@@ -4,9 +4,9 @@ import {
   createEmpleado,
   updateEmpleado,
   deleteEmpleado,
-  CreateEmpleadoInput,
-  UpdateEmpleadoInput,
-} from '@/services/appwrite-empleados';
+  CreateEmpleadoInput, // Correcto
+  UpdateEmpleadoInput, // Correcto
+} from '@/services/appwrite-empleados'; // Verificado
 
 const EMPLEADOS_QUERY_KEY = 'empleados';
 
@@ -14,7 +14,7 @@ export const useGetEmpleados = (soloActivos: boolean = true) => {
   return useQuery({
     queryKey: [EMPLEADOS_QUERY_KEY, { soloActivos }],
     queryFn: () => getEmpleados(soloActivos),
-    staleTime: 1000 * 60 * 15, // 15 minutos de caché para empleados
+    staleTime: 1000 * 60 * 15,
   });
 };
 
@@ -33,11 +33,8 @@ export const useUpdateEmpleado = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateEmpleadoInput }) =>
       updateEmpleado(id, data),
-    onSuccess: (_, variables) => {
-      // Invalidar toda la lista
+    onSuccess: (/* _, variables */) => { // Comentamos variables si no se usa
       queryClient.invalidateQueries({ queryKey: [EMPLEADOS_QUERY_KEY] });
-      // (Opcional) Actualizar la caché individual si tenemos el dato completo
-      // queryClient.setQueryData([EMPLEADOS_QUERY_KEY, variables.id], updatedData);
     },
   });
 };

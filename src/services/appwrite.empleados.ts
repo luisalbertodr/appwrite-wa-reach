@@ -1,8 +1,9 @@
 import { databases, DATABASE_ID, EMPLEADOS_COLLECTION_ID } from '@/lib/appwrite';
-import { Empleado } from '@/types';
-import { ID, Query } from 'appwrite';
+import { Empleado, LipooutUserInput } from '@/types'; // Import LipooutUserInput
+import { ID, Query, Models } from 'appwrite'; // Import Models
 
-export type CreateEmpleadoInput = Omit<Empleado, '$id' | '$collectionId' | '$databaseId' | '$createdAt' | '$updatedAt' | '$permissions'>;
+// Usamos el helper LipooutUserInput
+export type CreateEmpleadoInput = LipooutUserInput<Empleado>;
 export type UpdateEmpleadoInput = Partial<CreateEmpleadoInput>;
 
 export const getEmpleados = async (soloActivos: boolean = true): Promise<Empleado[]> => {
@@ -24,7 +25,7 @@ export const createEmpleado = (empleado: CreateEmpleadoInput) => {
     ...empleado,
     nombre_completo: `${empleado.nombre} ${empleado.apellidos}`.trim(),
   };
-  return databases.createDocument<Empleado>(
+  return databases.createDocument<Empleado & Models.Document>( // Añadimos Models.Document
     DATABASE_ID,
     EMPLEADOS_COLLECTION_ID,
     ID.unique(),
@@ -36,14 +37,13 @@ export const updateEmpleado = (id: string, empleado: UpdateEmpleadoInput) => {
    // Actualizar nombre_completo si nombre o apellidos cambian
    const empleadoCompleto = { ...empleado };
    if (empleado.nombre !== undefined || empleado.apellidos !== undefined) {
-       // Necesitamos obtener el registro actual para combinar nombre/apellidos
-       // Esto se manejará mejor en el hook con una query previa si es necesario,
-       // o se puede pasar el objeto completo al hook.
-       // Por simplicidad aquí, asumimos que el hook se encarga o que se pasan ambos campos.
+       // Asumimos que si se actualiza uno, se pasan ambos o se obtienen previamente
+       // Idealmente, se pasaría el nombre completo ya calculado desde el hook/componente
        empleadoCompleto.nombre_completo = `${empleado.nombre || ''} ${empleado.apellidos || ''}`.trim();
+       // Si solo se pasa uno, necesitaríamos obtener el valor actual del otro campo
    }
 
-  return databases.updateDocument<Empleado>(
+  return databases.updateDocument<Empleado & Models.Document>( // Añadimos Models.Document
     DATABASE_ID,
     EMPLEADOS_COLLECTION_ID,
     id,

@@ -1,9 +1,10 @@
 import { databases, DATABASE_ID, CITAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Cita } from '@/types';
-import { ID, Query } from 'appwrite';
+import { Cita, LipooutUserInput } from '@/types'; // Import LipooutUserInput
+import { ID, Query, Models } from 'appwrite'; // Import Models
 import { formatISO, startOfDay, endOfDay } from 'date-fns';
 
-export type CreateCitaInput = Omit<Cita, '$id' | '$collectionId' | '$databaseId' | '$createdAt' | '$updatedAt' | '$permissions' | 'cliente' | 'empleado' | 'articulo' | 'duracion_minutos'>;
+// Usamos el helper y Omitimos campos calculados/anidados
+export type CreateCitaInput = Omit<LipooutUserInput<Cita>, 'cliente' | 'empleado' | 'articulo' | 'duracion_minutos'>;
 export type UpdateCitaInput = Partial<CreateCitaInput>;
 
 // Obtener citas para un día específico y opcionalmente un empleado
@@ -15,7 +16,7 @@ export const getCitasPorDia = async (fecha: Date, empleadoId?: string): Promise<
     Query.greaterThanEqual('fecha_hora_inicio', inicioDia),
     Query.lessThanEqual('fecha_hora_inicio', finDia),
     Query.orderAsc('fecha_hora_inicio'),
-    Query.limit(500), // Límite alto para un día
+    Query.limit(500),
   ];
 
   if (empleadoId) {
@@ -38,39 +39,45 @@ export const createCita = (cita: CreateCitaInput) => {
   const duracionMs = fin.getTime() - inicio.getTime();
   const duracionMinutos = Math.round(duracionMs / (1000 * 60));
 
-  const citaCompleta = {
+  // Preparamos el objeto a guardar, incluyendo el campo calculado
+  const citaToSave: LipooutUserInput<Cita> = {
     ...cita,
     duracion_minutos: duracionMinutos,
   };
 
-  return databases.createDocument<Cita>(
+  return databases.createDocument<Cita & Models.Document>( // Añadimos Models.Document
     DATABASE_ID,
     CITAS_COLLECTION_ID,
     ID.unique(),
-    citaCompleta
+    citaToSave // Enviamos el objeto compatible
   );
 };
 
 // Actualizar una cita existente
 export const updateCita = (id: string, cita: UpdateCitaInput) => {
-   const citaCompleta = { ...cita } as Partial<Cita>;
+   // Preparamos el objeto parcial a actualizar
+   const citaToUpdate: Partial<LipooutUserInput<Cita>> = { ...cita };
+
    // Recalcular duración si las fechas cambian
    if (cita.fecha_hora_inicio || cita.fecha_hora_fin) {
-       // Similar a Empleado, necesitamos las fechas actuales para calcular bien.
-       // El hook se encargará de esto. Por ahora, asumimos que se pasan ambas si cambian.
+       // Asumimos que el hook/componente envía ambas fechas si una cambia
        if (cita.fecha_hora_inicio && cita.fecha_hora_fin) {
            const inicio = new Date(cita.fecha_hora_inicio);
            const fin = new Date(cita.fecha_hora_fin);
            const duracionMs = fin.getTime() - inicio.getTime();
-           citaCompleta.duracion_minutos = Math.round(duracionMs / (1000 * 60));
+           citaToUpdate.duracion_minutos = Math.round(duracionMs / (1000 * 60));
+       } else {
+         // Si solo cambia una fecha, necesitaríamos la otra del objeto original.
+         // Esto debería gestionarse en el hook que llama a updateCita.
+         console.warn("Actualizando fechas de cita sin ambas presentes, la duración podría ser incorrecta.");
        }
    }
 
-  return databases.updateDocument<Cita>(
+  return databases.updateDocument<Cita & Models.Document>( // Añadimos Models.Document
     DATABASE_ID,
     CITAS_COLLECTION_ID,
     id,
-    citaCompleta // Enviamos el objeto con la duración potencialmente actualizada
+    citaToUpdate // Enviamos el objeto parcial compatible
   );
 };
 

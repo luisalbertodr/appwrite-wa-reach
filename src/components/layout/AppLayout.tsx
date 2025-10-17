@@ -1,20 +1,22 @@
 import { Outlet } from 'react-router-dom';
-import Header from './Header';
-import BottomNavigation from './BottomNavigation';
+import Header from './Header'; // Verificado
+import BottomNavigation from './BottomNavigation'; // Verificado
+// Importamos Dashboard aquí solo si la prueba anterior falló y lo dejamos comentado
+// import Dashboard from '@/pages/Dashboard';
 
 const AppLayout = () => {
+  console.log("AppLayout Rendering"); // Mantenemos para debug
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
-      {/* Cabecera principal (Desktop) */}
       <Header />
-
-      {/* Contenido principal de la página */}
       <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
-        {/* Outlet renderiza el componente de la ruta activa (Dashboard, Agenda, etc.) */}
+        {/* Mantenemos el Outlet, ya que la prueba anterior mostró el debug text */}
         <Outlet />
+        {/* <p style={{ color: 'red', fontWeight: 'bold' }}>BEFORE OUTLET AREA</p> */}
+        {/* <Dashboard /> */}
+        {/* <p style={{ color: 'blue', fontWeight: 'bold' }}>AFTER OUTLET AREA</p> */}
       </main>
-
-      {/* Navegación inferior (Móvil) */}
       <BottomNavigation />
     </div>
   );

@@ -5,16 +5,31 @@ export interface LipooutDocument extends Models.Document {
   // Aquí podemos añadir campos comunes si los hubiera
 }
 
+// Helper type to remove Appwrite metadata for creation/update inputs
+export type LipooutUserInput<T extends LipooutDocument> = Omit<T, keyof Models.Document>;
+
+
 // --- Tipos Core Lipoout ---
-export * from './cliente.types';
+export * from './cliente.types'; // Verificado
 export * from './articulo.types';
 export * from './familia.types';
-export * from './empleado.types'; // Añadido
-export * from './cita.types'; // Añadido
+export * from './empleado.types';
+export * from './cita.types';
 // (Próximamente se añadirán: Factura, Proveedor, Recurso)
 
 
 // --- Tipos Módulo WhatsApp (Migrados de la PoC) ---
+
+// Definimos MessageLog aquí si no existe en otro sitio
+export interface MessageLog extends Models.Document {
+  clientId: string;
+  clientName?: string;
+  timestamp: string;
+  status: 'sent' | 'failed' | 'skipped';
+  error?: string;
+  campaignId?: string; // Asumiendo que existe este campo
+}
+
 
 export interface WhatsAppFunctionPayload {
   recipient: string;
@@ -50,7 +65,7 @@ export interface Campaign extends LipooutDocument {
   selectedImageIndex?: number;
   status: 'pending' | 'sent' | 'scheduled' | 'failed' | 'sending' | 'completed_with_errors';
   audienceCount: number;
-  createdAt: string;
+  createdAt: string; // Mantenido como string ISO
   startTime?: string;
   endTime?: string;
 }
@@ -59,8 +74,8 @@ export interface WahaConfig extends LipooutDocument {
   apiUrl: string;
   apiKey?: string;
   session?: string;
-  minDelayMs?: number; 
-  maxDelayMs?: number; 
+  minDelayMs?: number;
+  maxDelayMs?: number;
   batchSizeMin?: number;
   batchSizeMax?: number;
   batchDelayMsMin?: number;
