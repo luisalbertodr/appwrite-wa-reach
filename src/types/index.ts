@@ -17,6 +17,10 @@ export * from './empleado.types';
 export * from './cita.types';
 // (Próximamente se añadirán: Factura, Proveedor, Recurso)
 
+// Exportar tipos Input específicos
+export type { CitaInput } from './cita.types';
+export type { ArticuloInput } from './articulo.types';
+
 
 // --- Tipos Módulo WhatsApp (Migrados de la PoC) ---
 

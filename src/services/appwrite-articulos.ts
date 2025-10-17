@@ -1,5 +1,5 @@
 import { databases, DATABASE_ID, ARTICULOS_COLLECTION_ID, FAMILIAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Articulo, Familia, LipooutUserInput } from '@/types'; // Import LipooutUserInput
+import { Articulo, ArticuloInput, Familia } from '@/types'; // Import ArticuloInput
 import { ID, Query, Models } from 'appwrite'; // Import Models
 
 // --- API de Familias ---
@@ -15,8 +15,8 @@ export const getFamilias = async (): Promise<Familia[]> => {
 
 // --- API de Artículos ---
 
-// Usamos el helper LipooutUserInput
-export type CreateArticuloInput = LipooutUserInput<Articulo>;
+// Usamos el tipo ArticuloInput directamente
+export type CreateArticuloInput = ArticuloInput;
 // Update es Partial del Create type
 export type UpdateArticuloInput = Partial<CreateArticuloInput>;
 
@@ -38,10 +38,8 @@ export const getArticulos = async (familiaId?: string): Promise<Articulo[]> => {
 export const createArticulo = (articuloInput: CreateArticuloInput) => {
    // Appwrite no permite crear/actualizar con objetos anidados directamente
    // Nos aseguramos de enviar solo los campos permitidos y el ID de relación
-   const { familia, ...rest } = articuloInput; // Quitamos el objeto 'familia'
    const articuloToSave = {
-     ...rest,
-     familia_id: articuloInput.familia_id // Aseguramos que el ID de familia está
+     ...articuloInput,
    };
 
    // Validamos que los campos requeridos como 'precio' y 'tipo' están
@@ -60,7 +58,7 @@ export const createArticulo = (articuloInput: CreateArticuloInput) => {
 
 export const updateArticulo = (id: string, articuloInput: UpdateArticuloInput) => {
    // Similar a create, quitamos 'familia' si está presente
-   const { familia, ...articuloToUpdate } = articuloInput;
+   const articuloToUpdate = { ...articuloInput };
   return databases.updateDocument<Articulo & Models.Document>( // Añadimos Models.Document para el retorno
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,

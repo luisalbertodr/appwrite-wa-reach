@@ -6,7 +6,7 @@ import {
   deleteEmpleado,
   CreateEmpleadoInput, // Correcto
   UpdateEmpleadoInput, // Correcto
-} from '@/services/appwrite-empleados'; // Verificado
+} from '../services/appwrite-empleados'; // Verificado
 
 const EMPLEADOS_QUERY_KEY = 'empleados';
 

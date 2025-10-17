@@ -7,7 +7,7 @@ import LoadingSpinner from './components/LoadingSpinner'; // Verificado
 import AppLayout from './components/layout/AppLayout'; // Verificado
 
 // --- Importamos Dashboard directamente ---
-import Dashboard from '@/pages/Dashboard'; // Verificado
+import Dashboard from './pages/Dashboard'; // Verificado
 // Comentamos las otras importaciones lazy por ahora
 // import Agenda from '@/pages/Agenda'; // etc.
 import Configuracion from '@/pages/Configuracion'; // Mantenemos esta si es necesaria directa
@@ -28,20 +28,18 @@ function App() {
 
   // Define las rutas protegidas (SIN Suspense)
   const ProtectedRoutes = (
-    <AppLayout>
-      {/* <Suspense fallback={<LoadingSpinner />}> */}
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          {/* Comentamos las otras rutas lazy temporalmente */}
-          {/* <Route path="/agenda" element={<Agenda />} /> */}
-          {/* <Route path="/clientes" element={<Clientes />} /> */}
-          {/* ... */}
-          <Route path="/configuracion" element={<Configuracion />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      {/* </Suspense> */}
-    </AppLayout>
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Comentamos las otras rutas lazy temporalmente */}
+        {/* <Route path="/agenda" element={<Agenda />} /> */}
+        {/* <Route path="/clientes" element={<Clientes />} /> */}
+        {/* ... */}
+        <Route path="/configuracion" element={<Configuracion />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 
   // Define las rutas públicas (SIN Suspense)

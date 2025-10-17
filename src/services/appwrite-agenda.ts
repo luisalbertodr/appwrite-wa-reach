@@ -1,11 +1,11 @@
 import { databases, DATABASE_ID, CITAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Cita, LipooutUserInput } from '@/types'; // Import LipooutUserInput
+import { Cita, CitaInput } from '@/types'; // Import CitaInput
 import { ID, Query, Models } from 'appwrite'; // Import Models
 import { formatISO, startOfDay, endOfDay } from 'date-fns';
 
-// Usamos el helper y Omitimos campos calculados/anidados
-export type CreateCitaInput = Omit<LipooutUserInput<Cita>, 'cliente' | 'empleado' | 'articulo' | 'duracion_minutos'>;
-export type UpdateCitaInput = Partial<CreateCitaInput>;
+// Usamos el tipo CitaInput directamente
+export type CreateCitaInput = CitaInput;
+export type UpdateCitaInput = Partial<CitaInput>;
 
 // Obtener citas para un día específico y opcionalmente un empleado
 export const getCitasPorDia = async (fecha: Date, empleadoId?: string): Promise<Cita[]> => {
@@ -40,7 +40,7 @@ export const createCita = (cita: CreateCitaInput) => {
   const duracionMinutos = Math.round(duracionMs / (1000 * 60));
 
   // Preparamos el objeto a guardar, incluyendo el campo calculado
-  const citaToSave: LipooutUserInput<Cita> = {
+  const citaToSave = {
     ...cita,
     duracion_minutos: duracionMinutos,
   };
@@ -56,7 +56,7 @@ export const createCita = (cita: CreateCitaInput) => {
 // Actualizar una cita existente
 export const updateCita = (id: string, cita: UpdateCitaInput) => {
    // Preparamos el objeto parcial a actualizar
-   const citaToUpdate: Partial<LipooutUserInput<Cita>> = { ...cita };
+   const citaToUpdate = { ...cita };
 
    // Recalcular duración si las fechas cambian
    if (cita.fecha_hora_inicio || cita.fecha_hora_fin) {

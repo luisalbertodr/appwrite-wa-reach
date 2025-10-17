@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { WahaConfig, LipooutUserInput, LipooutDocument } from '@/types'; // Importar tipos necesarios
+import { WahaConfig, LipooutUserInput } from '@/types'; // Importar tipos necesarios
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Save, Shield, Bot, HardDriveUpload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { WAHA_CONFIG_COLLECTION_ID, storage, IMPORT_BUCKET_ID, IMPORT_LOGS_COLLECTION_ID, client, DATABASE_ID } from '@/lib/appwrite'; // DATABASE_ID importado
-import { ID, Models, Functions } from 'appwrite';
+import { WAHA_CONFIG_COLLECTION_ID, IMPORT_LOGS_COLLECTION_ID, client } from '@/lib/appwrite';
+import { Models } from 'appwrite';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,15 +44,14 @@ const Configuracion = () => {
   const { toast } = useToast();
   // El estado usa el tipo Input sin metadata
   const [config, setConfig] = useState<WahaConfigInput>(defaultConfig);
-  const { data: importLogs, loading: loadingImportLogs, reload: reloadImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
+  const { data: importLogs, loading: loadingImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
 
-  const [wahaSessions, setWahaSessions] = useState<string[]>([]);
+  const [wahaSessions] = useState<string[]>([]);
   const [showImportLogDialog, setShowImportLogDialog] = useState(false);
   const [importLogContent, setImportLogContent] = useState<string[]>([]);
-  const [isLocalImporting, setIsLocalImporting] = useState(false);
+  const [isLocalImporting] = useState(false);
 
   useEffect(() => {
-    const functions = new Functions(client);
     const fetchWahaSessions = async () => { /* ... lógica sin cambios ... */ };
     fetchWahaSessions();
   }, [toast]);

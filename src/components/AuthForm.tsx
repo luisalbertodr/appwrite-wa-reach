@@ -1,16 +1,11 @@
 import { useState } from 'react';
-import { account } from '@/lib/appwrite';
-import { AppwriteException, ID } from 'appwrite';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs } from '@/components/ui/tabs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-// Quitamos la interfaz no usada
-// interface AuthFormProps {}
 
 const AuthForm = () => { // Quitamos props
   const [email, setEmail] = useState('');
