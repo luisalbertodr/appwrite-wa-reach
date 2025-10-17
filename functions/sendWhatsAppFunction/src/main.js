@@ -1,316 +1,423 @@
-const { Client, Databases, Query, ID } = require('node-appwrite');
-const fetch = require('node-fetch'); // Asegúrate de tener node-fetch v2 (npm install node-fetch@^2.6.1)
+const { Client, Databases, ID, Storage, Functions, Query } = require('node-appwrite'); // Importar Query
+const fetch = require('node-fetch');
 
-// Constantes de Appwrite
-const DATABASE_ID = '68d78cb20028fac621d4';
-const CLIENTS_COLLECTION_ID = 'clients';
-const CAMPAIGNS_COLLECTION_ID = 'campaigns';
-const TEMPLATES_COLLECTION_ID = 'templates';
-const CONFIG_COLLECTION_ID = 'config';
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
 const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
-
-// --- Helpers (sin cambios) ---
-const getRandomInt = (min, max) => {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const sendMessage = async (apiUrl, apiKey, phone, message) => {
-    const url = `${apiUrl}/sendText`;
-    console.log(`Sending message to ${phone}...`);
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': apiKey,
-            },
-            body: JSON.stringify({ chatId: `${phone}@c.us`, text: message }),
-        });
-        let responseData;
-        try {
-            responseData = await response.json();
-        } catch (jsonError) {
-            responseData = await response.text();
-        }
-        console.log(`Response from WAHA for ${phone}: ${response.status}`, responseData);
-        if (!response.ok) {
-            console.error(`WAHA API Error for ${phone}: ${response.status}`, responseData);
-            const errorMessage = (typeof responseData === 'object' && responseData !== null && responseData.message) ? responseData.message : `HTTP error ${response.status} - ${responseData}`;
-            return { success: false, error: errorMessage };
-        }
-        const messageId = (typeof responseData === 'object' && responseData !== null && responseData.id) ? responseData.id : null;
-        return { success: true, messageId: messageId };
-    } catch (error) {
-        console.error(`Network or Fetch Error sending to ${phone}:`, error);
-        return { success: false, error: error.message };
-    }
-};
-// --- Fin Helpers ---
+const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress';
+const MAX_EXECUTION_TIME = 270000; // 4.5 minutos en milisegundos
 
 module.exports = async ({ req, res, log, error }) => {
+    if (req.method !== 'POST') {
+        return res.json({ success: false, error: 'Only POST requests are allowed.' }, 405);
+    }
+
+    const executionStartTime = Date.now();
+
     const client = new Client()
-        .setEndpoint(process.env.APPWRITE_ENDPOINT)
+        .setEndpoint(process.env.APPWRITE_ENDPOINT || 'http://appwrite/v1')
         .setProject(process.env.APPWRITE_PROJECT_ID)
         .setKey(process.env.APPWRITE_API_KEY);
 
     const databases = new Databases(client);
+    const storage = new Storage(client);
+    const functions = new Functions(client);
 
-    let campaignId, templateId, sessionName, audienceFilters;
+    const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
+    const CAMPAIGNS_COLLECTION_ID = process.env.APPWRITE_CAMPAIGNS_COLLECTION_ID || 'campaigns';
 
-    // --- Validación inicial del payload ---
+    if (!DATABASE_ID) {
+        error('Variable de entorno APPWRITE_DATABASE_ID no configurada.');
+        return res.json({ success: false, error: 'Server configuration is incomplete.' }, 500);
+    }
+
+    let payload;
+    if (typeof req.body === 'string' && req.body.length > 0) {
+        try {
+            payload = JSON.parse(req.body);
+        } catch (e) {
+            error(`Error al parsear el cuerpo de la solicitud JSON: ${e.message}`);
+            return res.json({ success: false, error: 'Cuerpo de la solicitud JSON inválido.' }, 400);
+        }
+    } else if (typeof req.body === 'object' && req.body !== null) {
+        payload = req.body;
+    } else {
+        error('El cuerpo de la solicitud está vacío o tiene un formato no válido.');
+        return res.json({ success: false, error: 'El cuerpo de la solicitud está vacío o tiene un formato no válido.' }, 400);
+    }
+
+    // 'clients' (original) se usará para el recuento total en la notificación final
+    let { clients, template, config, campaignId, remainingClients } = payload;
+    const clientList = remainingClients || clients;
+
+
+    if (!clientList || !Array.isArray(clientList) || !template || !config || !campaignId || !clients) {
+        error('Payload inválido. Faltan clients, template, config o campaignId.');
+        return res.json({ success: false, error: 'Invalid payload.' }, 400);
+    }
+
+    const {
+        minDelayMs = 2000, maxDelayMs = 5000,
+        batchSizeMin = 15, batchSizeMax = 25,
+        batchDelayMsMin = 60000, batchDelayMsMax = 120000,
+        adminPhoneNumbers,
+        notificationInterval = 50,
+        startTime = '09:00',
+        endTime = '18:00',
+        session = 'default'
+    } = config;
+
+    if (!remainingClients) {
+        res.json({ success: true, message: 'Campaign process started in the background.' });
+    }
+
+    log(`Campaña ${campaignId} iniciada para ${clientList.length} clientes (de un total de ${clients.length}) usando la sesión '${session}'.`);
+
+    const WAHA_API_URL = process.env.WAHA_API_URL;
+    const WAHA_API_KEY = process.env.WAHA_API_KEY;
+
+    if (!WAHA_API_URL || !WAHA_API_KEY) {
+        error('Variables de entorno de Waha no configuradas.');
+        if (remainingClients) { return res.json({ success: false, error: 'Waha environment variables not configured.' }, 500); }
+        return;
+    }
+
+    const logStatus = async (client, status, errorMsg = '') => {
+        try {
+            await databases.createDocument(
+                DATABASE_ID,
+                MESSAGE_LOGS_COLLECTION_ID,
+                ID.unique(),
+                {
+                    campaignId: campaignId,
+                    clientId: String(client.codcli),
+                    clientName: client.nombre_completo,
+                    status: status,
+                    timestamp: new Date().toISOString(),
+                    error: errorMsg,
+                }
+            );
+        } catch (e) {
+            error(`Failed to log status for client ${client.codcli}: ${e.message}`);
+        }
+    };
+
+    const updateProgress = async (currentClient) => {
+        try {
+            await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
+            await databases.updateDocument(
+                DATABASE_ID,
+                CAMPAIGN_PROGRESS_COLLECTION_ID,
+                campaignId,
+                {
+                    currentClientName: currentClient.nomcli,
+                    currentClientPhone: currentClient.tel2cli
+                }
+            );
+        } catch (e) {
+            if (e.code === 404) {
+                try {
+                    await databases.createDocument(
+                        DATABASE_ID,
+                        CAMPAIGN_PROGRESS_COLLECTION_ID,
+                        campaignId,
+                        {
+                            currentClientName: currentClient.nomcli,
+                            currentClientPhone: currentClient.tel2cli
+                        }
+                    );
+                } catch (e2) {
+                    error(`Failed to create progress for campaign ${campaignId}: ${e2.message}`);
+                }
+            } else {
+                error(`Failed to update progress for campaign ${campaignId}: ${e.message}`);
+            }
+        }
+    };
+
+    const sendAdminNotification = async (text) => {
+        if (!adminPhoneNumbers || !Array.isArray(adminPhoneNumbers) || adminPhoneNumbers.length === 0) {
+            return;
+        }
+
+        for (const adminPhoneNumber of adminPhoneNumbers) {
+            if (!adminPhoneNumber) continue;
+
+            let formattedAdminPhoneNumber = adminPhoneNumber.trim();
+            if (!formattedAdminPhoneNumber.startsWith('34') && !formattedAdminPhoneNumber.startsWith('+34')) {
+                formattedAdminPhoneNumber = `34${formattedAdminPhoneNumber}`;
+            }
+            formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
+
+            try {
+                await fetch(`${WAHA_API_URL}/api/sendText`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+                    body: JSON.stringify({ chatId: formattedAdminPhoneNumber, text: text, session: session }),
+                });
+                log(`Notificación de admin enviada a ${adminPhoneNumber}`);
+            } catch (e) {
+                error(`Fallo al enviar notificación de admin a ${adminPhoneNumber}: ${e.message}`);
+            }
+        }
+    };
+
+    if (!remainingClients) {
+        await databases.updateDocument(
+            DATABASE_ID,
+            CAMPAIGNS_COLLECTION_ID,
+            campaignId,
+            { status: 'sending' }
+        );
+        // Usar clients.length (total) en lugar de clientList.length (chunk)
+        await sendAdminNotification(`🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${clients.length} clientes.`);
+    }
+
+    let totalSent = 0; // Estadísticas locales para este chunk
+    let totalSkipped = 0;
+    let totalFailed = 0;
+
+    const validMessages = template.messages.filter(m => m && m.trim() !== '');
+    const validImageUrls = template.imageUrls.filter(url => url && url.trim() !== '');
+    
+    let currentBatchSize = getRandomNumber(batchSizeMin, batchSizeMax);
+    let messagesSinceLastBatchPause = 0;
+
+    for (const [index, c] of clientList.entries()) {
+        const elapsedTime = Date.now() - executionStartTime;
+        if (elapsedTime > MAX_EXECUTION_TIME) {
+            log('Tiempo de ejecución máximo casi alcanzado. Re-planificando la tarea.');
+            const nextClients = clientList.slice(index);
+            await sleep(1000); // Pausa antes de re-lanzar
+            await functions.createExecution(
+                'sendWhatsAppFunction',
+                JSON.stringify({ ...payload, remainingClients: nextClients }),
+                true
+            );
+            // Salir de la ejecución actual, ya que se ha re-planificado
+            if (remainingClients) { return res.json({ success: true, message: 'Chunk rescheduled due to time limit.' }); }
+            return; 
+        }
+
+        await updateProgress(c);
+
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+        const startTimeInMinutes = startHour * 60 + startMinute;
+        const endTimeInMinutes = endHour * 60 + endMinute;
+
+        if (currentTimeInMinutes < startTimeInMinutes || currentTimeInMinutes >= endTimeInMinutes) {
+            log('Fuera del horario de envío. Planificando para el siguiente día.');
+            const nextClients = clientList.slice(index);
+
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(startHour, startMinute, 0, 0);
+
+            await sleep(1000); // Pausa antes de re-lanzar
+            await functions.createExecution(
+                'sendWhatsAppFunction',
+                JSON.stringify({ ...payload, remainingClients: nextClients }),
+                true,
+                undefined,
+                undefined,
+                tomorrow.toISOString()
+            );
+            // Salir de la ejecución actual, ya que se ha re-planificado
+            if (remainingClients) { return res.json({ success: true, message: 'Chunk rescheduled for next day.' }); }
+            return;
+        }
+
+        if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
+            totalSkipped++;
+            await logStatus(c, 'skipped', 'Opt-out o teléfono inválido');
+            continue;
+        }
+
+        let messageToSend = '';
+        if (validMessages.length > 0) {
+            const randomIndex = Math.floor(Math.random() * validMessages.length);
+            messageToSend = validMessages[randomIndex];
+        }
+
+        let imageUrlToSend = '';
+        if (validImageUrls.length > 0) {
+            const randomIndex = Math.floor(Math.random() * validImageUrls.length);
+            imageUrlToSend = validImageUrls[randomIndex];
+        }
+
+        if (!messageToSend && !imageUrlToSend) {
+            totalSkipped++;
+            await logStatus(c, 'skipped', 'No hay contenido de plantilla para enviar.');
+            continue;
+        }
+
+        const phoneNumber = c.tel2cli;
+        let formattedPhoneNumber = phoneNumber;
+        if (!formattedPhoneNumber.startsWith('34') && !formattedPhoneNumber.startsWith('+34')) {
+            formattedPhoneNumber = `34${formattedPhoneNumber}`;
+        }
+        formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
+
+        // --- MODIFICACIÓN (Sin retraso inicial) ---
+        // Se comprueba si 'remainingClients' existe. Si NO existe Y es el index 0, es el primer cliente.
+        const isFirstClientOfCampaign = !remainingClients && index === 0;
+
+        if (!isFirstClientOfCampaign) {
+            const delay = getRandomNumber(minDelayMs, maxDelayMs);
+            log(`Retraso individual de ${delay}ms antes de enviar a ${formattedPhoneNumber}`);
+            await sleep(delay);
+        } else {
+            log(`Procesando primer cliente de la campaña ${formattedPhoneNumber} sin retraso individual.`);
+        }
+        // --- FIN MODIFICACIÓN ---
+
+        let messageContent = messageToSend.replace(/\[nombre\]/g, c.nomcli || '');
+
+        log(`Attempting to send message to ${formattedPhoneNumber}`);
+
+        try {
+            let response;
+            if (imageUrlToSend && imageUrlToSend.trim() !== '') {
+                const url = new URL(imageUrlToSend);
+                const pathParts = url.pathname.split('/');
+                const bucketId = pathParts[pathParts.indexOf('buckets') + 1];
+                const fileId = pathParts[pathParts.indexOf('files') + 1];
+
+                if (!bucketId || !fileId) {
+                    throw new Error(`URL de Appwrite Storage no válida: ${imageUrlToSend}`);
+                }
+
+                const imageBuffer = await storage.getFileDownload(bucketId, fileId);
+                const imageBase64 = imageBuffer.toString('base64');
+
+                const fileMeta = await storage.getFile(bucketId, fileId);
+                const mimetype = fileMeta.mimeType || 'image/jpeg';
+
+                response = await fetch(`${WAHA_API_URL}/api/sendImage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+                    body: JSON.stringify({
+                        chatId: formattedPhoneNumber,
+                        file: {
+                            mimetype: mimetype,
+                            data: imageBase64,
+                            filename: "image.jpg"
+                        },
+                        caption: messageContent,
+                        session: session
+                    }),
+                });
+            } else {
+                response = await fetch(`${WAHA_API_URL}/api/sendText`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
+                    body: JSON.stringify({ chatId: formattedPhoneNumber, text: messageContent, session: session }),
+                });
+            }
+
+            if (response.ok) {
+                totalSent++;
+                await logStatus(c, 'sent');
+            } else {
+                const errorData = await response.json();
+                totalFailed++;
+                await logStatus(c, 'failed', `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
+            }
+        } catch (e) {
+            totalFailed++;
+            await logStatus(c, 'failed', `Network error: ${e.message}`);
+        }
+        
+        messagesSinceLastBatchPause++;
+
+        // Notificación de progreso (usa 'clients.length' para el total)
+        if ((index + 1) % notificationInterval === 0) {
+            await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados (aprox): ${index + 1}/${clients.length}\n- Enviados (este chunk): ${totalSent}\n- Fallidos (este chunk): ${totalFailed}\n- Saltados (este chunk): ${totalSkipped}`);
+        }
+        
+        // Lógica de pausa de lote (batch)
+        if (messagesSinceLastBatchPause >= currentBatchSize) {
+            const batchDelay = getRandomNumber(batchDelayMsMin, batchDelayMsMax);
+            log(`Pausa de lote de ${batchDelay / 1000}s`);
+            await sleep(batchDelay);
+            // Reset for the next batch
+            messagesSinceLastBatchPause = 0;
+            currentBatchSize = getRandomNumber(batchSizeMin, batchSizeMax);
+        }
+    }
+
+    // --- Si llegamos aquí, este CHUNK ha terminado y NO se ha re-planificado ---
+    
+    // --- MODIFICACIÓN: Obtener estadísticas finales de los logs (CORREGIDO) ---
+    log(`Campaña ${campaignId} finalizada. Obteniendo estadísticas finales...`);
+    let finalSent = 0;
+    let finalFailed = 0;
+    let finalSkipped = 0;
+
     try {
-        if (!req.body) {
-          throw new Error('Request body is missing');
-        }
-        const payload = JSON.parse(req.body);
-        campaignId = payload.campaignId;
-        templateId = payload.templateId;
-        sessionName = payload.sessionName || 'default';
-        audienceFilters = payload.audienceFilters || {};
-        log(`Payload received: campaignId=${campaignId}, templateId=${templateId}, sessionName=${sessionName}, filters=${JSON.stringify(audienceFilters)}`);
+        // Contar 'sent'
+        const sentResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
+            Query.equal('campaignId', campaignId),
+            Query.equal('status', 'sent'),
+            Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
+        ]);
+        finalSent = sentResponse.total;
 
-        if (!campaignId || !templateId) {
-            throw new Error('campaignId and templateId are required');
-        }
+        // Contar 'failed'
+        const failedResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
+            Query.equal('campaignId', campaignId),
+            Query.equal('status', 'failed'),
+            Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
+        ]);
+        finalFailed = failedResponse.total;
+
+        // Contar 'skipped'
+        const skippedResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
+            Query.equal('campaignId', campaignId),
+            Query.equal('status', 'skipped'),
+            Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
+        ]);
+        finalSkipped = skippedResponse.total;
+
+        log(`Estadísticas finales obtenidas de los logs: Sent=${finalSent}, Failed=${finalFailed}, Skipped=${finalSkipped}`);
+
     } catch (e) {
-        error('Invalid request body:', e.message);
-        // **RETURN TEMPRANO EN CASO DE ERROR DE PAYLOAD**
-        return res.json({ success: false, error: `Invalid payload: ${e.message}` }, 400);
+        error(`Error al obtener estadísticas finales de los logs: ${e.message}`);
+        // Usar los totales locales como fallback (aunque sean solo de este chunk)
+        finalSent = totalSent;
+        finalFailed = totalFailed;
+        finalSkipped = totalSkipped;
+        log('Usando estadísticas locales del chunk como fallback para la notificación final.');
     }
-    // --- Fin Validación inicial ---
-
-    let config = null;
-    let apiKey = null;
+    // --- FIN MODIFICACIÓN ---
 
     try {
-        // --- Obtener configuración ---
-        log('Fetching system configuration...');
-        const configResponse = await databases.listDocuments(DATABASE_ID, CONFIG_COLLECTION_ID, [Query.limit(1)]);
-        if (configResponse.documents.length === 0) throw new Error('System configuration not found.');
-        config = configResponse.documents[0];
-        apiKey = config.apiKey;
-        log('System configuration fetched successfully.');
-        if (!config.apiUrl || !apiKey) throw new Error('WAHA API URL or API Key not configured.');
-        // --- Fin Obtener configuración ---
-
-        // --- Obtener Campaña y Plantilla ---
-        log(`Fetching campaign ${campaignId}...`);
-        const campaign = await databases.getDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId);
-        log(`Campaign fetched. Status: ${campaign.status}`);
-        log(`Fetching template ${templateId}...`);
-        const template = await databases.getDocument(DATABASE_ID, TEMPLATES_COLLECTION_ID, templateId);
-        log('Template fetched.');
-        // --- Fin Obtener Campaña y Plantilla ---
-
-        // --- Validar estado y Notificar Admins (Sin cambios) ---
-        if (campaign.status !== 'pending' && campaign.status !== 'paused') {
-             log(`Campaign ${campaignId} has invalid status for start: ${campaign.status}. Aborting.`);
-             // **RETURN TEMPRANO**
-             return res.json({ success: false, error: `Campaign cannot be started with status ${campaign.status}.` });
-        }
-        if (config.adminPhoneNumbers && config.adminPhoneNumbers.length > 0) {
-            log(`Notifying ${config.adminPhoneNumbers.length} admins...`);
-            let realAudienceCount = campaign.targetAudienceCount || '(calculating...)';
-            try {
-                 let countQueries = [Query.limit(0)];
-                 if (audienceFilters.tagsInclude && audienceFilters.tagsInclude.length > 0) {
-                   countQueries.push(Query.search('tags', audienceFilters.tagsInclude.join(' ')));
-                 }
-                 const countResponse = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, countQueries);
-                 realAudienceCount = countResponse.total;
-            } catch (countError) {
-                 error("Could not calculate real audience count for admin message:", countError);
-            }
-            const adminMessage = `🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${realAudienceCount} clientes.`;
-            for (const adminPhone of config.adminPhoneNumbers) {
-                log(`Attempting to send admin notification to ${adminPhone}...`);
-                const adminSendResult = await sendMessage(config.apiUrl, apiKey, adminPhone, adminMessage);
-                log(`Admin notification result for ${adminPhone}: success=${adminSendResult.success}`);
-            }
-        } else {
-            log('No admin phone numbers configured for notification.');
-        }
-         // --- Fin Validar estado y Notificar Admins ---
-
-
-        // --- Marcar como 'running' y Obtener Clientes (Sin cambios) ---
-        log(`Updating campaign ${campaignId} status to running...`);
-        await databases.updateDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId, { status: 'running', startedAt: new Date().toISOString() });
-        log(`Campaign ${campaignId} status updated to running.`);
-        log('Building client queries...');
-        let clientQueries = [Query.limit(5000)];
-        if (audienceFilters.tagsInclude && audienceFilters.tagsInclude.length > 0) {
-            clientQueries.push(Query.search('tags', audienceFilters.tagsInclude.join(' ')));
-             log(`Added tag filter: ${audienceFilters.tagsInclude.join(' ')}`);
-        }
-        log(`Fetching clients with queries: ${JSON.stringify(clientQueries)}`);
-        const clientResponse = await databases.listDocuments(DATABASE_ID, CLIENTS_COLLECTION_ID, clientQueries);
-        const clients = clientResponse.documents;
-        log(`Fetched ${clients.length} clients (Total potentially matching: ${clientResponse.total}).`);
-        // --- Fin Marcar como 'running' y Obtener Clientes ---
-
-        // --- Obtener Logs para evitar duplicados (Sin cambios) ---
-        log('Fetching message logs for this campaign to avoid duplicates...');
-        let loggedPhones = new Set();
-        let logOffset = 0;
-        let logLimit = 100;
-        let logResponse;
-        do {
-            log(`Fetching message logs batch: offset=${logOffset}, limit=${logLimit}`);
-            logResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
-                Query.equal('campaignId', campaignId),
-                Query.limit(logLimit),
-                Query.offset(logOffset)
-            ]);
-            log(`Fetched ${logResponse.documents.length} log entries in this batch.`);
-            logResponse.documents.forEach(logEntry => loggedPhones.add(logEntry.clientPhone));
-            logOffset += logResponse.documents.length;
-        } while (logResponse.documents.length === logLimit && logOffset < 5000);
-        log(`Found ${loggedPhones.size} phones that already received messages for campaign ${campaignId}.`);
-        // --- Fin Obtener Logs ---
-
-
-        // --- Bucle principal de envío (Sin cambios en la lógica interna, solo en el control de errores general) ---
-        let processedCount = campaign.processedCount || 0;
-        let successCount = campaign.successCount || 0;
-        let failedCount = campaign.failedCount || 0;
-        let batchCounter = 0;
-        let notificationCounter = 0;
-
-        log('Starting client loop...');
-        for (const client of clients) {
-            console.log(`Processing client ${client.$id} - ${client.phone}`);
-            if (loggedPhones.has(client.phone)) {
-                 log(`Skipping client ${client.phone} - already processed.`);
-                 continue;
-            }
-
-            log(`Checking campaign ${campaignId} status before processing client ${client.phone}...`);
-            const currentCampaignState = await databases.getDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId);
-            log(`Current campaign status: ${currentCampaignState.status}`);
-            if (currentCampaignState.status !== 'running') {
-                log(`Campaign ${campaignId} status changed to ${currentCampaignState.status}. Stopping execution.`);
-                break;
-            }
-
-            const messageDelay = getRandomInt(config.minDelayMs || 1000, config.maxDelayMs || 3000);
-            log(`Delaying for ${messageDelay}ms before sending to ${client.phone}`);
-            await delay(messageDelay);
-
-            let personalizedMessage = template.body.replace(/{{name}}/g, client.name || '');
-
-            const result = await sendMessage(config.apiUrl, apiKey, client.phone, personalizedMessage);
-
-            try {
-                log(`Attempting to log message result for ${client.phone}...`);
-                await databases.createDocument(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, ID.unique(), {
-                    campaignId: campaignId, clientId: client.$id, clientPhone: client.phone, templateId: templateId,
-                    status: result.success ? 'sent' : 'failed', errorMessage: result.success ? null : result.error,
-                    sentAt: new Date().toISOString(), wahaMessageId: result.messageId || null
-                });
-                log(`Message log created successfully for ${client.phone}.`);
-            } catch (logError) {
-                error(`Failed to create message log for client ${client.phone}:`, logError);
-            }
-
-            processedCount++;
-            if (result.success) { successCount++; notificationCounter++; } else { failedCount++; }
-
-            try {
-                log(`Attempting to update campaign progress: processed=${processedCount}, success=${successCount}, failed=${failedCount}`);
-                await databases.updateDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId, {
-                    processedCount, successCount, failedCount, lastUpdatedAt: new Date().toISOString()
-                });
-                log('Campaign progress updated.');
-            } catch (updateError) {
-                error(`Failed to update campaign progress for ${campaignId}:`, updateError);
-            }
-
-            const notifyInterval = config.notificationInterval || 50;
-            if (notificationCounter >= notifyInterval && config.adminPhoneNumbers && config.adminPhoneNumbers.length > 0) {
-                 log(`Reached notification interval (${notifyInterval}). Notifying admins...`);
-                 const progressMessage = `📊 *Progreso Campaña ${campaignId}*\n\n- Enviados: ${successCount}\n- Fallidos: ${failedCount}\n- Total Procesados: ${processedCount}`;
-                 for (const adminPhone of config.adminPhoneNumbers) {
-                     log(`Sending progress update to admin ${adminPhone}...`);
-                     await sendMessage(config.apiUrl, apiKey, adminPhone, progressMessage);
-                     log(`Progress update sent to admin ${adminPhone}.`);
-                 }
-                 notificationCounter = 0;
-            }
-
-            batchCounter++;
-            const batchSize = getRandomInt(config.batchSizeMin || 5, config.batchSizeMax || 15);
-            if (batchCounter >= batchSize) {
-                const batchDelay = getRandomInt(config.batchDelayMsMin || 30000, config.batchDelayMsMax || 60000);
-                log(`Batch size ${batchSize} reached. Pausing for ${batchDelay}ms...`);
-                await delay(batchDelay);
-                batchCounter = 0;
-            }
-        } // Fin del bucle for
-        log('Finished client loop.');
-        // --- Fin Bucle principal ---
-
-
-        // --- Finalización de campaña (Sin cambios) ---
-        log(`Checking final campaign status for ${campaignId}...`);
-        const finalCampaignState = await databases.getDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId);
-        log(`Final campaign status before completion check: ${finalCampaignState.status}`);
-
-        if (finalCampaignState.status === 'running') {
-            log(`Marking campaign ${campaignId} as completed...`);
-            await databases.updateDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId, {
-                status: 'completed', completedAt: new Date().toISOString(),
-                processedCount, successCount, failedCount
-            });
-            log(`Campaign ${campaignId} marked as completed.`);
-            if (config.adminPhoneNumbers && config.adminPhoneNumbers.length > 0) {
-                 log('Sending final completion notification to admins...');
-                 const finalMessage = `✅ *Campaña Finalizada*\n\n- ID: ${campaignId}\n- Enviados: ${successCount}\n- Fallidos: ${failedCount}\n- Total Procesados: ${processedCount}`;
-                 for (const adminPhone of config.adminPhoneNumbers) {
-                    log(`Sending final notification to admin ${adminPhone}...`);
-                    await sendMessage(config.apiUrl, apiKey, adminPhone, finalMessage);
-                    log(`Final notification sent to admin ${adminPhone}.`);
-                 }
-            }
-        } else {
-             log(`Campaign ${campaignId} was not in 'running' state at the end. Final status: ${finalCampaignState.status}`);
-        }
-        // --- Fin Finalización ---
-
-        // **RETURN EN CASO DE ÉXITO**
-        return res.json({ success: true, message: 'Campaign processing finished or stopped.' });
-
-    } catch (err) {
-        error('Error during campaign execution:', err.message, err.stack); // Loguear más detalle del error
-         // --- Marcar campaña como fallida (Sin cambios) ---
-        if (campaignId && config) {
-            try {
-                 log(`Attempting to mark campaign ${campaignId} as failed due to error...`);
-                 await databases.updateDocument(DATABASE_ID, CAMPAIGNS_COLLECTION_ID, campaignId, {
-                    status: 'failed', errorMessage: err.message || 'Unknown error during execution.',
-                    lastUpdatedAt: new Date().toISOString()
-                 });
-                 log(`Campaign ${campaignId} marked as failed.`);
-                 if (config.adminPhoneNumbers && config.adminPhoneNumbers.length > 0 && apiKey) {
-                     log('Notifying admins about the failure...');
-                     const failMessage = `❌ *Error en Campaña*\n\n- ID: ${campaignId}\n- Error: ${err.message || 'Unknown error'}`;
-                     for (const adminPhone of config.adminPhoneNumbers) {
-                         log(`Sending failure notification to admin ${adminPhone}...`);
-                         await sendMessage(config.apiUrl, apiKey, adminPhone, failMessage);
-                          log(`Failure notification sent to admin ${adminPhone}.`);
-                     }
-                 }
-            } catch (updateError) {
-                error(`Failed to update campaign ${campaignId} status to failed:`, updateError);
-            }
-        }
-        // **RETURN EN CASO DE ERROR EN EL BLOQUE TRY PRINCIPAL**
-        return res.json({ success: false, error: err.message || 'An unknown error occurred' }, 500);
+        await databases.deleteDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
+    } catch (e) {
+        error(`Could not delete progress document for campaign ${campaignId}: ${e.message}`);
     }
-    // **AÑADIDO: RETURN DE SEGURIDAD POR SI ALGO FALLA ANTES DEL TRY PRINCIPAL (IMPROBABLE)**
-    // Si la ejecución llega aquí, algo muy raro ocurrió antes del bloque try principal.
-    error('Execution reached unexpected end without returning response.');
-    return res.json({ success: false, error: 'Function ended unexpectedly.' }, 500);
+
+    const finalStatus = finalFailed > 0 ? 'completed_with_errors' : 'sent';
+
+    await databases.updateDocument(
+        DATABASE_ID,
+        CAMPAIGNS_COLLECTION_ID,
+        campaignId,
+        { status: finalStatus }
+    );
+
+    // Usar 'clients.length' (total) y las estadísticas finales consultadas
+    await sendAdminNotification(`✅ *Campaña Finalizada*\n\n- ID: ${campaignId}\n- Total: ${clients.length}\n- Enviados: ${finalSent}\n- Fallidos: ${finalFailed}\n- Saltados: ${finalSkipped}`);
+
+    if (remainingClients) {
+        return res.json({ success: true, message: 'Chunk processed successfully.' });
+    }
+
+    return res.json({ success: true, message: 'Campaign finished successfully.' });
 };
