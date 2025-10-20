@@ -92,3 +92,17 @@ export interface WahaConfig extends LipooutDocument {
   startTime?: string;
   endTime?: string;
 }
+
+// --- Tipo Configuración Clínica (AÑADIDO) ---
+export interface Configuracion extends LipooutDocument {
+  nombreClinica?: string;
+  direccion?: string;
+  cif?: string;
+  emailContacto?: string;
+  telefonoContacto?: string;
+  serieFactura?: string;
+  seriePresupuesto?: string;
+  ultimoNumeroFactura: number; // Campo requerido según el setup
+  ultimoNumeroPresupuesto: number; // Campo requerido según el setup
+  tipoIvaPredeterminado?: number;
+}

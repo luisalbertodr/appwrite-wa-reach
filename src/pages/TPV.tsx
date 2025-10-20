@@ -3,20 +3,23 @@ import { useTpvStore, LineaTicket } from '@/stores/tpvStore';
 import { useGetClientes } from '@/hooks/useClientes';
 import { useGetArticulos } from '@/hooks/useArticulos';
 import { useCreateFactura } from '@/hooks/useFacturas';
-import { useGetConfiguracion, useGenerarSiguienteNumero } from '@/hooks/useConfiguracion'; // <-- 1. Importar hooks config
-import { Cliente, Articulo, LineaFactura, FacturaInputData, CreateFacturaInput } from '@/types';
+import { useGetConfiguration, useGenerarSiguienteNumero } from '@/hooks/useConfiguration'; // <-- Nombre corregido
+import { Cliente, Articulo, LineaFactura, FacturaInputData, CreateFacturaInput, Factura, Configuracion } from '@/types'; // <-- Añadir Factura, Configuracion
+import { Models } from 'appwrite'; // <-- Añadir Models
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, X, Plus, Minus, Trash2, CreditCard, Percent, Banknote } from 'lucide-react';
+import { User, X, Plus, Minus, Trash2, CreditCard, Percent, Banknote, Download } from 'lucide-react'; // <-- Añadir Download
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // <-- 2. Importar Select
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { DownloadFacturaPDF } from '@/components/pdf/DownloadFacturaPDF'; // <-- Importar PDF
 import { useToast } from '@/hooks/use-toast';
 import { formatISO, format } from 'date-fns';
+import { cn } from '@/lib/utils'; // <-- Importar cn
 
 // Componente EditableNumberCell (sin cambios)
 const EditableNumberCell = ({ value, onChange, className }: { value: number, onChange: (newValue: number) => void, className?: string }) => {
@@ -60,16 +63,19 @@ const TPV = () => {
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [busquedaArticulo, setBusquedaArticulo] = useState('');
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const [articuloPopoverOpen, setArticuloPopoverOpen] = useState(false); // <-- Estado de popover de artículos (del código GitHub)
   const { toast } = useToast();
 
-  const { data: clientes, isLoading: loadingClientes } = useGetClientes(clientePopoverOpen ? busquedaCliente : "");
-  const { data: articulos, isLoading: loadingArticulos } = useGetArticulos();
+  // <-- Estado para el último ticket generado -->
+  const [ultimaFacturaGenerada, setUltimaFacturaGenerada] = useState<(Factura & Models.Document) | null>(null);
 
-  // <-- 3. Obtener estado y acciones del TPV Store -->
+  const { data: clientes, isLoading: loadingClientes } = useGetClientes(clientePopoverOpen ? busquedaCliente : "");
+  const { data: articulos, isLoading: loadingArticulos } = useGetArticulos(); // <-- Usar getArticulos sin filtro aquí
+
   const {
     clienteSeleccionado,
     lineas,
-    totalNeto, // Base Imponible
+    totalNeto,
     descuentoGlobalPorcentaje,
     metodoPago,
     seleccionarCliente,
@@ -81,19 +87,102 @@ const TPV = () => {
     actualizarDescuentoLinea,
     setDescuentoGlobalPorcentaje,
     setMetodoPago,
-    limpiarTicket,
+    limpiarTicket: limpiarTicketStore,
   } = useTpvStore();
 
-  // <-- 4. Hooks para Config y Facturación -->
-  const { data: config, isLoading: loadingConfig } = useGetConfiguracion();
+  const { data: config, isLoading: loadingConfig } = useGetConfiguration(); // <-- Nombre corregido
   const createFacturaMutation = useCreateFactura();
   const generarNumeroMutation = useGenerarSiguienteNumero();
 
-  // --- Buscadores (sin cambios) ---
-  const BuscadorClientes = () => { /* ... sin cambios ... */ };
-  const BuscadorArticulos = () => { /* ... sin cambios ... */ };
+  // --- Buscadores (Integrados con código GitHub) ---
+  const BuscadorClientes = () => {
+        return (
+            <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !clienteSeleccionado && "text-muted-foreground")}>
+                        <span className="truncate">{clienteSeleccionado?.nombre_completo || 'Seleccionar cliente...'}</span>
+                        <User className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
+                    <Command shouldFilter={false}>
+                        <CommandInput placeholder="Buscar cliente..." value={busquedaCliente} onValueChange={setBusquedaCliente}/>
+                        <CommandList>
+                             {loadingClientes && <CommandItem disabled><LoadingSpinner/></CommandItem>}
+                             <CommandEmpty>No encontrado.</CommandItem>
+                             <CommandGroup>
+                                 {clientes?.map((cliente) => (
+                                 <CommandItem
+                                     key={cliente.$id}
+                                     value={cliente.nombre_completo || cliente.$id}
+                                     onSelect={() => {
+                                         seleccionarCliente(cliente);
+                                         setClientePopoverOpen(false);
+                                     }}
+                                 >
+                                     {cliente.nombre_completo} ({cliente.dnicli || cliente.email})
+                                 </CommandItem>
+                                 ))}
+                             </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+        );
+    };
 
-  // --- Lógica de Cobro (MUY MODIFICADA) ---
+  const BuscadorArticulos = () => {
+        // Filtrar artículos localmente para el buscador
+        const articulosFiltrados = busquedaArticulo
+            ? articulos?.filter(a => a.nombre.toLowerCase().includes(busquedaArticulo.toLowerCase()))
+            : articulos;
+
+        return (
+             <Card className="flex-1 flex flex-col min-h-0">
+                <CardHeader className="py-4"><CardTitle>2. Artículos/Servicios</CardTitle></CardHeader>
+                 <CardContent className="flex-1 flex flex-col gap-2 overflow-hidden p-2">
+                     <Input
+                        type="search"
+                        placeholder="Buscar artículo..."
+                        value={busquedaArticulo}
+                        onChange={(e) => setBusquedaArticulo(e.target.value)}
+                        className="mb-2"
+                     />
+                    <ScrollArea className="flex-1">
+                        {loadingArticulos ? <LoadingSpinner /> : (
+                            <div className="space-y-1 pr-2">
+                                {articulosFiltrados?.map(articulo => (
+                                    <Button
+                                        key={articulo.$id}
+                                        variant="outline"
+                                        className="w-full justify-start h-auto py-2"
+                                        onClick={() => agregarLinea(articulo)}
+                                        disabled={!articulo.activo}
+                                    >
+                                        <div className="flex flex-col items-start">
+                                            <span className="font-medium">{articulo.nombre}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {articulo.precio.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} - {articulo.tipo}
+                                                {!articulo.activo && ' (Inactivo)'}
+                                            </span>
+                                        </div>
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                    </ScrollArea>
+                 </CardContent>
+             </Card>
+        );
+    };
+
+   // --- Limpiar ticket localmente (Añadido) ---
+  const handleLimpiarTicketLocal = () => {
+      limpiarTicketStore();
+      setUltimaFacturaGenerada(null); // Limpiar también el último ticket
+  };
+
+  // --- Lógica de Cobro (Corregida y fusionada) ---
   const handleCobrar = async () => {
     if (!clienteSeleccionado || lineas.length === 0) {
       toast({ title: "Error", description: "Debe seleccionar un cliente y añadir al menos un artículo.", variant: "destructive" });
@@ -104,10 +193,8 @@ const TPV = () => {
       return;
     }
 
-    // --- 5. Generar Número de Factura (Ticket) ---
     let numeroFacturaGenerado: string;
     try {
-        // El TPV genera 'facturas' (estado cobrada)
         const { numeroCompleto } = await generarNumeroMutation.mutateAsync({ config, tipo: 'factura' });
         numeroFacturaGenerado = numeroCompleto;
     } catch (error) {
@@ -115,21 +202,19 @@ const TPV = () => {
          return;
     }
 
-
-    // --- 6. Calcular Totales Finales ---
-    const tipoIvaPredeterminado = config.tipoIvaPredeterminado || 21; // Usar de config
+    const tipoIvaPredeterminado = config.tipoIvaPredeterminado || 21;
     let baseImponibleTotal = 0;
     let ivaTotal = 0;
 
     const lineasFactura: LineaFactura[] = lineas.map((lineaTpv) => {
-      // totalNeto (base imponible) ya tiene descuento de línea
-      const baseLinea = lineaTpv.importeTotal; 
+      const baseLinea = lineaTpv.importeTotal;
       const ivaImporteLinea = baseLinea * (tipoIvaPredeterminado / 100);
       baseImponibleTotal += baseLinea;
       ivaTotal += ivaImporteLinea;
 
+      // Simplificamos la estructura de LineaFactura para que coincida con el tipo
       return {
-        id: lineaTpv.id,
+        id: lineaTpv.id, // ID interno, puede ser útil pero no es parte estricta del tipo Factura
         articulo_id: lineaTpv.articulo.$id,
         descripcion: lineaTpv.articulo.nombre,
         cantidad: lineaTpv.cantidad,
@@ -142,44 +227,50 @@ const TPV = () => {
       };
     });
 
-    const totalFacturaBruto = baseImponibleTotal + ivaTotal; // Total antes de dto global
+    const totalFacturaBruto = baseImponibleTotal + ivaTotal;
     const importeDescuentoGlobal = totalFacturaBruto * (descuentoGlobalPorcentaje / 100);
     const totalAPagarFinal = totalFacturaBruto - importeDescuentoGlobal;
 
-    // --- 7. Preparar datos para Appwrite ---
     const facturaData: FacturaInputData = {
       numeroFactura: numeroFacturaGenerado,
-      fechaEmision: formatISO(new Date(), { representation: 'date' }), // YYYY-MM-DD
-      estado: 'cobrada', // TPV siempre cobra
+      fechaEmision: formatISO(new Date(), { representation: 'date' }),
+      estado: 'cobrada',
       cliente_id: clienteSeleccionado.$id,
-      lineas: JSON.stringify(lineasFactura),
+      lineas: JSON.stringify(lineasFactura), // Convertir a JSON string
       baseImponible: baseImponibleTotal,
       totalIva: ivaTotal,
       totalFactura: totalFacturaBruto,
       descuentoGlobalPorcentaje: descuentoGlobalPorcentaje,
       importeDescuentoGlobal: importeDescuentoGlobal,
       totalAPagar: totalAPagarFinal,
-      metodoPago: metodoPago, // <-- Nuevo
+      metodoPago: metodoPago,
     };
 
     try {
-      await createFacturaMutation.mutateAsync(facturaData as CreateFacturaInput);
+      // Guardamos la factura devuelta para el PDF
+      const nuevaFactura = await createFacturaMutation.mutateAsync(facturaData as CreateFacturaInput);
+      
+      // Añadimos el cliente (necesario para el PDF)
+      const facturaCompleta = {
+          ...nuevaFactura,
+          cliente: clienteSeleccionado, 
+      } as (Factura & Models.Document);
+      
+      setUltimaFacturaGenerada(facturaCompleta); // Guardar para imprimir
+
       toast({
         title: "Venta Registrada",
-        description: `Se creó el documento ${numeroFacturaGenerado}. El ticket se ha limpiado.`,
+        description: `Se creó el documento ${numeroFacturaGenerado}. Ticket limpiado.`,
       });
-      limpiarTicket(); // Limpiar TPV
+      limpiarTicketStore(); // Limpiar solo el store
     } catch (error) {
       console.error("Error al crear factura:", error);
       toast({ title: "Error al registrar la venta", description: (error as Error).message, variant: "destructive" });
-      // NOTA: No revertimos el contador aquí, podría causar números duplicados.
-      // Se registrará el error, pero el número se considera "quemado".
     }
   };
 
-  // --- Componente TicketActual (MODIFICADO) ---
+  // --- Componente TicketActual (Corregido y fusionado) ---
   const TicketActual = () => {
-    // Calculamos totales para la UI (reflejando Dto Global)
     const tipoIva = config?.tipoIvaPredeterminado || 21;
     const ivaCalculado = totalNeto * (tipoIva / 100);
     const subtotal = totalNeto + ivaCalculado;
@@ -232,10 +323,7 @@ const TPV = () => {
                  )}
             </ScrollArea>
             
-            {/* --- Footer Fijo (MODIFICADO) --- */}
             <div className="border-t p-4 space-y-4 mt-auto bg-card">
-                 
-                 {/* --- Totales --- */}
                  <div className="space-y-1 text-sm">
                      <div className="flex justify-between">
                          <span>Base Imponible:</span>
@@ -260,23 +348,21 @@ const TPV = () => {
                                 value={descuentoGlobalPorcentaje} 
                                 onChange={e => setDescuentoGlobalPorcentaje(parseFloat(e.target.value) || 0)}
                                 className="h-8 text-right"
-                                disabled={isMutating}
+                                disabled={isMutating || lineas.length === 0}
                              />
                              <span>(-{importeDtoGlobal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })})</span>
                          </div>
                      </div>
                  </div>
 
-                 {/* --- TOTAL --- */}
                  <div className="flex justify-between items-center font-semibold text-2xl border-t pt-3">
                     <span>TOTAL:</span>
                     <span>{totalFinal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
                  </div>
 
-                 {/* --- Acciones --- */}
                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1" onClick={limpiarTicket} disabled={lineas.length === 0 || isMutating}>Vaciar</Button>
-                    <Select value={metodoPago} onValueChange={setMetodoPago} disabled={isMutating}>
+                    <Button variant="outline" className="flex-1" onClick={handleLimpiarTicketLocal} disabled={isMutating}>Vaciar</Button>
+                    <Select value={metodoPago} onValueChange={setMetodoPago} disabled={isMutating || lineas.length === 0}>
                         <SelectTrigger className="w-[150px]">
                             <SelectValue />
                         </SelectTrigger>
@@ -300,15 +386,29 @@ const TPV = () => {
                         {isMutating ? 'Guardando...' : 'Cobrar'}
                     </Button>
                  </div>
+
+                 {/* Botón Descargar Último Ticket */}
+                 {ultimaFacturaGenerada && !loadingConfig && config && (
+                    <DownloadFacturaPDF
+                        factura={ultimaFacturaGenerada}
+                        config={config}
+                        className="w-full" // Aplicamos clase al wrapper del Link
+                    >
+                        {/* El children es el botón real */}
+                        <Button variant="outline" className="w-full">
+                            <Download className="w-4 h-4 mr-2" />
+                            Descargar Ticket ({ultimaFacturaGenerada.numeroFactura})
+                        </Button>
+                    </DownloadFacturaPDF>
+                 )}
             </div>
         </CardContent>
     </Card>
     );
   };
 
-  // --- Renderizado principal (sin cambios) ---
   return (
-    <div className="flex flex-col md:flex-row gap-4 flex-1 overflow-hidden">
+    <div className="flex flex-col md:flex-row gap-4 h-[calc(100vh-100px)] overflow-hidden"> {/* Ajustar altura si es necesario */}
         {/* Columna Izquierda */}
         <div className="w-full md:w-[350px] lg:w-[400px] space-y-4 flex flex-col">
              <Card> 
@@ -327,9 +427,8 @@ const TPV = () => {
                     )}
                  </CardContent> 
              </Card>
-             <div className="flex-1 flex flex-col min-h-0"> 
-                <BuscadorArticulos/> 
-             </div>
+             {/* El BuscadorArticulos ahora es una Card y ocupa el espacio restante */}
+             <BuscadorArticulos/> 
         </div>
         {/* Columna Derecha */}
         <div className="flex-1 flex flex-col min-h-0"> <TicketActual /> </div>

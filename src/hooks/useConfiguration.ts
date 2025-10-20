@@ -1,35 +1,33 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getConfiguracion,
-  updateConfiguracion,
-  UpdateConfiguracionInput,
-} from '@/services/appwrite-configuracion';
+  getConfiguration,
+  updateConfiguration,
+  UpdateConfigurationInput,
+} from '@/services/appwrite-configuration'; // Usa el servicio renombrado
 import { Configuracion } from '@/types';
 import { Models } from 'appwrite';
 
-const CONFIGURACION_QUERY_KEY = 'configuracion';
+const CONFIGURATION_QUERY_KEY = 'configuration'; // Clave renombrada
 
 // Hook para OBTENER la configuración
-export const useGetConfiguracion = () => {
+export const useGetConfiguration = () => {
   return useQuery<Configuracion & Models.Document>({
-    queryKey: [CONFIGURACION_QUERY_KEY],
-    queryFn: getConfiguracion,
+    queryKey: [CONFIGURATION_QUERY_KEY],
+    queryFn: getConfiguration, // Usa la función renombrada
     staleTime: 1000 * 60 * 60, // Cachear 1 hora
     retry: 1,
   });
 };
 
 // Hook para ACTUALIZAR la configuración (genérico)
-export const useUpdateConfiguracion = () => {
+export const useUpdateConfiguration = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateConfiguracionInput }) =>
-      updateConfiguracion(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateConfigurationInput }) =>
+      updateConfiguration(id, data), // Usa la función renombrada
     onSuccess: (data) => {
       // Actualiza la caché local con los nuevos datos
-      queryClient.setQueryData([CONFIGURACION_QUERY_KEY], data);
-      // Invalida por si acaso, aunque setQueryData debería ser suficiente
-      // queryClient.invalidateQueries({ queryKey: [CONFIGURACION_QUERY_KEY] });
+      queryClient.setQueryData([CONFIGURATION_QUERY_KEY], data);
     },
   });
 };
@@ -39,12 +37,11 @@ export const useUpdateConfiguracion = () => {
 export const useGenerarSiguienteNumero = () => {
     const queryClient = useQueryClient();
 
-    // Usamos la mutación de actualización
     const mutation = useMutation({
         mutationFn: async ({ config, tipo }: { config: Configuracion & Models.Document, tipo: 'factura' | 'presupuesto' }) => {
             
             let nuevoNumero: number;
-            let dataToUpdate: UpdateConfiguracionInput;
+            let dataToUpdate: UpdateConfigurationInput;
             let serie: string;
             
             if (tipo === 'factura') {
@@ -58,7 +55,7 @@ export const useGenerarSiguienteNumero = () => {
             }
 
             // 1. Actualizar el contador en Appwrite
-            const updatedConfig = await updateConfiguracion(config.$id, dataToUpdate);
+            const updatedConfig = await updateConfiguration(config.$id, dataToUpdate); // Usa la función renombrada
 
             // 2. Formatear el número (ej: FRA2025-00001)
             const año = new Date().getFullYear();
@@ -69,11 +66,10 @@ export const useGenerarSiguienteNumero = () => {
         },
         onSuccess: ({ updatedConfig }) => {
             // Actualizar la caché de configuración inmediatamente
-            queryClient.setQueryData([CONFIGURACION_QUERY_KEY], updatedConfig);
+            queryClient.setQueryData([CONFIGURATION_QUERY_KEY], updatedConfig);
         },
         onError: (error) => {
              console.error("Error al incrementar el contador:", error);
-             // Aquí podríamos intentar revertir si algo salió mal
         }
     });
 

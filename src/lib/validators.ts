@@ -15,7 +15,7 @@ export const calculateAge = (fecnac: string | Date | undefined): number | undefi
 
 // --- Esquemas de Formulario ---
 
-// 1. Cliente (Basado en ClienteForm.tsx)
+// 1. Cliente
 export const clienteSchema = z.object({
   codcli: z.string().min(1, "El código es obligatorio").max(10, "Código demasiado largo"),
   nomcli: z.string().min(1, "El nombre es obligatorio"),
@@ -38,7 +38,7 @@ export const clienteSchema = z.object({
 export type ClienteFormData = z.infer<typeof clienteSchema>;
 
 
-// 2. Empleado (Basado en EmpleadoForm.tsx)
+// 2. Empleado
 export const empleadoSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   apellidos: z.string().min(1, "Los apellidos son obligatorios"),
@@ -50,7 +50,7 @@ export const empleadoSchema = z.object({
 export type EmpleadoFormData = z.infer<typeof empleadoSchema>;
 
 
-// 3. Factura (Basado en FacturaForm.tsx)
+// 3. Factura
 export const lineaFacturaSchema = z.object({
   articulo_id: z.string().min(1, "Se requiere artículo"),
   descripcion: z.string().min(1, "Se requiere descripción"),
@@ -75,7 +75,7 @@ export const facturaSchema = z.object({
 export type FacturaFormData = z.infer<typeof facturaSchema>;
 
 
-// 4. Artículo (NUEVO)
+// 4. Artículo
 export const articuloSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   descripcion: z.string().optional(),
@@ -89,7 +89,7 @@ export const articuloSchema = z.object({
 export type ArticuloFormData = z.infer<typeof articuloSchema>;
 
 
-// 5. Cita (NUEVO)
+// 5. Cita
 export const citaSchema = z.object({
   fecha_hora_inicio: z.string().min(1, "Fecha y hora de inicio obligatorias"), // Se enviará como ISO string
   fecha_hora_fin: z.string().min(1, "Fecha y hora de fin obligatorias"), // Se enviará como ISO string
@@ -102,10 +102,23 @@ export const citaSchema = z.object({
 });
 export type CitaFormData = z.infer<typeof citaSchema>;
 
-// 6. Familia (NUEVO)
+// 6. Familia
 export const familiaSchema = z.object({
     nombre: z.string().min(1, "El nombre es obligatorio"),
     descripcion: z.string().optional().nullable(),
     icono: z.string().optional().nullable(),
 });
 export type FamiliaFormData = z.infer<typeof familiaSchema>;
+
+// 7. Configuración Clínica (NUEVO)
+export const configurationSchema = z.object({
+    nombreClinica: z.string().min(1, "Nombre obligatorio"),
+    direccion: z.string().optional(),
+    cif: z.string().min(1, "CIF obligatorio"),
+    emailContacto: z.string().email("Email inválido").optional().or(z.literal('')),
+    telefonoContacto: z.string().optional(),
+    serieFactura: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
+    seriePresupuesto: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
+    tipoIvaPredeterminado: z.number().min(0, "IVA no puede ser negativo").max(100),
+});
+export type ConfigurationFormData = z.infer<typeof configurationSchema>;

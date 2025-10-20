@@ -1,9 +1,9 @@
-import { databases, DATABASE_ID, CONFIGURACION_COLLECTION_ID } from '@/lib/appwrite';
+import { databases, DATABASE_ID, CONFIGURATION_COLLECTION_ID } from '@/lib/appwrite';
 import { Configuracion } from '@/types';
 import { Query, Models } from 'appwrite';
 
 // Definimos el tipo de Input (basado en el setup)
-export type UpdateConfiguracionInput = Partial<{
+export type UpdateConfigurationInput = Partial<{
   nombreClinica: string;
   direccion: string;
   cif: string;
@@ -17,23 +17,23 @@ export type UpdateConfiguracionInput = Partial<{
 }>;
 
 // Asumimos que SOLO hay UN documento de configuración
-const CONFIGURACION_DOC_ID = 'singleton'; // O el $id real si ya existe
+const CONFIGURATION_DOC_ID = 'singleton'; // O el $id real si ya existe
 
 // Obtener la configuración (asumiendo un único documento)
-export const getConfiguracion = async (): Promise<Configuracion & Models.Document> => {
+export const getConfiguration = async (): Promise<Configuracion & Models.Document> => {
   try {
     // Intentamos obtener por ID conocido
     return await databases.getDocument<Configuracion & Models.Document>(
         DATABASE_ID,
-        CONFIGURACION_COLLECTION_ID,
-        CONFIGURACION_DOC_ID
+        CONFIGURATION_COLLECTION_ID,
+        CONFIGURATION_DOC_ID
     );
   } catch (error) {
      // Si falla (ej. no existe), intentamos listarlo
-     console.warn(`No se encontró config con ID '${CONFIGURACION_DOC_ID}', listando...`);
+     console.warn(`No se encontró config con ID '${CONFIGURATION_DOC_ID}', listando...`);
      const response = await databases.listDocuments<Configuracion & Models.Document>(
         DATABASE_ID,
-        CONFIGURACION_COLLECTION_ID,
+        CONFIGURATION_COLLECTION_ID,
         [Query.limit(1)]
      );
      if (response.documents.length > 0) {
@@ -44,13 +44,11 @@ export const getConfiguracion = async (): Promise<Configuracion & Models.Documen
 };
 
 // Actualizar la configuración
-export const updateConfiguracion = (id: string, data: UpdateConfiguracionInput) => {
+export const updateConfiguration = (id: string, data: UpdateConfigurationInput) => {
   return databases.updateDocument<Configuracion & Models.Document>(
     DATABASE_ID,
-    CONFIGURACION_COLLECTION_ID,
+    CONFIGURATION_COLLECTION_ID,
     id,
     data
   );
 };
-
-// (Opcional) Hook para generar el siguiente número (más complejo, mejor en hook)

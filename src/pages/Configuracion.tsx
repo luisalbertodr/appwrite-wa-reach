@@ -1,231 +1,311 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { WahaConfig, LipooutUserInput } from '@/types'; // Importar tipos necesarios
+import { WahaConfig, ImportLog, LipooutUserInput, Configuracion } from '@/types'; // <-- Añadir Configuracion
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Shield, Bot, HardDriveUpload, Download } from 'lucide-react';
+import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server } from 'lucide-react'; // <-- Añadir iconos Settings, Server
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { ConfigurationForm } from '@/components/forms/ConfigurationForm'; // <-- Importar Formulario Clínica
+import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration'; // <-- Importar Hooks Clínica
+import { Separator } from '@/components/ui/separator'; // <-- Importar Separator
 import { useToast } from '@/hooks/use-toast';
-import { WAHA_CONFIG_COLLECTION_ID, IMPORT_LOGS_COLLECTION_ID, client } from '@/lib/appwrite';
-import { Models } from 'appwrite';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import LoadingSpinner from '@/components/LoadingSpinner'; // Importado
+import {
+  WAHA_CONFIG_COLLECTION_ID,
+  IMPORT_LOGS_COLLECTION_ID,
+  databases,
+  DATABASE_ID,
+  storage,
+  IMPORT_BUCKET_ID,
+  client,
+  // CONFIGURATION_COLLECTION_ID // Ya importado indirectamente por hooks
+} from '@/lib/appwrite';
+import { Functions, Models } from 'appwrite'; // <-- Añadir Models
+import { format } from 'date-fns';
 
+const functions = new Functions(client);
+
+// Helper para tipo ImportLog (si no está definido globalmente)
 interface ImportLog extends Models.Document {
-  timestamp: string;
-  filename: string;
-  successfulImports: number;
-  totalProcessed: number;
-  errors: string[];
-  status: 'completed' | 'completed_with_errors' | 'failed';
+    timestamp: string;
+    filename: string;
+    successfulImports: number;
+    totalProcessed: number;
+    errors?: string[];
+    status: 'completed' | 'completed_with_errors' | 'failed';
 }
 
-// Usamos LipooutUserInput para el estado y el default config
-type WahaConfigInput = LipooutUserInput<WahaConfig>;
-
-const defaultConfig: WahaConfigInput = {
-  apiUrl: import.meta.env.VITE_WAHA_API_URL || 'http://192.168.30.50:3000/api',
-  session: 'default',
-  minDelayMs: 2000, maxDelayMs: 5000, batchSizeMin: 15, batchSizeMax: 25,
-  batchDelayMsMin: 60000, batchDelayMsMax: 120000, adminPhoneNumbers: [], notificationInterval: 50,
-  startTime: '09:00',
-  endTime: '18:00',
-  // Quitamos apiKey si no lo usamos directamente en el form/estado
-};
 
 const Configuracion = () => {
-  // Aseguramos que el hook use el tipo correcto (WahaConfig incluye LipooutDocument)
-  const { data: configs, loading: loadingConfig, create: createConfig, update: updateConfig, reload: reloadConfig } = useAppwriteCollection<WahaConfig>(WAHA_CONFIG_COLLECTION_ID);
   const { toast } = useToast();
-  // El estado usa el tipo Input sin metadata
-  const [config, setConfig] = useState<WahaConfigInput>(defaultConfig);
-  const { data: importLogs, loading: loadingImportLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
+  // --- Estado y Hooks para Configuración WAHA ---
+  const { data: configs, update: updateWahaConfig, loading: loadingWahaConfig, reload: reloadWahaConfig } = useAppwriteCollection<WahaConfig>(WAHA_CONFIG_COLLECTION_ID);
+  const [wahaSettings, setWahaSettings] = useState<Partial<WahaConfig>>({});
+  const [sessions, setSessions] = useState<{ name: string; status: string }[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
-  const [wahaSessions] = useState<string[]>([]);
-  const [showImportLogDialog, setShowImportLogDialog] = useState(false);
-  const [importLogContent, setImportLogContent] = useState<string[]>([]);
-  const [isLocalImporting] = useState(false);
+  // --- Estado y Hooks para Importación CSV ---
+  const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
+  const importLogs = importLogsData as ImportLog[]; // Cast para asegurar el tipo
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  useEffect(() => {
-    const fetchWahaSessions = async () => { /* ... lógica sin cambios ... */ };
-    fetchWahaSessions();
-  }, [toast]);
+  // --- Estado y Hooks para Configuración Clínica ---
+  const { data: clinicConfig, isLoading: loadingClinicConfig } = useGetConfiguration();
+  const updateClinicMutation = useUpdateConfiguration();
 
+  // Cargar configuración WAHA inicial en el estado local
   useEffect(() => {
     if (configs.length > 0) {
-      const fetchedConfig = configs[0];
-      // Mapeamos los campos del documento al tipo Input para el estado
-      setConfig({
-        apiUrl: fetchedConfig.apiUrl || defaultConfig.apiUrl,
-        session: fetchedConfig.session || defaultConfig.session,
-        minDelayMs: fetchedConfig.minDelayMs ?? defaultConfig.minDelayMs,
-        maxDelayMs: fetchedConfig.maxDelayMs ?? defaultConfig.maxDelayMs,
-        batchSizeMin: fetchedConfig.batchSizeMin ?? defaultConfig.batchSizeMin,
-        batchSizeMax: fetchedConfig.batchSizeMax ?? defaultConfig.batchSizeMax,
-        batchDelayMsMin: fetchedConfig.batchDelayMsMin ?? defaultConfig.batchDelayMsMin,
-        batchDelayMsMax: fetchedConfig.batchDelayMsMax ?? defaultConfig.batchDelayMsMax,
-        adminPhoneNumbers: fetchedConfig.adminPhoneNumbers || defaultConfig.adminPhoneNumbers,
-        notificationInterval: fetchedConfig.notificationInterval ?? defaultConfig.notificationInterval,
-        startTime: fetchedConfig.startTime || defaultConfig.startTime,
-        endTime: fetchedConfig.endTime || defaultConfig.endTime,
-      });
+      setWahaSettings(configs[0]);
     }
   }, [configs]);
 
-  const handleSaveConfig = async () => {
+  // Manejar cambios en formulario WAHA
+  const handleWahaChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setWahaSettings({ ...wahaSettings, [e.target.name]: e.target.value });
+  };
+
+  // Guardar configuración WAHA
+  const handleSaveWahaConfig = async () => {
+    if (!configs[0]?.$id) return;
     try {
-      // El estado 'config' ya es del tipo correcto (WahaConfigInput)
-      const configToSave = { ...config };
-      if (configs.length > 0 && configs[0].$id) {
-        await updateConfig(configs[0].$id, configToSave);
-      } else {
-        // createConfig espera el tipo Input
-        await createConfig(configToSave);
-      }
-      reloadConfig();
-      toast({ title: 'Configuración del sistema guardada' });
-    } catch (error) {
-      toast({ title: 'Error al guardar configuración', variant: 'destructive', description: (error as Error).message });
+      // Usamos LipooutUserInput para asegurar que no enviamos metadatos
+      const dataToSave: LipooutUserInput<WahaConfig> = {
+          apiUrl: wahaSettings.apiUrl || '', // Asegurar que es string
+          apiKey: wahaSettings.apiKey,
+          session: wahaSettings.session,
+          // Añadir resto de campos si existen en el estado y son editables
+      };
+      await updateWahaConfig(configs[0].$id, dataToSave);
+      toast({ title: 'Configuración WAHA guardada' });
+      reloadWahaConfig();
+    } catch (e) {
+      toast({ title: 'Error al guardar', description: (e as Error).message, variant: 'destructive' });
     }
   };
 
-  const handleLocalImport = async (event: React.ChangeEvent<HTMLInputElement>) => { /* ... lógica sin cambios ... */ };
-  const handleDownloadLog = (log: ImportLog) => { /* ... lógica sin cambios ... */ };
 
-  if (loadingConfig) {
-    return <LoadingSpinner className="mt-16" />; // Usamos el componente importado
-  }
+  // Obtener sesiones WAHA
+  const fetchSessions = useCallback(async () => {
+    setLoadingSessions(true);
+    try {
+      const result = await functions.createExecution('getWahaSessionsFunction', '{}', false);
+      if (result.status === 'completed') {
+        const responseData = JSON.parse(result.responseBody);
+        setSessions(responseData);
+      } else {
+        throw new Error(result.responseBody || 'Error desconocido');
+      }
+    } catch (error) {
+      toast({ title: 'Error al obtener sesiones', description: (error as Error).message, variant: 'destructive' });
+      setSessions([]);
+    } finally {
+      setLoadingSessions(false);
+    }
+  }, [toast]);
 
-  // --- Renderizado JSX (sin cambios estructurales, solo verificamos que use LoadingSpinner) ---
+  // Selección de archivo CSV
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
+  // Subir archivo CSV
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+    setIsUploading(true);
+    try {
+      await storage.createFile(IMPORT_BUCKET_ID, 'unique()', selectedFile);
+      toast({ title: 'Archivo subido', description: 'La importación se procesará en segundo plano.' });
+      setSelectedFile(null);
+      // Opcional: Recargar logs tras un delay
+      setTimeout(reloadLogs, 5000);
+    } catch (error) {
+      toast({ title: 'Error al subir archivo', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // --- Guardar Configuración Clínica ---
+  const handleSaveClinicConfig = async (data: LipooutUserInput<Configuracion>) => {
+       if (!clinicConfig?.$id) {
+           toast({ title: "Error", description: "No se encontró el ID de configuración.", variant: "destructive" });
+           return;
+       }
+        try {
+            await updateClinicMutation.mutateAsync({ id: clinicConfig.$id, data });
+            toast({ title: "Configuración de la clínica guardada" });
+        } catch (err) {
+            toast({ title: "Error al guardar", description: (err as Error).message, variant: "destructive" });
+        }
+  };
+
+
   return (
-     <div className="space-y-6">
+    <div className="space-y-6">
        <div>
-         <h1 className="text-3xl font-bold">Configuración del Sistema</h1>
-         <p className="text-muted-foreground mt-2">
-           Ajusta los parámetros de Waha y gestiona la importación de datos.
-         </p>
+        <h1 className="text-3xl font-bold">Configuración</h1>
+        <p className="text-muted-foreground">Ajustes generales del sistema.</p>
        </div>
-       {/* ... resto del JSX sin cambios ... */}
-        <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" />Configuración General (WAHA)</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {/* ... Inputs ... */}
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                      <Label htmlFor="apiUrl">URL de la API de Waha</Label>
-                      <Input id="apiUrl" value={config.apiUrl || ''} onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}/>
-                  </div>
-                  <div>
-                      <Label htmlFor="waha-session">Sesión de Waha</Label>
-                      <Select value={config.session} onValueChange={(value) => setConfig({ ...config, session: value })}>
-                          <SelectTrigger id="waha-session">
-                              <SelectValue placeholder="Selecciona una sesión" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              {wahaSessions.map(session => (
-                                  <SelectItem key={session} value={session}>{session}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                  </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="adminPhoneNumbers">Nº de Teléfonos de Admin (separados por comas)</Label>
-                  <Textarea
-                    id="adminPhoneNumbers"
-                    value={config.adminPhoneNumbers?.join(', ') || ''}
-                    onChange={(e) => setConfig({ ...config, adminPhoneNumbers: e.target.value.split(',').map(phone => phone.trim()).filter(phone => phone) })}
-                    placeholder="34600111222, 34600333444"
-                  />
-                   <p className="text-xs text-muted-foreground mt-1">Incluye el código de país para cada número. Ej: 34 para España.</p>
-                </div>
-                <div>
-                    <Label>Intervalo de Notificación</Label>
-                    <Input type="number" value={config.notificationInterval ?? ''} onChange={(e) => setConfig({ ...config, notificationInterval: Number(e.target.value) || undefined })}/> {/* Usar undefined si está vacío */}
-                    <p className="text-xs text-muted-foreground mt-1">Notificar cada X mensajes enviados.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5" />Políticas de Envío (WAHA)</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><Label>Horas hábiles (desde)</Label><Input type="time" value={config.startTime || ''} onChange={(e) => setConfig({ ...config, startTime: e.target.value })}/></div>
-                    <div><Label>Horas hábiles (hasta)</Label><Input type="time" value={config.endTime || ''} onChange={(e) => setConfig({ ...config, endTime: e.target.value })}/></div>
-                </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><Label>Retardo entre Mensajes (ms)</Label><div className="flex gap-2"><Input type="number" value={config.minDelayMs ?? ''} onChange={(e) => setConfig({ ...config, minDelayMs: Number(e.target.value) || undefined })} placeholder="Mín"/> <Input type="number" value={config.maxDelayMs ?? ''} onChange={(e) => setConfig({ ...config, maxDelayMs: Number(e.target.value) || undefined })} placeholder="Máx"/></div></div>
-                <div><Label>Tamaño de Lote</Label><div className="flex gap-2"><Input type="number" value={config.batchSizeMin ?? ''} onChange={(e) => setConfig({ ...config, batchSizeMin: Number(e.target.value) || undefined })} placeholder="Mín"/> <Input type="number" value={config.batchSizeMax ?? ''} onChange={(e) => setConfig({ ...config, batchSizeMax: Number(e.target.value) || undefined })} placeholder="Máx"/></div></div>
-                <div><Label>Pausa entre Lotes (ms)</Label><div className="flex gap-2"><Input type="number" value={config.batchDelayMsMin ?? ''} onChange={(e) => setConfig({ ...config, batchDelayMsMin: Number(e.target.value) || undefined })} placeholder="Mín"/> <Input type="number" value={config.batchDelayMsMax ?? ''} onChange={(e) => setConfig({ ...config, batchDelayMsMax: Number(e.target.value) || undefined })} placeholder="Máx"/></div></div>
-              </div>
-            </CardContent>
-          </Card>
-          {/* ... Botón Guardar ... */}
-          <Button onClick={handleSaveConfig} className="w-full"><Save className="w-4 h-4 mr-2" />Guardar Configuración del Sistema</Button>
-          {/* ... Historial Importaciones ... */}
-          <hr className="my-8" />
-           <Card>
-             <CardHeader><CardTitle>Historial de Importaciones (CSV)</CardTitle></CardHeader>
-             <CardContent>
-                {/* ... Botón Importar y tabla ... */}
-                 <div className="flex flex-wrap gap-2 mb-4">
-                    <Label htmlFor="csv-upload-local" className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90">
-                    <HardDriveUpload className="w-4 h-4" />
-                    Importar Clientes CSV
-                    <Input id="csv-upload-local" type="file" accept=".csv" onChange={handleLocalImport} className="sr-only" disabled={isLocalImporting} />
-                    </Label>
-                </div>
-                 <p className="text-sm text-muted-foreground mb-4">
-                    Sube un archivo CSV para importar clientes en lote. Los clientes se añadirán a la colección principal `clientes`.
-                 </p>
-                 {loadingImportLogs ? <p>Cargando historial...</p> : (
-                 <Table>
-                    <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Archivo</TableHead><TableHead>Resultado</TableHead><TableHead>Estado</TableHead><TableHead>Log</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                    {importLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((log) => (
-                        <TableRow key={log.$id}>
-                        <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
-                        <TableCell>{log.filename}</TableCell>
-                        <TableCell>{log.successfulImports} / {log.totalProcessed}</TableCell>
-                        <TableCell>
-                            <button onClick={() => { setImportLogContent(log.errors); setShowImportLogDialog(true); }}>
-                            <Badge variant={log.status === 'completed' ? 'default' : log.status === 'completed_with_errors' ? 'secondary' : 'destructive'}>{log.status}</Badge>
-                            </button>
-                        </TableCell>
-                        <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => handleDownloadLog(log)}>
-                                <Download className="w-4 h-4" />
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                 </Table>
-                 )}
-             </CardContent>
+      <Tabs defaultValue="waha">
+        <TabsList className="mb-4 grid w-full grid-cols-3"> {/* Ajustado para 3 pestañas */}
+          <TabsTrigger value="clinica"> <Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
+          <TabsTrigger value="waha"> <Server className="w-4 h-4 mr-2"/> WhatsApp (WAHA)</TabsTrigger>
+          <TabsTrigger value="import"> <Upload className="w-4 h-4 mr-2"/> Importar Clientes (CSV)</TabsTrigger>
+        </TabsList>
+
+        {/* --- Contenido Pestaña Clínica --- */}
+        <TabsContent value="clinica">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Datos de la Clínica</CardTitle>
+                    <CardDescription>Información general y configuración de facturación.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <ConfigurationForm
+                        configInicial={clinicConfig}
+                        isLoading={loadingClinicConfig}
+                        isSubmitting={updateClinicMutation.isPending}
+                        onSubmit={handleSaveClinicConfig}
+                   />
+                </CardContent>
             </Card>
-           {/* ... AlertDialog ... */}
-            <AlertDialog open={showImportLogDialog} onOpenChange={setShowImportLogDialog}>
-                <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Log de Importación</AlertDialogTitle>
-                    <AlertDialogDescription>
-                    Este es el registro de la importación de clientes.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="max-h-[60vh] overflow-y-auto rounded-md bg-slate-950 p-4"><code className="text-white whitespace-pre-wrap">{importLogContent.join('\n')}</code></div>
-                <AlertDialogFooter><AlertDialogAction>Cerrar</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+        </TabsContent>
 
-     </div>
+        {/* --- Contenido Pestaña WAHA --- */}
+        <TabsContent value="waha">
+           <Card>
+                <CardHeader>
+                    <CardTitle>Configuración WAHA</CardTitle>
+                    <CardDescription>Define la conexión con tu instancia de WhatsApp HTTP API.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {loadingWahaConfig ? <LoadingSpinner /> : (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label htmlFor="apiUrl">URL de la API</Label>
+                                    <Input id="apiUrl" name="apiUrl" value={wahaSettings.apiUrl || ''} onChange={handleWahaChange} />
+                                </div>
+                                <div>
+                                    <Label htmlFor="apiKey">API Key (Opcional)</Label>
+                                    <Input id="apiKey" name="apiKey" type="password" value={wahaSettings.apiKey || ''} onChange={handleWahaChange} />
+                                </div>
+                                <div>
+                                    <Label htmlFor="session">Nombre de Sesión</Label>
+                                    <Input id="session" name="session" value={wahaSettings.session || ''} onChange={handleWahaChange} />
+                                </div>
+                            </div>
+                             {/* TODO: Añadir resto de campos de WahaConfig si es necesario (delays, etc.) */}
+                             <Button onClick={handleSaveWahaConfig} disabled={updateWahaConfig.isLoading}> {/* Usar isLoading de la mutación */}
+                                {updateWahaConfig.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar
+                             </Button>
+
+                            <Separator className="my-6"/> {/* Separador añadido */}
+
+                             <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-medium">Estado de Sesiones WAHA</h3>
+                                <Button variant="outline" onClick={fetchSessions} disabled={loadingSessions}>
+                                    {loadingSessions ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Refrescar
+                                </Button>
+                             </div>
+                             {loadingSessions ? <LoadingSpinner /> : (
+                                <ul className="list-disc pl-5 space-y-1">
+                                    {sessions.length > 0 ? sessions.map(s => (
+                                        <li key={s.name}>
+                                            <span className="font-medium">{s.name}:</span>{' '}
+                                            <Badge variant={s.status === 'STARTED' ? 'default' : 'outline'}>{s.status}</Badge>
+                                        </li>
+                                    )) : <p className="text-muted-foreground">No se encontraron sesiones o error al cargar.</p>}
+                                </ul>
+                             )}
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        {/* --- Contenido Pestaña Importación --- */}
+        <TabsContent value="import">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Subir Archivo CSV</CardTitle>
+                <CardDescription>Selecciona el archivo CSV para importar clientes.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input type="file" accept=".csv" onChange={handleFileChange} />
+                {selectedFile && <p className="text-sm text-muted-foreground">Archivo seleccionado: {selectedFile.name}</p>}
+                <Button onClick={handleFileUpload} disabled={!selectedFile || isUploading}>
+                  {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  {isUploading ? 'Subiendo...' : 'Iniciar Importación'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Asegúrate de que el CSV tenga las columnas: `codcli`, `nomcli`, `ape1cli`, `email`, `dnicli`, `dircli`, `codposcli`, `pobcli`, `procli`, `tel1cli`, `tel2cli`, `fecnac` (YYYY-MM-DD), `enviar` (1 o 0), `sexo` (H/M/Otro), `fecalta` (YYYY-MM-DD).
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between"> {/* Ajuste para botón */}
+                <div className="space-y-1">
+                  <CardTitle>Historial de Importaciones</CardTitle>
+                  <CardDescription>Últimas importaciones realizadas.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={reloadLogs} disabled={loadingLogs}>
+                  {loadingLogs ? <Loader2 className="h-4 w-4 animate-spin"/> : "Refrescar"}
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {loadingLogs ? <LoadingSpinner /> : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Archivo</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Resultado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {importLogs && importLogs.length > 0 ? importLogs.map(log => (
+                        <TableRow key={log.$id}>
+                          <TableCell>{format(new Date(log.timestamp), 'dd/MM/yy HH:mm')}</TableCell>
+                          <TableCell className="truncate max-w-[150px]">{log.filename}</TableCell>
+                          <TableCell>
+                            <Badge variant={log.status === 'completed' ? 'default' : log.status === 'completed_with_errors' ? 'secondary' : 'destructive'}>
+                              {log.status === 'completed' ? 'Completado' : log.status === 'completed_with_errors' ? 'Con Errores' : 'Fallido'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {log.successfulImports}/{log.totalProcessed}
+                            {log.errors && log.errors.length > 0 && <span className="text-destructive"> ({log.errors.length} err.)</span>}
+                          </TableCell>
+                          {/* Opcional: Añadir botón para ver errores */}
+                        </TableRow>
+                      )) : (
+                          <TableRow>
+                              <TableCell colSpan={4} className="text-center text-muted-foreground">No hay logs de importación.</TableCell>
+                          </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 
