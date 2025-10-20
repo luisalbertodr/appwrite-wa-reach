@@ -1,386 +1,341 @@
 {
-    "projectId": "68d6d4060020e39899f6", // Keep your existing project ID
-    "projectName": "Lipoout", // Updated Name
-    "settings": {
-        "services": { /* ... Keep existing services ... */ },
-        "auth": { /* ... Keep existing auth settings ... */ }
-    },
-    "functions": [ /* ... Keep existing function definitions ... */ ],
-    "databases": [
-        {
-            "$id": "68d78cb20028fac621d4",
-            "name": "LipooutDB", // Updated Name
-            "enabled": true
-        }
-    ],
+    "$id": "LipooutDB",
+    "name": "LipooutDB",
+    "enabled": true,
     "collections": [
-        // --- Lipoout Collections ---
-        {
-            "$id": "clientes",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Clientes",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                {"key": "codcli", "type": "string", "size": 6, "required": true, "array": false},
-                {"key": "nomcli", "type": "string", "size": 255, "required": false, "array": false},
-                {"key": "ape1cli", "type": "string", "size": 255, "required": false, "array": false},
-                {"key": "nombre_completo", "type": "string", "size": 511, "required": false, "array": false},
-                {"key": "email", "type": "email", "size": 255, "required": false, "array": false},
-                {"key": "dnicli", "type": "string", "size": 15, "required": false, "array": false},
-                {"key": "dircli", "type": "string", "size": 511, "required": false, "array": false},
-                {"key": "codposcli", "type": "string", "size": 10, "required": false, "array": false},
-                {"key": "pobcli", "type": "string", "size": 255, "required": false, "array": false},
-                {"key": "procli", "type": "string", "size": 255, "required": false, "array": false},
-                {"key": "tel1cli", "type": "string", "size": 20, "required": false, "array": false},
-                {"key": "tel2cli", "type": "string", "size": 20, "required": false, "array": false},
-                {"key": "fecnac", "type": "datetime", "required": false, "array": false},
-                {"key": "enviar", "type": "integer", "required": false, "array": false, "default": 1},
-                {"key": "sexo", "type": "string", "size": 10, "required": false, "array": false, "format": "enum", "elements": ["H", "M", "Otro"]},
-                {"key": "fecalta", "type": "datetime", "required": false, "array": false},
-                {"key": "edad", "type": "integer", "required": false, "array": false},
-                {"key": "facturacion", "type": "float", "required": true, "array": false, "default": 0.0},
-                {"key": "intereses", "type": "string", "size": 1024, "required": false, "array": true}, // Store as array of strings
-                {"key": "importErrors", "type": "string", "size": 4096, "required": false, "array": true}
-            ],
-            "indexes": [
-                {"key": "idx_codcli", "type": "key", "attributes": ["codcli"], "orders": ["ASC"], "unique": true},
-                {"key": "idx_nombre_completo", "type": "fulltext", "attributes": ["nombre_completo"], "orders": ["ASC"]},
-                {"key": "idx_email", "type": "key", "attributes": ["email"], "orders": ["ASC"]},
-                {"key": "idx_dnicli", "type": "key", "attributes": ["dnicli"], "orders": ["ASC"]},
-                {"key": "idx_tel2cli", "type": "key", "attributes": ["tel2cli"], "orders": ["ASC"]},
-                {"key": "idx_edad", "type": "key", "attributes": ["edad"], "orders": ["ASC"]},
-                {"key": "idx_facturacion", "type": "key", "attributes": ["facturacion"], "orders": ["ASC"]},
-                {"key": "idx_intereses", "type": "fulltext", "attributes": ["intereses"], "orders": ["ASC"]} // Fulltext for array search
-            ]
-        },
-        {
-            "$id": "empleados",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Empleados",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "nombre", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "apellidos", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "nombre_completo", "type": "string", "size": 511, "required": false, "array": false},
-                 {"key": "email", "type": "email", "size": 255, "required": true, "array": false},
-                 {"key": "telefono", "type": "string", "size": 20, "required": false, "array": false},
-                 {"key": "rol", "type": "string", "size": 50, "required": true, "array": false, "format": "enum", "elements": ["Admin", "Médico", "Recepción", "Lectura"]},
-                 {"key": "activo", "type": "boolean", "required": true, "array": false, "default": true}
-            ],
-            "indexes": [
-                {"key": "idx_email", "type": "key", "attributes": ["email"], "orders": ["ASC"], "unique": true},
-                {"key": "idx_activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"]},
-                {"key": "idx_rol", "type": "key", "attributes": ["rol"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "familias",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Familias Articulos",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "nombre", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false},
-                 {"key": "icono", "type": "string", "size": 50, "required": false, "array": false}
-            ],
-            "indexes": [
-                 {"key": "idx_nombre", "type": "key", "attributes": ["nombre"], "orders": ["ASC"], "unique": true}
-            ]
-        },
-        {
-            "$id": "articulos",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Articulos",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                {"key": "nombre", "type": "string", "size": 255, "required": true, "array": false},
-                {"key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false},
-                {"key": "precio", "type": "float", "required": true, "array": false},
-                {"key": "tipo", "type": "string", "size": 50, "required": true, "array": false, "format": "enum", "elements": ["producto", "servicio", "bono"]},
-                {"key": "familia_id", "type": "string", "size": 50, "required": true, "array": false}, // Link to familias
-                {"key": "stock", "type": "integer", "required": false, "array": false},
-                {"key": "sesiones_bono", "type": "integer", "required": false, "array": false},
-                {"key": "activo", "type": "boolean", "required": true, "array": false, "default": true}
-            ],
-            "indexes": [
-                {"key": "idx_nombre", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"]},
-                {"key": "idx_tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"]},
-                {"key": "idx_familia_id", "type": "key", "attributes": ["familia_id"], "orders": ["ASC"]},
-                {"key": "idx_activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "citas",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Citas",
-            "enabled": true,
-            "documentSecurity": false, // Adjust if needed (e.g., only see own appointments)
-            "attributes": [
-                {"key": "fecha_hora_inicio", "type": "datetime", "required": true, "array": false},
-                {"key": "fecha_hora_fin", "type": "datetime", "required": true, "array": false},
-                {"key": "duracion_minutos", "type": "integer", "required": false, "array": false},
-                {"key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false}, // Link to clientes
-                {"key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false}, // Link to empleados
-                {"key": "articulo_id", "type": "string", "size": 50, "required": true, "array": false}, // Link to articulos
-                {"key": "estado", "type": "string", "size": 50, "required": true, "array": false, "format": "enum", "elements": ["agendada", "confirmada", "realizada", "cancelada", "no_asistio"]},
-                {"key": "notas_internas", "type": "string", "size": 4096, "required": false, "array": false},
-                {"key": "notas_cliente", "type": "string", "size": 1024, "required": false, "array": false}
-                // Add recurso_id if needed
-            ],
-            "indexes": [
-                {"key": "idx_fecha_inicio", "type": "key", "attributes": ["fecha_hora_inicio"], "orders": ["ASC"]},
-                {"key": "idx_cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"]},
-                {"key": "idx_empleado_id", "type": "key", "attributes": ["empleado_id"], "orders": ["ASC"]},
-                {"key": "idx_estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"]},
-                {"key": "idx_fecha_empleado", "type": "key", "attributes": ["fecha_hora_inicio", "empleado_id"], "orders": ["ASC", "ASC"]}
-            ]
-        },
-        {
-            "$id": "facturas",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Facturas",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "numeroFactura", "type": "string", "size": 50, "required": true, "array": false},
-                 {"key": "fechaEmision", "type": "datetime", "required": true, "array": false},
-                 {"key": "fechaVencimiento", "type": "datetime", "required": false, "array": false},
-                 {"key": "estado", "type": "string", "size": 50, "required": true, "array": false, "format": "enum", "elements": ["borrador", "finalizada", "cobrada", "anulada", "presupuesto"]},
-                 {"key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false}, // Link to clientes
-                 {"key": "empleado_id", "type": "string", "size": 50, "required": false, "array": false}, // Link to empleados
-                 {"key": "lineas", "type": "string", "size": 10000, "required": true, "array": false}, // JSON String
-                 {"key": "baseImponible", "type": "float", "required": true, "array": false},
-                 {"key": "totalIva", "type": "float", "required": true, "array": false},
-                 {"key": "totalFactura", "type": "float", "required": true, "array": false},
-                 {"key": "descuentoGlobalPorcentaje", "type": "float", "required": false, "array": false, "default": 0.0},
-                 {"key": "importeDescuentoGlobal", "type": "float", "required": false, "array": false, "default": 0.0},
-                 {"key": "totalAPagar", "type": "float", "required": true, "array": false},
-                 {"key": "metodoPago", "type": "string", "size": 100, "required": false, "array": false},
-                 {"key": "notas", "type": "string", "size": 4096, "required": false, "array": false},
-                 {"key": "facturaRectificada_id", "type": "string", "size": 50, "required": false, "array": false}
-            ],
-            "indexes": [
-                {"key": "idx_numeroFactura", "type": "key", "attributes": ["numeroFactura"], "orders": ["ASC"], "unique": true},
-                {"key": "idx_fechaEmision", "type": "key", "attributes": ["fechaEmision"], "orders": ["DESC"]},
-                {"key": "idx_cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"]},
-                {"key": "idx_estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"]},
-                {"key": "idx_fecha_estado", "type": "key", "attributes": ["fechaEmision", "estado"], "orders": ["DESC", "ASC"]}
-            ]
-        },
-        {
-            "$id": "configuracion", // Lipoout Config
-            "$permissions": ["read(\"users\")", "update(\"users\")"], // More restricted maybe?
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Configuracion Clinica",
-            "enabled": true,
-            "documentSecurity": false, // Only one doc expected
-            "attributes": [
-                {"key": "nombreClinica", "type": "string", "size": 255, "required": false, "array": false},
-                {"key": "direccion", "type": "string", "size": 511, "required": false, "array": false},
-                {"key": "cif", "type": "string", "size": 20, "required": false, "array": false},
-                {"key": "emailContacto", "type": "email", "size": 255, "required": false, "array": false},
-                {"key": "telefonoContacto", "type": "string", "size": 20, "required": false, "array": false},
-                {"key": "serieFactura", "type": "string", "size": 10, "required": false, "array": false, "default": "FRA"},
-                {"key": "seriePresupuesto", "type": "string", "size": 10, "required": false, "array": false, "default": "PRE"},
-                {"key": "ultimoNumeroFactura", "type": "integer", "required": false, "array": false, "default": 0},
-                {"key": "ultimoNumeroPresupuesto", "type": "integer", "required": false, "array": false, "default": 0},
-                {"key": "tipoIvaPredeterminado", "type": "float", "required": false, "array": false, "default": 21.0}
-            ],
-            "indexes": []
-        },
-        // --- Placeholders (Define attributes as needed) ---
-        {
-            "$id": "proveedores",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4", "name": "Proveedores", "enabled": true, "documentSecurity": false,
-            "attributes": [
-                 {"key": "nombre", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "cif", "type": "string", "size": 20, "required": false, "array": false},
-                 {"key": "email", "type": "email", "required": false, "array": false},
-                 {"key": "telefono", "type": "string", "size": 20, "required": false, "array": false},
-                 {"key": "direccion", "type": "string", "size": 511, "required": false, "array": false}
-            ],
-            "indexes": [
-                 {"key": "idx_nombre", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "recursos",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4", "name": "Recursos", "enabled": true, "documentSecurity": false,
-             "attributes": [
-                 {"key": "nombre", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "tipo", "type": "string", "size": 50, "required": false, "array": false, "format": "enum", "elements": ["Cabina", "Aparatología", "Otro"]},
-                 {"key": "activo", "type": "boolean", "required": true, "array": false, "default": true}
-            ],
-            "indexes": [
-                 {"key": "idx_nombre", "type": "key", "attributes": ["nombre"], "orders": ["ASC"]},
-                 {"key": "idx_tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "asistencia",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Maybe restrict create/update more
-            "databaseId": "68d78cb20028fac621d4", "name": "Asistencia Empleados", "enabled": true, "documentSecurity": false,
-            "attributes": [
-                 {"key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false},
-                 {"key": "fecha_hora_entrada", "type": "datetime", "required": true, "array": false},
-                 {"key": "fecha_hora_salida", "type": "datetime", "required": false, "array": false},
-                 {"key": "tipo", "type": "string", "size": 20, "required": false, "array": false, "format": "enum", "elements": ["Entrada", "Salida", "PausaInicio", "PausaFin"]}
-            ],
-            "indexes": [
-                {"key": "idx_empleado_fecha", "type": "key", "attributes": ["empleado_id", "fecha_hora_entrada"], "orders": ["ASC", "DESC"]}
-            ]
-        },
-        // --- WhatsApp PoC Collections (Updated Definitions) ---
-        {
-            "$id": "config", // WAHA Config
-            "$permissions": ["read(\"users\")", "update(\"users\")"], // Usually only read/update
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Configuracion WAHA",
-            "enabled": true,
-            "documentSecurity": false, // Only one doc expected
-            "attributes": [
-                 {"key": "apiUrl", "type": "url", "size": 255, "required": true, "array": false},
-                 {"key": "apiKey", "type": "string", "size": 255, "required": false, "array": false},
-                 {"key": "session", "type": "string", "size": 100, "required": false, "array": false, "default": "default"},
-                 {"key": "minDelayMs", "type": "integer", "required": false, "array": false},
-                 {"key": "maxDelayMs", "type": "integer", "required": false, "array": false},
-                 {"key": "batchSizeMin", "type": "integer", "required": false, "array": false},
-                 {"key": "batchSizeMax", "type": "integer", "required": false, "array": false},
-                 {"key": "batchDelayMsMin", "type": "integer", "required": false, "array": false},
-                 {"key": "batchDelayMsMax", "type": "integer", "required": false, "array": false},
-                 {"key": "adminPhoneNumbers", "type": "string", "size": 1024, "required": false, "array": true},
-                 {"key": "notificationInterval", "type": "integer", "required": false, "array": false},
-                 {"key": "startTime", "type": "string", "size": 5, "required": false, "array": false},
-                 {"key": "endTime", "type": "string", "size": 5, "required": false, "array": false}
-            ],
-            "indexes": []
-        },
-        {
-            "$id": "templates",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Plantillas WhatsApp",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "name", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "messages", "type": "string", "size": 4096, "required": true, "array": true},
-                 {"key": "imageUrls", "type": "url", "size": 2048, "required": false, "array": true}
-            ],
-            "indexes": [
-                 {"key": "idx_name", "type": "key", "attributes": ["name"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "campaigns",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Campanas WhatsApp",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                {"key": "name", "type": "string", "size": 255, "required": true, "array": false},
-                {"key": "templateId", "type": "string", "size": 50, "required": true, "array": false}, // Link to templates
-                {"key": "filters", "type": "string", "size": 1024, "required": false, "array": false}, // JSON String
-                {"key": "scheduledDate", "type": "datetime", "required": false, "array": false},
-                {"key": "scheduledTime", "type": "string", "size": 5, "required": false, "array": false},
-                {"key": "selectedMessageIndex", "type": "integer", "required": false, "array": false},
-                {"key": "selectedImageIndex", "type": "integer", "required": false, "array": false},
-                {"key": "status", "type": "string", "size": 50, "required": true, "array": false},
-                {"key": "audienceCount", "type": "integer", "required": true, "array": false},
-                {"key": "createdAt", "type": "datetime", "required": true, "array": false}, // Appwrite can manage this
-                {"key": "startTime", "type": "string", "size": 5, "required": false, "array": false},
-                {"key": "endTime", "type": "string", "size": 5, "required": false, "array": false}
-            ],
-            "indexes": [
-                 {"key": "idx_createdAt", "type": "key", "attributes": ["createdAt"], "orders": ["DESC"]},
-                 {"key": "idx_status", "type": "key", "attributes": ["status"], "orders": ["ASC"]}
-            ]
-        },
-        {
-            "$id": "campaign_progress",
-            "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")"], // Function needs write access
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Progreso Campana",
-            "enabled": true,
-            "documentSecurity": true, // Doc ID matches Campaign ID
-            "attributes": [
-                 {"key": "currentClientName", "type": "string", "size": 255, "required": false, "array": false},
-                 {"key": "currentClientPhone", "type": "string", "size": 20, "required": false, "array": false}
-            ],
-            "indexes": []
-        },
-        {
-            "$id": "message_logs",
-            "$permissions": ["read(\"users\")", "create(\"users\")"], // Function needs create access
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Logs Mensajes WhatsApp",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "campaignId", "type": "string", "size": 50, "required": true, "array": false}, // Link to campaigns
-                 {"key": "clientId", "type": "string", "size": 50, "required": true, "array": false}, // Link to clientes
-                 {"key": "clientName", "type": "string", "size": 255, "required": false, "array": false},
-                 {"key": "phone", "type": "string", "size": 20, "required": true, "array": false},
-                 {"key": "timestamp", "type": "datetime", "required": true, "array": false},
-                 {"key": "status", "type": "string", "size": 20, "required": true, "array": false},
-                 {"key": "error", "type": "string", "size": 1024, "required": false, "array": false},
-                 {"key": "messageContent", "type": "string", "size": 4096, "required": false, "array": false},
-                 {"key": "imageUrlSent", "type": "url", "size": 2048, "required": false, "array": false}
-            ],
-            "indexes": [
-                {"key": "idx_campaignId", "type": "key", "attributes": ["campaignId"], "orders": ["ASC"]},
-                {"key": "idx_clientId", "type": "key", "attributes": ["clientId"], "orders": ["ASC"]},
-                {"key": "idx_status", "type": "key", "attributes": ["status"], "orders": ["ASC"]},
-                {"key": "idx_timestamp", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"]}
-            ]
-        },
-        {
-            "$id": "import_logs", // Changed from IMPORT_LOGS_COLLECTION_ID for consistency
-            "$permissions": ["read(\"users\")", "create(\"users\")"], // Function needs create access
-            "databaseId": "68d78cb20028fac621d4",
-            "name": "Logs Importacion CSV",
-            "enabled": true,
-            "documentSecurity": false,
-            "attributes": [
-                 {"key": "timestamp", "type": "datetime", "required": true, "array": false},
-                 {"key": "filename", "type": "string", "size": 255, "required": true, "array": false},
-                 {"key": "successfulImports", "type": "integer", "required": true, "array": false},
-                 {"key": "totalProcessed", "type": "integer", "required": true, "array": false},
-                 {"key": "errors", "type": "string", "size": 10000, "required": false, "array": true},
-                 {"key": "status", "type": "string", "size": 50, "required": true, "array": false}
-            ],
-            "indexes": [
-                 {"key": "idx_timestamp", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"]}
-            ]
-        }
-    ],
-    "buckets": [
-        {
-            "$id": "68d7cd3a0019edb5703b", // Bucket for CSV Imports
-            "$permissions": ["create(\"users\")", "read(\"users\")", "update(\"users\")", "delete(\"users\")"],
-            "fileSecurity": true,
-            "name": "ImportCSV", // Updated Name
-            "enabled": true,
-            "maximumFileSize": 30000000, // 30MB example
-            "allowedFileExtensions": ["csv"], // Only allow CSV
-            "compression": "none",
-            "encryption": true,
-            "antivirus": true
-        }
-        // Add other buckets if needed (e.g., client documents, article images)
+      {
+        "$id": "clientes",
+        "name": "clientes",
+        "$permissions": [
+          "read(\"any\")", // Ajustar permisos según roles reales
+          "create(\"users\")",
+          "update(\"users\")",
+          "delete(\"users\")"
+        ],
+        "documentSecurity": false,
+        "enabled": true,
+        "attributes": [
+          { "key": "codcli", "type": "string", "size": 6, "required": true, "array": false },
+          { "key": "nomcli", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "ape1cli", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "nombre_completo", "type": "string", "size": 511, "required": false, "array": false },
+          { "key": "email", "type": "email", "size": 255, "required": false, "array": false },
+          { "key": "dnicli", "type": "string", "size": 15, "required": false, "array": false },
+          { "key": "dircli", "type": "string", "size": 511, "required": false, "array": false },
+          { "key": "codposcli", "type": "string", "size": 10, "required": false, "array": false },
+          { "key": "pobcli", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "procli", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "tel1cli", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "tel2cli", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "fecnac", "type": "datetime", "required": false, "array": false },
+          { "key": "enviar", "type": "integer", "required": false, "default": 1, "array": false },
+          { "key": "sexo", "type": "string", "size": 10, "required": false, "elements": ["H", "M", "Otro"], "array": false },
+          { "key": "fecalta", "type": "datetime", "required": false, "array": false },
+          { "key": "edad", "type": "integer", "required": false, "array": false },
+          { "key": "facturacion", "type": "float", "required": true, "default": 0, "array": false },
+          { "key": "intereses", "type": "string", "size": 1024, "required": false, "array": true },
+          { "key": "importErrors", "type": "string", "size": 4096, "required": false, "array": true }
+        ],
+        "indexes": [
+          { "key": "codcli_unique", "type": "unique", "attributes": ["codcli"], "orders": ["ASC"] },
+          { "key": "nombre_completo_fulltext", "type": "fulltext", "attributes": ["nombre_completo"], "orders": ["ASC"] },
+          { "key": "email", "type": "key", "attributes": ["email"], "orders": ["ASC"] },
+          { "key": "dnicli", "type": "key", "attributes": ["dnicli"], "orders": ["ASC"] },
+          { "key": "tel2cli", "type": "key", "attributes": ["tel2cli"], "orders": ["ASC"] },
+          { "key": "edad", "type": "key", "attributes": ["edad"], "orders": ["ASC"] },
+          { "key": "facturacion", "type": "key", "attributes": ["facturacion"], "orders": ["ASC"] },
+          { "key": "intereses_fulltext", "type": "fulltext", "attributes": ["intereses"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "empleados",
+        "name": "empleados",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "apellidos", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "nombre_completo", "type": "string", "size": 511, "required": false, "array": false },
+          { "key": "email", "type": "email", "size": 255, "required": true, "array": false },
+          { "key": "telefono", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "rol", "type": "string", "size": 50, "required": true, "elements": ["Admin", "Médico", "Recepción", "Lectura"], "array": false },
+          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
+        ],
+        "indexes": [
+          { "key": "email_unique", "type": "unique", "attributes": ["email"], "orders": ["ASC"] },
+          { "key": "activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"] },
+          { "key": "rol", "type": "key", "attributes": ["rol"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "familias",
+        "name": "familias",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false },
+          { "key": "icono", "type": "string", "size": 50, "required": false, "array": false }
+        ],
+        "indexes": [
+          { "key": "nombre_unique", "type": "unique", "attributes": ["nombre"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "articulos",
+        "name": "articulos",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false },
+          { "key": "precio", "type": "float", "required": true, "array": false },
+          { "key": "tipo", "type": "string", "size": 50, "required": true, "elements": ["producto", "servicio", "bono"], "array": false },
+          { "key": "familia_id", "type": "string", "size": 50, "required": true, "array": false }, // Relación manual
+          { "key": "stock", "type": "integer", "required": false, "array": false },
+          { "key": "sesiones_bono", "type": "integer", "required": false, "array": false },
+          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
+        ],
+        "indexes": [
+          { "key": "nombre_fulltext", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"] },
+          { "key": "tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"] },
+          { "key": "familia_id", "type": "key", "attributes": ["familia_id"], "orders": ["ASC"] },
+          { "key": "activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "citas",
+        "name": "citas",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "fecha_hora_inicio", "type": "datetime", "required": true, "array": false },
+          { "key": "fecha_hora_fin", "type": "datetime", "required": true, "array": false },
+          { "key": "duracion_minutos", "type": "integer", "required": false, "array": false },
+          { "key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "articulo_id", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "estado", "type": "string", "size": 50, "required": true, "elements": ["agendada", "confirmada", "realizada", "cancelada", "no_asistio"], "array": false },
+          { "key": "notas_internas", "type": "string", "size": 4096, "required": false, "array": false },
+          { "key": "notas_cliente", "type": "string", "size": 1024, "required": false, "array": false }
+        ],
+        "indexes": [
+          { "key": "fecha_inicio", "type": "key", "attributes": ["fecha_hora_inicio"], "orders": ["ASC"] },
+          { "key": "cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"] },
+          { "key": "empleado_id", "type": "key", "attributes": ["empleado_id"], "orders": ["ASC"] },
+          { "key": "estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"] },
+          { "key": "fecha_empleado", "type": "key", "attributes": ["fecha_hora_inicio", "empleado_id"], "orders": ["ASC", "ASC"] }
+        ]
+      },
+      {
+        "$id": "facturas",
+        "name": "facturas",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "numeroFactura", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "fechaEmision", "type": "datetime", "required": true, "array": false },
+          { "key": "fechaVencimiento", "type": "datetime", "required": false, "array": false },
+          { "key": "estado", "type": "string", "size": 50, "required": true, "elements": ["borrador", "finalizada", "cobrada", "anulada", "presupuesto"], "array": false },
+          { "key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "empleado_id", "type": "string", "size": 50, "required": false, "array": false },
+          { "key": "lineas", "type": "string", "size": 10000, "required": true, "array": false }, // JSON String
+          { "key": "baseImponible", "type": "float", "required": true, "array": false },
+          { "key": "totalIva", "type": "float", "required": true, "array": false },
+          { "key": "totalFactura", "type": "float", "required": true, "array": false },
+          { "key": "descuentoGlobalPorcentaje", "type": "float", "required": false, "default": 0, "array": false },
+          { "key": "importeDescuentoGlobal", "type": "float", "required": false, "default": 0, "array": false },
+          { "key": "totalAPagar", "type": "float", "required": true, "array": false },
+          { "key": "metodoPago", "type": "string", "size": 100, "required": false, "array": false },
+          { "key": "notas", "type": "string", "size": 4096, "required": false, "array": false },
+          { "key": "facturaRectificada_id", "type": "string", "size": 50, "required": false, "array": false }
+        ],
+        "indexes": [
+          { "key": "numeroFactura_unique", "type": "unique", "attributes": ["numeroFactura"], "orders": ["ASC"] },
+          { "key": "fechaEmision_desc", "type": "key", "attributes": ["fechaEmision"], "orders": ["DESC"] },
+          { "key": "cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"] },
+          { "key": "estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"] },
+          { "key": "fecha_estado", "type": "key", "attributes": ["fechaEmision", "estado"], "orders": ["ASC", "ASC"] }
+        ]
+      },
+      {
+        "$id": "configuration", // ID corregido
+        "name": "configuration", // Nombre corregido
+        "$permissions": ["read(\"users\")", "update(\"users\")"], // Ajustar, solo admins?
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombreClinica", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "direccion", "type": "string", "size": 511, "required": false, "array": false },
+          { "key": "cif", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "emailContacto", "type": "email", "size": 255, "required": false, "array": false },
+          { "key": "telefonoContacto", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "serieFactura", "type": "string", "size": 10, "required": false, "default": "FRA", "array": false },
+          { "key": "seriePresupuesto", "type": "string", "size": 10, "required": false, "default": "PRE", "array": false },
+          { "key": "ultimoNumeroFactura", "type": "integer", "required": false, "default": 0, "array": false },
+          { "key": "ultimoNumeroPresupuesto", "type": "integer", "required": false, "default": 0, "array": false },
+          { "key": "tipoIvaPredeterminado", "type": "float", "required": false, "default": 21, "array": false }
+        ],
+        "indexes": [] // No se especificaron índices
+      },
+      // --- Colecciones WhatsApp (Mantenidas de PoC) ---
+      {
+        "$id": "config",
+        "name": "config",
+        "$permissions": ["read(\"users\")", "update(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "apiUrl", "type": "url", "size": 255, "required": true, "array": false },
+          { "key": "apiKey", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "session", "type": "string", "size": 100, "required": false, "default": "default", "array": false },
+          { "key": "minDelayMs", "type": "integer", "required": false, "array": false },
+          { "key": "maxDelayMs", "type": "integer", "required": false, "array": false },
+          { "key": "batchSizeMin", "type": "integer", "required": false, "array": false },
+          { "key": "batchSizeMax", "type": "integer", "required": false, "array": false },
+          { "key": "batchDelayMsMin", "type": "integer", "required": false, "array": false },
+          { "key": "batchDelayMsMax", "type": "integer", "required": false, "array": false },
+          { "key": "adminPhoneNumbers", "type": "string", "size": 1024, "required": false, "array": true },
+          { "key": "notificationInterval", "type": "integer", "required": false, "array": false },
+          { "key": "startTime", "type": "string", "size": 5, "required": false, "array": false },
+          { "key": "endTime", "type": "string", "size": 5, "required": false, "array": false }
+        ],
+        "indexes": []
+      },
+      {
+        "$id": "templates",
+        "name": "templates",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "messages", "type": "string", "size": 4096, "required": true, "array": true },
+          { "key": "imageUrls", "type": "url", "size": 2048, "required": false, "array": true }
+        ],
+        "indexes": [
+            { "key": "name", "type": "key", "attributes": ["name"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "campaigns",
+        "name": "campaigns",
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "templateId", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "filters", "type": "string", "size": 1024, "required": false, "array": false }, // JSON String
+          { "key": "scheduledDate", "type": "datetime", "required": false, "array": false },
+          { "key": "scheduledTime", "type": "string", "size": 5, "required": false, "array": false },
+          { "key": "selectedMessageIndex", "type": "integer", "required": false, "array": false },
+          { "key": "selectedImageIndex", "type": "integer", "required": false, "array": false },
+          { "key": "status", "type": "string", "size": 50, "required": true, "array": false }, // Podría ser Enum
+          { "key": "audienceCount", "type": "integer", "required": true, "array": false },
+          { "key": "createdAt", "type": "datetime", "required": true, "array": false }, // Appwrite puede gestionarlo
+          { "key": "startTime", "type": "string", "size": 5, "required": false, "array": false },
+          { "key": "endTime", "type": "string", "size": 5, "required": false, "array": false }
+        ],
+        "indexes": [
+           { "key": "createdAt_desc", "type": "key", "attributes": ["createdAt"], "orders": ["DESC"] },
+           { "key": "status", "type": "key", "attributes": ["status"], "orders": ["ASC"] }
+        ]
+      },
+       {
+        "$id": "campaign_progress",
+        "name": "campaign_progress",
+        "$permissions": ["read(\"users\")", "update(\"users\")"], // Función actualiza, Front lee
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "currentClientName", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "currentClientPhone", "type": "string", "size": 20, "required": false, "array": false }
+          // $id = campaignId
+        ],
+        "indexes": []
+      },
+      {
+        "$id": "message_logs",
+        "name": "message_logs",
+        "$permissions": ["read(\"users\")", "create(\"functions\")"], // Función crea, Front lee
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "campaignId", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "clientId", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "clientName", "type": "string", "size": 255, "required": false, "array": false },
+          { "key": "phone", "type": "string", "size": 20, "required": true, "array": false },
+          { "key": "timestamp", "type": "datetime", "required": true, "array": false },
+          { "key": "status", "type": "string", "size": 20, "required": true, "array": false }, // Podría ser Enum
+          { "key": "error", "type": "string", "size": 1024, "required": false, "array": false },
+          { "key": "messageContent", "type": "string", "size": 4096, "required": false, "array": false },
+          { "key": "imageUrlSent", "type": "url", "size": 2048, "required": false, "array": false }
+        ],
+        "indexes": [
+          { "key": "campaignId", "type": "key", "attributes": ["campaignId"], "orders": ["ASC"] },
+          { "key": "clientId", "type": "key", "attributes": ["clientId"], "orders": ["ASC"] },
+          { "key": "status", "type": "key", "attributes": ["status"], "orders": ["ASC"] },
+          { "key": "timestamp_desc", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"] }
+        ]
+      },
+       {
+        "$id": "import_logs",
+        "name": "import_logs",
+        "$permissions": ["read(\"users\")", "create(\"functions\")"], // Función crea, Front lee
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "timestamp", "type": "datetime", "required": true, "array": false },
+          { "key": "filename", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "successfulImports", "type": "integer", "required": true, "array": false },
+          { "key": "totalProcessed", "type": "integer", "required": true, "array": false },
+          { "key": "errors", "type": "string", "size": 10000, "required": false, "array": true },
+          { "key": "status", "type": "string", "size": 50, "required": true, "array": false } // Podría ser Enum
+        ],
+        "indexes": [
+           { "key": "timestamp_desc", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"] }
+        ]
+      },
+      // --- Colecciones Placeholder (Añadidas desde setup.md) ---
+       {
+        "$id": "proveedores",
+        "name": "proveedores",
+        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "cif", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "email", "type": "email", "required": false, "array": false },
+          { "key": "telefono", "type": "string", "size": 20, "required": false, "array": false },
+          { "key": "direccion", "type": "string", "size": 511, "required": false, "array": false }
+        ],
+        "indexes": [
+           { "key": "nombre_fulltext", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "recursos",
+        "name": "recursos",
+        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
+          { "key": "tipo", "type": "string", "size": 50, "required": false, "array": false }, // Podría ser Enum
+          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
+        ],
+        "indexes": [
+           { "key": "nombre", "type": "key", "attributes": ["nombre"], "orders": ["ASC"] },
+           { "key": "tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"] }
+        ]
+      },
+      {
+        "$id": "asistencia",
+        "name": "asistencia",
+        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "documentSecurity": false, "enabled": true,
+        "attributes": [
+          { "key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false },
+          { "key": "fecha_hora_entrada", "type": "datetime", "required": true, "array": false },
+          { "key": "fecha_hora_salida", "type": "datetime", "required": false, "array": false },
+          { "key": "tipo", "type": "string", "size": 20, "required": false, "array": false } // Podría ser Enum
+        ],
+        "indexes": [
+          { "key": "empleado_fecha", "type": "key", "attributes": ["empleado_id", "fecha_hora_entrada"], "orders": ["ASC", "ASC"] }
+        ]
+      }
     ]
-    // Removed legacy "tablesDB" and "tables" sections as they are deprecated
-}
+  }
