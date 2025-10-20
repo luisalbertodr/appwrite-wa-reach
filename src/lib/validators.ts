@@ -1,81 +1,111 @@
 import { z } from 'zod';
-import { TipoArticulo, RolEmpleado, EstadoFactura } from '@/types'; // Importar tipos necesarios
+import { formatISO, differenceInYears, parseISO } from 'date-fns';
 
-// --- Funciones auxiliares ---
-export const calculateAge = (dob: string): number => { /* ... */ };
-export const validateDniNie = (dni: string): boolean => { /* ... */ };
-export const validateMobilePhone = (phone: string): boolean => { /* ... */ };
+// --- Helper Functions ---
 
-// --- Esquema Zod para Cliente ---
-export const clienteSchema = z.object({ /* ... */ });
+export const calculateAge = (fecnac: string | Date | undefined): number | undefined => {
+  if (!fecnac) return undefined;
+  try {
+    const birthDate = (typeof fecnac === 'string') ? parseISO(fecnac) : fecnac;
+    return differenceInYears(new Date(), birthDate);
+  } catch (e) {
+    return undefined;
+  }
+};
+
+// --- Esquemas de Formulario ---
+
+// 1. Cliente (Basado en ClienteForm.tsx)
+export const clienteSchema = z.object({
+  codcli: z.string().min(1, "El código es obligatorio").max(10, "Código demasiado largo"),
+  nomcli: z.string().min(1, "El nombre es obligatorio"),
+  ape1cli: z.string().min(1, "El apellido es obligatorio"),
+  email: z.string().email("Email inválido").optional().or(z.literal('')),
+  dnicli: z.string().optional(),
+  dircli: z.string().optional(),
+  codposcli: z.string().optional(),
+  pobcli: z.string().optional(),
+  procli: z.string().optional(),
+  tel1cli: z.string().optional(),
+  tel2cli: z.string().optional(),
+  fecnac: z.string().optional().nullable(), // Se envía como YYYY-MM-DD
+  sexo: z.enum(['H', 'M', 'Otro']).optional(),
+  fecalta: z.string().optional().nullable(), // Se envía como YYYY-MM-DD
+  enviar: z.number().min(0).max(1).optional(),
+  facturacion: z.number().optional(),
+  intereses: z.array(z.string()).optional(),
+});
 export type ClienteFormData = z.infer<typeof clienteSchema>;
 
-// --- Esquema Zod para Artículo ---
-export const articuloSchema = z.object({ /* ... */ });
-export type ArticuloFormData = z.infer<typeof articuloSchema>;
 
-// --- Esquema Zod para Empleado ---
-//export const empleadoSchema = z.object({ /* ... */ });
-//export type EmpleadoFormData = z.infer<typeof empleadoSchema>;
-
-// --- NUEVO: Esquema Zod para Empleado ---
+// 2. Empleado (Basado en EmpleadoForm.tsx)
 export const empleadoSchema = z.object({
-  nombre: z.string().min(1, "Nombre requerido").max(255),
-  apellidos: z.string().min(1, "Apellidos requeridos").max(255),
-  email: z.string().email("Email inválido"), // Requerido para login? Asumimos que sí.
-  telefono: z.string().max(20).optional(),
-  rol: z.enum(['Admin', 'Médico', 'Recepción', 'Lectura'], { required_error: "Rol requerido" }),
-  activo: z.boolean().default(true),
-  // nombre_completo se calcula, no va en el form
+  nombre: z.string().min(1, "El nombre es obligatorio"),
+  apellidos: z.string().min(1, "Los apellidos son obligatorios"),
+  email: z.string().email("Email inválido"),
+  telefono: z.string().optional(),
+  rol: z.enum(['Admin', 'Médico', 'Recepción', 'Lectura']),
+  activo: z.boolean(),
 });
+export type EmpleadoFormData = z.infer<typeof empleadoSchema>;
 
-// --- NUEVO: Esquema Zod para Línea de Factura ---
-// (Usado internamente en el esquema de Factura)
-const lineaFacturaSchema = z.object({
-  // id: z.string().uuid(), // El ID interno no necesita validarse aquí
-  articulo_id: z.string().min(1, "Artículo requerido"),
-  descripcion: z.string().min(1, "Descripción requerida").max(255),
-  cantidad: z.preprocess(
-      (val) => parseInt(String(val), 10) || 1,
-      z.number().int().min(1, "Mínimo 1")
-  ),
-  precioUnitario: z.preprocess(
-      (val) => parseFloat(String(val).replace(',', '.')) || 0,
-      z.number().min(0, "Precio >= 0")
-  ),
-  tipoIva: z.preprocess(
-      (val) => parseFloat(String(val).replace(',', '.')) || 21, // IVA por defecto 21%
-      z.number().min(0).max(100)
-  ),
-  descuentoPorcentaje: z.preprocess(
-      (val) => parseFloat(String(val).replace(',', '.')) || 0,
-      z.number().min(0).max(100, "Máximo 100%")
-  ),
-  // Campos calculados (ivaImporte, totalSinIva, totalConIva) no se validan en el input, se calculan al guardar/mostrar
+
+// 3. Factura (Basado en FacturaForm.tsx)
+export const lineaFacturaSchema = z.object({
+  articulo_id: z.string().min(1, "Se requiere artículo"),
+  descripcion: z.string().min(1, "Se requiere descripción"),
+  cantidad: z.number().min(0.01, "Cantidad debe ser positiva"),
+  precioUnitario: z.number().min(0, "Precio no puede ser negativo"),
+  tipoIva: z.number().min(0, "IVA no puede ser negativo"),
+  descuentoPorcentaje: z.number().min(0).max(100).optional(),
 });
-
-// --- NUEVO: Esquema Zod para Factura (Input Data) ---
-export const facturaSchema = z.object({
-  // numeroFactura se genera/asigna fuera del form básico, no se valida aquí
-  fechaEmision: z.string().min(1, "Fecha requerida"), // Podría ser z.date() si usamos date picker
-  fechaVencimiento: z.string().optional().nullable(),
-  estado: z.enum(['borrador', 'finalizada', 'cobrada', 'anulada', 'presupuesto'], { required_error: "Estado requerido" }),
-  cliente_id: z.string().min(1, "Cliente requerido"),
-  empleado_id: z.string().optional().nullable(),
-  lineas: z.array(lineaFacturaSchema).min(1, "Añade al menos una línea"), // Array de líneas validado
-  // Totales (baseImponible, totalIva, totalFactura, totalAPagar) se calculan, no se validan aquí directamente
-  descuentoGlobalPorcentaje: z.preprocess(
-      (val) => parseFloat(String(val).replace(',', '.')) || 0,
-      z.number().min(0).max(100).optional()
-  ).optional(),
-  metodoPago: z.string().max(100).optional().nullable(),
-  notas: z.string().max(4096).optional().nullable(),
-  // facturaRectificada_id no se suele editar en el form principal
-});
-
-// Tipo TypeScript para el formulario
-export type FacturaFormData = z.infer<typeof facturaSchema>;
-// Tipo para las líneas dentro del formulario
 export type LineaFacturaFormData = z.infer<typeof lineaFacturaSchema>;
 
-export type EmpleadoFormData = z.infer<typeof empleadoSchema>;
+export const facturaSchema = z.object({
+  fechaEmision: z.string().min(10, "Fecha de emisión obligatoria"), // YYYY-MM-DD
+  fechaVencimiento: z.string().optional().nullable(),
+  estado: z.enum(['borrador', 'finalizada', 'cobrada', 'anulada', 'presupuesto']),
+  cliente_id: z.string().min(1, "Cliente obligatorio"),
+  empleado_id: z.string().optional().nullable(),
+  lineas: z.array(lineaFacturaSchema).min(1, "Se requiere al menos una línea"),
+  descuentoGlobalPorcentaje: z.number().min(0).max(100).optional().nullable(),
+  metodoPago: z.string().optional().nullable(),
+  notas: z.string().optional().nullable(),
+});
+export type FacturaFormData = z.infer<typeof facturaSchema>;
+
+
+// 4. Artículo (NUEVO)
+export const articuloSchema = z.object({
+  nombre: z.string().min(1, "El nombre es obligatorio"),
+  descripcion: z.string().optional(),
+  precio: z.number().min(0, "El precio debe ser 0 o mayor"),
+  tipo: z.enum(['producto', 'servicio', 'bono']),
+  familia_id: z.string().min(1, "La familia es obligatoria"),
+  stock: z.number().optional().nullable(),
+  sesiones_bono: z.number().optional().nullable(),
+  activo: z.boolean(),
+});
+export type ArticuloFormData = z.infer<typeof articuloSchema>;
+
+
+// 5. Cita (NUEVO)
+export const citaSchema = z.object({
+  fecha_hora_inicio: z.string().min(1, "Fecha y hora de inicio obligatorias"), // Se enviará como ISO string
+  fecha_hora_fin: z.string().min(1, "Fecha y hora de fin obligatorias"), // Se enviará como ISO string
+  cliente_id: z.string().min(1, "Cliente obligatorio"),
+  empleado_id: z.string().min(1, "Empleado obligatorio"),
+  articulo_id: z.string().min(1, "Tratamiento obligatorio"),
+  estado: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'no_asistio']),
+  notas_internas: z.string().optional(),
+  notas_cliente: z.string().optional(),
+});
+export type CitaFormData = z.infer<typeof citaSchema>;
+
+// 6. Familia (NUEVO)
+export const familiaSchema = z.object({
+    nombre: z.string().min(1, "El nombre es obligatorio"),
+    descripcion: z.string().optional().nullable(),
+    icono: z.string().optional().nullable(),
+});
+export type FamiliaFormData = z.infer<typeof familiaSchema>;

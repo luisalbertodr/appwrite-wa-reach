@@ -15,8 +15,9 @@ export interface LineaTicket {
 interface TpvState {
   clienteSeleccionado: Cliente | null;
   lineas: LineaTicket[];
-  totalNeto: number; // Suma de importeTotal de las líneas
-  // Podríamos añadir más campos como: descuentoGlobal, impuestos, totalFinal, empleadoAsignado, etc.
+  totalNeto: number; // Suma de importeTotal de las líneas (BASE IMPONIBLE)
+  descuentoGlobalPorcentaje: number; // (NUEVO) Descuento global
+  metodoPago: string; // (NUEVO) Ej: 'Efectivo', 'Tarjeta'
 }
 
 // Definimos las acciones que podemos realizar sobre el estado
@@ -28,18 +29,19 @@ interface TpvActions {
   actualizarCantidadLinea: (lineaId: string, nuevaCantidad: number) => void;
   actualizarPrecioLinea: (lineaId: string, nuevoPrecio: number) => void;
   actualizarDescuentoLinea: (lineaId: string, nuevoDescuento: number) => void;
+  setDescuentoGlobalPorcentaje: (descuento: number) => void; // (NUEVO)
+  setMetodoPago: (metodo: string) => void; // (NUEVO)
   limpiarTicket: () => void;
-  // Podríamos añadir acciones para: aplicarDescuentoGlobal, calcularImpuestos, etc.
 }
 
-// Función auxiliar para calcular el importe de una línea
+// Función auxiliar para calcular el importe de una línea (Base imponible de línea)
 const calcularImporteLinea = (linea: Omit<LineaTicket, 'importeTotal' | 'id'>): number => {
   const importeBase = linea.cantidad * linea.precioUnitario;
   const descuento = importeBase * (linea.descuentoPorcentaje / 100);
   return importeBase - descuento;
 };
 
-// Función auxiliar para calcular el total del ticket
+// Función auxiliar para calcular el total del ticket (Suma de bases imponibles)
 const calcularTotalNeto = (lineas: LineaTicket[]): number => {
   return lineas.reduce((total, linea) => total + linea.importeTotal, 0);
 };
@@ -50,6 +52,8 @@ export const useTpvStore = create<TpvState & TpvActions>((set) => ({
   clienteSeleccionado: null,
   lineas: [],
   totalNeto: 0,
+  descuentoGlobalPorcentaje: 0,
+  metodoPago: 'Efectivo', // Valor por defecto
 
   // --- Acciones ---
   seleccionarCliente: (cliente) => set({ clienteSeleccionado: cliente }),
@@ -130,8 +134,23 @@ export const useTpvStore = create<TpvState & TpvActions>((set) => ({
     });
     return { lineas: nuevasLineas, totalNeto: calcularTotalNeto(nuevasLineas) };
   }),
+  
+  // (NUEVO)
+  setDescuentoGlobalPorcentaje: (descuento) => set({ 
+      descuentoGlobalPorcentaje: Math.max(0, Math.min(100, descuento)) 
+  }),
 
-  limpiarTicket: () => set({ lineas: [], totalNeto: 0, clienteSeleccionado: null }), // Limpia todo
+  // (NUEVO)
+  setMetodoPago: (metodo) => set({ metodoPago: metodo }),
+
+  // (ACTUALIZADO)
+  limpiarTicket: () => set({ 
+      lineas: [], 
+      totalNeto: 0, 
+      clienteSeleccionado: null,
+      descuentoGlobalPorcentaje: 0,
+      metodoPago: 'Efectivo'
+  }),
 }));
 
 // (Opcional) Exportar tipos para usarlos fácilmente en componentes

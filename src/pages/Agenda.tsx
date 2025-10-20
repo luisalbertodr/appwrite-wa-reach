@@ -1,32 +1,95 @@
 import { useState } from 'react';
-import { useGetCitasPorDia } from '@/hooks/useAgenda';
-import { Cita } from '@/types';
+import { useGetCitasPorDia, useCreateCita, useUpdateCita, useDeleteCita } from '@/hooks/useAgenda';
+import { Cita, CitaInput, LipooutUserInput } from '@/types';
+import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Calendar } from "@/components/ui/calendar"; // Importamos el componente de calendario de shadcn/ui
+import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react'; // Añadir iconos
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CitaForm } from '@/components/forms/CitaForm'; // <-- Importar formulario
+import { useToast } from '@/hooks/use-toast';
 
 const Agenda = () => {
-  // Estado para el día seleccionado en el calendario, inicializado a hoy
+  // Estado para el día seleccionado
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
+  const { toast } = useToast();
 
-  // Hook para obtener las citas del día seleccionado
-  // Se ejecutará automáticamente cuando selectedDate cambie (si no es undefined)
-  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas } = useGetCitasPorDia(
-      selectedDate || new Date() // Usamos fecha seleccionada o hoy si es undefined
-      // Podríamos añadir aquí un filtro por empleado si tuviéramos un selector
+  // Hooks de datos y mutaciones
+  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas, refetch: refetchCitas } = useGetCitasPorDia(
+      selectedDate || new Date()
   );
+  const createCitaMutation = useCreateCita();
+  const updateCitaMutation = useUpdateCita();
+  const deleteCitaMutation = useDeleteCita();
 
-  // Formatear la fecha seleccionada para mostrarla
+  // Estado para el diálogo
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [citaToEdit, setCitaToEdit] = useState<(Cita & Models.Document) | null>(null);
+
+  // Formatear la fecha seleccionada
   const fechaSeleccionadaFormateada = selectedDate
       ? format(selectedDate, 'EEEE, dd MMMM yyyy', { locale: es })
       : 'Seleccione una fecha';
 
-  // Renderizar la tabla de citas para el día seleccionado
+  // --- Manejadores CRUD ---
+  const handleOpenCreateDialog = () => {
+    setCitaToEdit(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (cita: Cita & Models.Document) => {
+    setCitaToEdit(cita);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteCita = async (cita: Cita & Models.Document) => {
+    if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}?`)) {
+      try {
+        await deleteCitaMutation.mutateAsync({ id: cita.$id, fechaCita: cita.fecha_hora_inicio });
+        toast({ title: "Cita eliminada" });
+        // refetchCitas(); // InvalidateQueries lo hace
+      } catch (err) {
+        toast({ title: "Error al eliminar la cita", description: (err as Error).message, variant: "destructive" });
+      }
+    }
+  };
+
+  const handleFormSubmit = async (data: LipooutUserInput<CitaInput>) => {
+    try {
+      if (citaToEdit) {
+        await updateCitaMutation.mutateAsync({ id: citaToEdit.$id, data });
+        toast({ title: "Cita actualizada" });
+      } else {
+        await createCitaMutation.mutateAsync(data);
+        toast({ title: "Cita creada" });
+      }
+      setIsDialogOpen(false);
+      setCitaToEdit(null);
+      // refetchCitas(); // InvalidateQueries lo hace
+    } catch (err) {
+      toast({ title: `Error al ${citaToEdit ? 'actualizar' : 'crear'} la cita`, description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
+
+  // Renderizar la tabla de citas
   const renderCitasDelDia = () => {
     if (loadingCitas) {
       return <div className="flex justify-center py-8"><LoadingSpinner /></div>;
@@ -34,14 +97,13 @@ const Agenda = () => {
     if (errorCitas) {
       return <p className="text-center text-destructive py-8">Error al cargar las citas.</p>;
     }
-    // Asegurarse de que selectedDate no sea undefined antes de filtrar
     if (!selectedDate || !citasDelDia || citasDelDia.length === 0) {
       return <p className="text-center text-muted-foreground py-8">No hay citas programadas para este día.</p>;
     }
 
     // Filtramos de nuevo por si acaso la query trajo citas fuera del día exacto
     const citasFiltradas = citasDelDia.filter(cita =>
-        formatISO(startOfDay(parseISO(cita.fecha_hora_inicio)), { representation: 'date' }) === formatISO(startOfDay(selectedDate), { representation: 'date' })
+        format(startOfDay(parseISO(cita.fecha_hora_inicio)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
     );
 
      if (citasFiltradas.length === 0) {
@@ -58,19 +120,35 @@ const Agenda = () => {
             <TableHead>Tratamiento</TableHead>
             <TableHead>Profesional</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {citasFiltradas.map((cita: Cita) => (
+          {citasFiltradas.map((cita: Cita & Models.Document) => (
             <TableRow key={cita.$id}>
               <TableCell className="font-medium">
                 {format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}
               </TableCell>
-              {/* Mostramos nombres (requiere que las relaciones se carguen o se busquen) */}
               <TableCell>{cita.cliente?.nombre_completo || cita.cliente_id}</TableCell>
               <TableCell>{cita.articulo?.nombre || cita.articulo_id}</TableCell>
               <TableCell>{cita.empleado?.nombre_completo || cita.empleado_id}</TableCell>
               <TableCell>{cita.estado}</TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                     <Button variant="ghost" size="icon" className="h-8 w-8"> <MoreHorizontal className="w-4 h-4" /> <span className="sr-only">Acciones</span> </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenEditDialog(cita)} className="cursor-pointer">
+                       <Edit className="mr-2 h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleDeleteCita(cita)} className="text-destructive cursor-pointer">
+                       <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -85,7 +163,7 @@ const Agenda = () => {
             <h1 className="text-3xl font-bold">Agenda</h1>
             <p className="text-muted-foreground">Calendario y gestión de citas.</p>
          </div>
-         <Button>
+         <Button onClick={handleOpenCreateDialog}>
              <PlusCircle className="w-4 h-4 mr-2" />
              Nueva Cita
          </Button>
@@ -95,14 +173,13 @@ const Agenda = () => {
         {/* Columna Calendario */}
         <div className="lg:col-span-1">
            <Card>
-               <CardContent className="p-0"> {/* Padding 0 para que el calendario ocupe todo */}
+               <CardContent className="p-0">
                 <Calendar
                     mode="single"
                     selected={selectedDate}
                     onSelect={setSelectedDate}
-                    className="p-3" // Padding interno del calendario
-                    locale={es} // Usar localización española
-                    // Podríamos añadir props para deshabilitar días, mostrar eventos, etc.
+                    className="p-3"
+                    locale={es}
                 />
                </CardContent>
            </Card>
@@ -121,6 +198,21 @@ const Agenda = () => {
             </Card>
         </div>
       </div>
+
+       {/* --- Diálogo para Crear/Editar Cita --- */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl"> {/* Ancho ajustado */}
+          <DialogHeader>
+            <DialogTitle>{citaToEdit ? 'Editar Cita' : 'Crear Nueva Cita'}</DialogTitle>
+          </DialogHeader>
+          <CitaForm
+            citaInicial={citaToEdit}
+            fechaInicial={selectedDate} // Pasamos la fecha seleccionada
+            onSubmit={handleFormSubmit}
+            isSubmitting={createCitaMutation.isPending || updateCitaMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

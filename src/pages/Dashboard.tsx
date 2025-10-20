@@ -1,21 +1,46 @@
-import { useGetCitasPorDia } from '@/hooks/useAgenda'; // Importamos el hook de citas
-import { Cita } from '@/types';
+import { useGetCitasPorDia } from '@/hooks/useAgenda'; // Hook de citas
+import { useGetClientes } from '@/hooks/useClientes'; // Hook de clientes
+import { useGetFacturas } from '@/hooks/useFacturas'; // Hook de facturas
+import { Cita, Factura } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { format, parseISO, isToday } from 'date-fns'; // Para manejar fechas
+import { format, parseISO, isToday, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns'; // Manejo de fechas
 import { es } from 'date-fns/locale';
 import { CalendarCheck2, Users, Euro } from 'lucide-react'; // Iconos para KPIs
 
 const Dashboard = () => {
-  // Obtenemos las citas para el día de hoy
   const hoy = new Date();
+  const inicioMes = startOfMonth(hoy);
+  const finMes = endOfMonth(hoy);
+
+  // --- Conexión a Hooks Reales ---
   const { data: citasHoy, isLoading: loadingCitas, error: errorCitas } = useGetCitasPorDia(hoy);
+  // Pedimos clientes (aunque useGetClientes puede estar limitado a 100, usamos length por ahora)
+  const { data: clientes, isLoading: loadingClientes } = useGetClientes(); 
+  // Pedimos facturas (para calcular facturación del mes)
+  const { data: facturas, isLoading: loadingFacturas } = useGetFacturas(undefined, 'cobrada'); // Solo cobradas
 
-  // KPIs de ejemplo (podrían venir de otros hooks o cálculos)
-  const kpiClientesActivos = 125; // Placeholder
-  const kpiFacturacionMes = 4580.50; // Placeholder
+  // --- Cálculo de KPIs ---
+  
+  // KPI: Clientes Activos (usamos el total de clientes por ahora)
+  const kpiClientesActivos = clientes?.length ?? 0;
+  const kpiLoadingClientes = loadingClientes;
 
+  // KPI: Facturación del Mes
+  const kpiFacturacionMes = facturas
+    ? facturas.reduce((total, factura: Factura) => {
+        const fechaFactura = parseISO(factura.fechaEmision);
+        if (isWithinInterval(fechaFactura, { start: inicioMes, end: finMes })) {
+          return total + (factura.totalAPagar || 0);
+        }
+        return total;
+      }, 0)
+    : 0;
+  const kpiLoadingFacturacion = loadingFacturas;
+
+
+  // --- Renderizado Citas de Hoy ---
   const renderCitasHoy = () => {
     if (loadingCitas) {
       return <div className="flex justify-center py-8"><LoadingSpinner /></div>;
@@ -23,7 +48,11 @@ const Dashboard = () => {
     if (errorCitas) {
       return <p className="text-center text-destructive py-8">Error al cargar las citas de hoy.</p>;
     }
-    if (!citasHoy || citasHoy.length === 0) {
+    
+    // Filtramos en cliente por si la query trae de más (aunque getCitasPorDia debería ser precisa)
+     const citasFiltradas = citasHoy?.filter(cita => isToday(parseISO(cita.fecha_hora_inicio))) || [];
+
+    if (citasFiltradas.length === 0) {
       return <p className="text-center text-muted-foreground py-8">No hay citas programadas para hoy.</p>;
     }
 
@@ -39,7 +68,7 @@ const Dashboard = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {citasHoy.filter(cita => isToday(parseISO(cita.fecha_hora_inicio))).map((cita: Cita) => ( // Doble check por si la query trae de más
+          {citasFiltradas.map((cita: Cita) => (
             <TableRow key={cita.$id}>
               <TableCell className="font-medium">
                 {format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}
@@ -47,7 +76,7 @@ const Dashboard = () => {
               <TableCell>{cita.cliente?.nombre_completo || cita.cliente_id}</TableCell>
               <TableCell>{cita.articulo?.nombre || cita.articulo_id}</TableCell>
               <TableCell>{cita.empleado?.nombre_completo || cita.empleado_id}</TableCell>
-              <TableCell>{cita.estado}</TableCell> {/* Podríamos usar Badge aquí */}
+              <TableCell>{cita.estado}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -62,7 +91,7 @@ const Dashboard = () => {
         <p className="text-muted-foreground">Resumen de la actividad de hoy y métricas clave.</p>
       </div>
 
-      {/* Sección de KPIs */}
+      {/* Sección de KPIs (Conectada) */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -70,18 +99,18 @@ const Dashboard = () => {
             <CalendarCheck2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loadingCitas ? '...' : citasHoy?.length ?? 0}</div>
+            <div className="text-2xl font-bold">{loadingCitas ? '...' : citasHoy?.filter(c => isToday(parseISO(c.fecha_hora_inicio))).length ?? 0}</div>
             <p className="text-xs text-muted-foreground">Citas programadas para hoy</p>
           </CardContent>
         </Card>
          <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{kpiClientesActivos}</div>
-            <p className="text-xs text-muted-foreground">En el último mes (ejemplo)</p>
+            <div className="text-2xl font-bold">{kpiLoadingClientes ? '...' : kpiClientesActivos}</div>
+            <p className="text-xs text-muted-foreground">Clientes en la base de datos</p>
           </CardContent>
         </Card>
          <Card>
@@ -90,8 +119,10 @@ const Dashboard = () => {
             <Euro className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{kpiFacturacionMes.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</div>
-            <p className="text-xs text-muted-foreground">Mes actual (ejemplo)</p>
+            <div className="text-2xl font-bold">
+                {kpiLoadingFacturacion ? '...' : kpiFacturacionMes.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+            </div>
+            <p className="text-xs text-muted-foreground">Facturas cobradas este mes</p>
           </CardContent>
         </Card>
       </div>
@@ -102,7 +133,7 @@ const Dashboard = () => {
           <CardTitle>Citas de Hoy ({format(hoy, 'dd MMMM yyyy', { locale: es })})</CardTitle>
           <CardDescription>Resumen de las citas programadas para la jornada actual.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0"> {/* Quitamos padding para que la tabla llegue a los bordes */}
+        <CardContent className="p-0">
           {renderCitasHoy()}
         </CardContent>
       </Card>

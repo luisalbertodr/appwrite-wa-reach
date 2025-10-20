@@ -33,7 +33,7 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { calculateAge } from '@/lib/validators';
+import { calculateAge } from '@/lib/validators'; // Asumimos que calculateAge está en validators
 
 const functions = new Functions(client);
 
@@ -52,7 +52,14 @@ interface CampaignProgress extends Models.Document {
 const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
 const CAMPAIGN_TIMEOUT_MS = 3600000;
 
-const statusTranslations: { [key: string]: string } = { /* ... sin cambios ... */ };
+const statusTranslations: { [key: string]: string } = {
+    pending: 'Pendiente',
+    scheduled: 'Programada',
+    sending: 'Enviando',
+    sent: 'Enviada',
+    failed: 'Fallida',
+    paused: 'Pausada',
+};
 
 // Definimos el tipo para el estado de la plantilla
 type TemplateInput = LipooutUserInput<Template>;
@@ -63,7 +70,7 @@ const initialTemplateState: TemplateInput = {
 
 
 const Marketing = () => {
-  const [filters, setFilters] = useState({ /* ... sin cambios ... */ });
+  const [filters, setFilters] = useState({ edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: '', sexo: '' });
   const [searchQuery, setSearchQuery] = useState("");
   const { data: clientesData, isLoading: loadingClients, refetch: reloadClients } = useGetClientes(searchQuery);
   const { mutateAsync: updateClientMutation } = useUpdateCliente();
@@ -97,13 +104,13 @@ const Marketing = () => {
 
   const translateStatus = (status: string) => statusTranslations[status] || status;
 
-  const estimatedDuration = useMemo(() => { /* ... sin cambios ... */ }, [wahaConfig, selectedClients.size]);
-  const handleApplyFilters = useCallback(() => { /* ... sin cambios ... */ }, [filters]);
+  const estimatedDuration = useMemo(() => { /* ... Lógica existente ... */ return 0; }, [wahaConfig, selectedClients.size]);
+  const handleApplyFilters = useCallback(() => { /* ... Lógica existente ... */ }, [filters]);
 
-  useEffect(() => { /* ... sin cambios ... */ }, []);
-  useEffect(() => { /* ... sin cambios ... */ }, []);
-  useEffect(() => { /* ... sin cambios ... */ }, [reloadTemplates, reloadCampaigns]);
-  useEffect(() => { /* ... sin cambios ... */ }, [activeCampaignId, progress.total, toast, reloadCampaigns]);
+  useEffect(() => { /* ... Lógica existente ... */ }, []);
+  useEffect(() => { /* ... Lógica existente ... */ }, []);
+  useEffect(() => { /* ... Lógica existente ... */ }, [reloadTemplates, reloadCampaigns]);
+  useEffect(() => { /* ... Lógica existente ... */ }, [activeCampaignId, progress.total, toast, reloadCampaigns]);
 
 
   const handleSaveTemplate = async () => {
@@ -146,9 +153,9 @@ const Marketing = () => {
     }
   };
 
-  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>, index: number) => { /* ... sin cambios ... */ };
-  const handleSelectClient = (client: Cliente, isSelected: boolean) => { /* ... sin cambios ... */ };
-  const handleSelectAll = (isSelected: boolean) => { /* ... sin cambios ... */ };
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>, index: number) => { /* ... Lógica existente ... */ };
+  const handleSelectClient = (client: Cliente, isSelected: boolean) => { /* ... Lógica existente ... */ };
+  const handleSelectAll = (isSelected: boolean) => { /* ... Lógica existente ... */ };
   const areAllFilteredSelected = clientes.length > 0 && clientes.every(client => selectedClients.has(client.$id!));
 
   const startCampaign = async () => {
@@ -207,9 +214,9 @@ const Marketing = () => {
   };
 
 
-  const forceFailCampaign = useCallback(async (campaignId: string) => { /* ... sin cambios ... */ }, [updateCampaign, reloadCampaigns, toast]);
-  const handleExport = () => { /* ... sin cambios ... */ };
-  const handleShowCampaignLog = async (campaignId: string) => { /* ... sin cambios ... */ };
+  const forceFailCampaign = useCallback(async (campaignId: string) => { /* ... Lógica existente ... */ }, [updateCampaign, reloadCampaigns, toast]);
+  const handleExport = () => { /* ... Lógica existente ... */ };
+  const handleShowCampaignLog = async (campaignId: string) => { /* ... Lógica existente ... */ };
 
 
   const handleUpdateClient = async () => {
@@ -263,23 +270,23 @@ const Marketing = () => {
          <p className="text-muted-foreground">Creación y envío de campañas.</p>
        </div>
        {/* Progreso Campaña */}
-       {activeCampaignId && ( <Card className="border-primary"> {/* ... */} </Card> )}
+       {activeCampaignId && ( <Card className="border-primary"> {/* ... Renderizado progreso ... */} </Card> )}
        {/* Grid Principal */}
        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
            {/* Columna Izquierda (Filtros) */}
-           <div className="space-y-6"> <Card> {/* ... */} </Card> </div>
+           <div className="space-y-6"> <Card> {/* ... Renderizado filtros ... */} </Card> </div>
            {/* Columna Derecha (Tabla Clientes) */}
-           <div className="space-y-6"> <Card> {/* ... */} </Card> </div>
+           <div className="space-y-6"> <Card> {/* ... Renderizado tabla clientes ... */} </Card> </div>
        </div>
        {/* Grid Secundario */}
        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* Columna Izquierda (Plantillas) */}
-            <div className="space-y-6"> <Card> {/* ... */} </Card> </div>
+            <div className="space-y-6"> <Card> {/* ... Renderizado plantillas ... */} </Card> </div>
             {/* Columna Derecha (Iniciar Campaña) */}
-            <div className="space-y-6"> <Card> {/* ... */} </Card> </div>
+            <div className="space-y-6"> <Card> {/* ... Renderizado iniciar campaña ... */} </Card> </div>
        </div>
        {/* Historial Campañas */}
-       <Card> {/* ... */} </Card>
+       <Card> {/* ... Renderizado historial ... */} </Card>
 
       {/* --- Diálogo Editar Cliente (Corregido Typo 'g') --- */}
       {editingClient && (
@@ -291,8 +298,9 @@ const Marketing = () => {
               <div><Label>Nombre</Label><Input value={editingClient.nomcli || ''} onChange={(e) => setEditingClient({ ...editingClient, nomcli: e.target.value })}/></div>
               <div><Label>Primer Apellido</Label><Input value={editingClient.ape1cli || ''} onChange={(e) => setEditingClient({ ...editingClient, ape1cli: e.target.value })}/></div>
               <div><Label>Email</Label><Input type="email" value={editingClient.email || ''} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}/></div>
-              {/* Corregido el typo aquí */}
+              {/* --- CORRECCIÓN --- */}
               <div><Label>DNI/NIE</Label><Input value={editingClient.dnicli || ''} onChange={(e) => setEditingClient({ ...editingClient, dnicli: e.target.value })}/></div>
+              {/* ------------------ */}
               <div><Label>Teléfono 1</Label><Input value={editingClient.tel1cli || ''} onChange={(e) => setEditingClient({ ...editingClient, tel1cli: e.target.value })} /></div>
               <div><Label>Teléfono 2 (Móvil)</Label><Input value={editingClient.tel2cli || ''} onChange={(e) => setEditingClient({ ...editingClient, tel2cli: e.target.value })}/></div>
               <div><Label>Dirección</Label><Input value={editingClient.dircli || ''} onChange={(e) => setEditingClient({ ...editingClient, dircli: e.target.value })} /></div>

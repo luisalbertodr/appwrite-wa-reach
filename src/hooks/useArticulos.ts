@@ -5,8 +5,12 @@ import {
   createArticulo, 
   updateArticulo, 
   deleteArticulo,
+  createFamilia, // <-- NUEVO
+  updateFamilia, // <-- NUEVO
+  deleteFamilia, // <-- NUEVO
   CreateArticuloInput,
-  UpdateArticuloInput
+  UpdateArticuloInput,
+  FamiliaInput // <-- NUEVO
 } from '@/services/appwrite-articulos';
 
 const ARTICULOS_QUERY_KEY = 'articulos';
@@ -21,6 +25,42 @@ export const useGetFamilias = () => {
     staleTime: 1000 * 60 * 15, // 15 minutos de caché para familias
   });
 };
+
+// (NUEVO)
+export const useCreateFamilia = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (newFamilia: FamiliaInput) => createFamilia(newFamilia),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [FAMILIAS_QUERY_KEY] });
+    },
+  });
+};
+
+// (NUEVO)
+export const useUpdateFamilia = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<FamiliaInput> }) =>
+      updateFamilia(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [FAMILIAS_QUERY_KEY] });
+    },
+  });
+};
+
+// (NUEVO)
+export const useDeleteFamilia = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteFamilia(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [FAMILIAS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [ARTICULOS_QUERY_KEY] }); // Artículos pueden afectarse
+    },
+  });
+};
+
 
 // --- Hooks de Artículos ---
 
