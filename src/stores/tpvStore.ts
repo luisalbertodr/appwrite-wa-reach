@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Cliente, Articulo, LipooutUserInput } from '@/types'; // Importamos los tipos necesarios
+import { Cliente, Articulo } from '@/types'; // Importamos los tipos necesarios
 
 // Definimos cómo será una línea en nuestro ticket/carrito
 export interface LineaTicket {
@@ -134,19 +134,19 @@ export const useTpvStore = create<TpvState & TpvActions>((set) => ({
     });
     return { lineas: nuevasLineas, totalNeto: calcularTotalNeto(nuevasLineas) };
   }),
-  
+
   // (NUEVO)
-  setDescuentoGlobalPorcentaje: (descuento) => set({ 
-      descuentoGlobalPorcentaje: Math.max(0, Math.min(100, descuento)) 
+  setDescuentoGlobalPorcentaje: (descuento) => set({
+      descuentoGlobalPorcentaje: Math.max(0, Math.min(100, descuento))
   }),
 
   // (NUEVO)
   setMetodoPago: (metodo) => set({ metodoPago: metodo }),
 
   // (ACTUALIZADO)
-  limpiarTicket: () => set({ 
-      lineas: [], 
-      totalNeto: 0, 
+  limpiarTicket: () => set({
+      lineas: [],
+      totalNeto: 0,
       clienteSeleccionado: null,
       descuentoGlobalPorcentaje: 0,
       metodoPago: 'Efectivo'

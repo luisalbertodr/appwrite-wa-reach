@@ -1,3 +1,4 @@
+import React from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { FacturaPDF } from './FacturaPDF';
 import { Factura, Configuracion } from '@/types';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { formatISO, differenceInYears, parseISO } from 'date-fns';
+import { differenceInYears, parseISO } from 'date-fns';
 
 // --- Helper Functions ---
 
@@ -31,7 +31,7 @@ export const clienteSchema = z.object({
   fecnac: z.string().optional().nullable(), // Se envía como YYYY-MM-DD
   sexo: z.enum(['H', 'M', 'Otro']).optional(),
   fecalta: z.string().optional().nullable(), // Se envía como YYYY-MM-DD
-  enviar: z.number().min(0).max(1).optional(),
+  enviar: z.union([z.literal(0), z.literal(1)]).optional(),
   facturacion: z.number().optional(),
   intereses: z.array(z.string()).optional(),
 });
@@ -52,7 +52,7 @@ export type EmpleadoFormData = z.infer<typeof empleadoSchema>;
 
 // 3. Factura
 export const lineaFacturaSchema = z.object({
-  articulo_id: z.string().min(1, "Se requiere artículo"),
+  articulo_id: z.string().min(1, "Se requiere artículo").nullable(),
   descripcion: z.string().min(1, "Se requiere descripción"),
   cantidad: z.number().min(0.01, "Cantidad debe ser positiva"),
   precioUnitario: z.number().min(0, "Precio no puede ser negativo"),
@@ -112,13 +112,15 @@ export type FamiliaFormData = z.infer<typeof familiaSchema>;
 
 // 7. Configuración Clínica (NUEVO)
 export const configurationSchema = z.object({
-    nombreClinica: z.string().min(1, "Nombre obligatorio"),
-    direccion: z.string().optional(),
-    cif: z.string().min(1, "CIF obligatorio"),
-    emailContacto: z.string().email("Email inválido").optional().or(z.literal('')),
-    telefonoContacto: z.string().optional(),
-    serieFactura: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
-    seriePresupuesto: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
-    tipoIvaPredeterminado: z.number().min(0, "IVA no puede ser negativo").max(100),
+  nombreClinica: z.string().min(1, "Nombre obligatorio"),
+  direccion: z.string().optional(),
+  cif: z.string().min(1, "CIF obligatorio"),
+  emailContacto: z.string().email("Email inválido").optional().or(z.literal('')),
+  telefonoContacto: z.string().optional(),
+  serieFactura: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
+  seriePresupuesto: z.string().min(1, "Prefijo obligatorio").max(5, "Máx 5 chars"),
+  tipoIvaPredeterminado: z.number().min(0, "IVA no puede ser negativo").max(100),
+  ultimoNumeroFactura: z.number().min(0).optional(),
+  ultimoNumeroPresupuesto: z.number().min(0).optional(),
 });
 export type ConfigurationFormData = z.infer<typeof configurationSchema>;

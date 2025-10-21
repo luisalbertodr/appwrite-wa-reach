@@ -1,4 +1,4 @@
-import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
+import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import { Configuracion, Factura, LineaFactura } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -249,12 +249,16 @@ export const FacturaPDF = ({ factura, config }: { factura: Factura, config: Conf
                     <Text style={styles.totalLabel}>Subtotal</Text>
                     <Text style={styles.totalValue}>{formatCurrency(factura.totalFactura)}</Text>
                 </View>
-                {factura.importeDescuentoGlobal > 0 && (
-                     <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Dto. Global ({factura.descuentoGlobalPorcentaje}%)</Text>
-                        <Text style={styles.totalValue}>-{formatCurrency(factura.importeDescuentoGlobal)}</Text>
-                    </View>
-                )}
+                {(() => {
+                    const descuentoGlobal: number = factura.importeDescuentoGlobal ?? 0;
+                    const porcentajeDescuento: number = factura.descuentoGlobalPorcentaje ?? 0;
+                    return descuentoGlobal > 0 && (
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Dto. Global ({porcentajeDescuento}%)</Text>
+                            <Text style={styles.totalValue}>-{formatCurrency(descuentoGlobal)}</Text>
+                        </View>
+                    );
+                })()}
                 <View style={styles.totalRowBold}>
                     <Text style={styles.totalLabelBold}>TOTAL A PAGAR</Text>
                     <Text style={styles.totalValueBold}>{formatCurrency(factura.totalAPagar)}</Text>

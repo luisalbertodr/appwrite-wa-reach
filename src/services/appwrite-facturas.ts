@@ -1,11 +1,18 @@
 import { databases, DATABASE_ID, FACTURAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Factura, LineaFactura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput } from '@/types';
+import { Factura, LineaFactura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Cliente } from '@/types';
 import { ID, Query, Models } from 'appwrite';
-import { getClientesByNombre } from './appwrite-clientes'; // Importar servicio de clientes
+import { getClientesByNombre } from '@/services/appwrite-clientes'; // Importar servicio de clientes
 
 // --- API de Facturas ---
 
-const parseLineas = (lineasString?: string): LineaFactura[] => { /* ... sin cambios ... */ };
+const parseLineas = (lineasString?: string): LineaFactura[] => {
+  if (!lineasString) return [];
+  try {
+    return JSON.parse(lineasString);
+  } catch (e) {
+    return [];
+  }
+};
 
 // Obtener facturas (MODIFICADO para aceptar filtros)
 export const getFacturas = async (searchQuery?: string, estado?: string): Promise<Factura[]> => {
@@ -23,7 +30,7 @@ export const getFacturas = async (searchQuery?: string, estado?: string): Promis
   if (searchQuery) {
       // 1. Buscar clientes que coincidan
       const clientesCoincidentes = await getClientesByNombre(searchQuery);
-      const clienteIds = clientesCoincidentes.map(c => c.$id);
+      const clienteIds = clientesCoincidentes.map((c: Cliente & Models.Document) => c.$id);
 
       // 2. Construir query de búsqueda
       // Buscamos por:
@@ -51,9 +58,9 @@ export const getFacturas = async (searchQuery?: string, estado?: string): Promis
   // Idealmente, cachearíamos clientes en el frontend
   // O haríamos una query separada solo por los IDs necesarios
   const todosLosClientes = await getClientesByNombre(''); // Obtener todos
-  const clienteMap = new Map(todosLosClientes.map(c => [c.$id, c]));
+  const clienteMap = new Map(todosLosClientes.map((c: Cliente & Models.Document) => [c.$id, c]));
 
-  return response.documents.map(doc => ({
+  return response.documents.map((doc: FacturaInputData & Models.Document) => ({
       ...doc,
       lineas: parseLineas(doc.lineas),
       // "Poblamos" el cliente

@@ -13,9 +13,9 @@ export interface Articulo extends LipooutDocument {
   familia: any; // Familia completa poblada por Appwrite
 
   // (Opcional) Campos para control de stock si 'tipo' es 'producto'
-  stock?: number;
+  stock?: number | null;
   // (Opcional) Campos para 'bono'
-  sesiones_bono?: number;
+  sesiones_bono?: number | null;
 
   activo: boolean;
 }
@@ -31,9 +31,9 @@ export interface ArticuloInput {
   familia_id: string;
 
   // (Opcional) Campos para control de stock si 'tipo' es 'producto'
-  stock?: number;
+  stock?: number | null;
   // (Opcional) Campos para 'bono'
-  sesiones_bono?: number;
+  sesiones_bono?: number | null;
 
   activo: boolean;
 }

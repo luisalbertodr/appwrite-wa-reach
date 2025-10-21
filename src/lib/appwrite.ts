@@ -28,6 +28,7 @@ export const PROVEEDORES_COLLECTION_ID = 'proveedores';
 export const RECURSOS_COLLECTION_ID = 'recursos';
 export const ASISTENCIA_COLLECTION_ID = 'asistencia';
 export const LIPOOUT_CONFIG_COLLECTION_ID = 'configuracion'; // Config general Lipoout
+export const CONFIGURATION_COLLECTION_ID = 'configuracion'; // Alias para compatibilidad
 
 // === COLECCIONES WHATSAPP (MANTENIDAS DE LA PoC) ===
 export const CAMPAIGNS_COLLECTION_ID = 'campaigns';

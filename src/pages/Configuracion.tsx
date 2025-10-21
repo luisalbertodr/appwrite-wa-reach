@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { WahaConfig, ImportLog, LipooutUserInput, Configuracion } from '@/types'; // <-- Añadir Configuracion
+import { WahaConfig, LipooutUserInput } from '@/types';
+import type { Configuracion } from '@/types'; // Import tipo-only para evitar conflicto
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,9 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server } from 'lucide-react'; // <-- Añadir iconos Settings, Server
+import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { ConfigurationForm } from '@/components/forms/ConfigurationForm'; // <-- Importar Formulario Clínica
+import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
 import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration'; // <-- Importar Hooks Clínica
 import { Separator } from '@/components/ui/separator'; // <-- Importar Separator
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +48,7 @@ const Configuracion = () => {
   const [wahaSettings, setWahaSettings] = useState<Partial<WahaConfig>>({});
   const [sessions, setSessions] = useState<{ name: string; status: string }[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [isSavingWaha, setIsSavingWaha] = useState(false);
 
   // --- Estado y Hooks para Importación CSV ---
   const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
@@ -73,6 +75,7 @@ const Configuracion = () => {
   // Guardar configuración WAHA
   const handleSaveWahaConfig = async () => {
     if (!configs[0]?.$id) return;
+    setIsSavingWaha(true);
     try {
       // Usamos LipooutUserInput para asegurar que no enviamos metadatos
       const dataToSave: LipooutUserInput<WahaConfig> = {
@@ -86,6 +89,8 @@ const Configuracion = () => {
       reloadWahaConfig();
     } catch (e) {
       toast({ title: 'Error al guardar', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+      setIsSavingWaha(false);
     }
   };
 
@@ -207,8 +212,8 @@ const Configuracion = () => {
                                 </div>
                             </div>
                              {/* TODO: Añadir resto de campos de WahaConfig si es necesario (delays, etc.) */}
-                             <Button onClick={handleSaveWahaConfig} disabled={updateWahaConfig.isLoading}> {/* Usar isLoading de la mutación */}
-                                {updateWahaConfig.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar
+                             <Button onClick={handleSaveWahaConfig} disabled={isSavingWaha}>
+                                {isSavingWaha ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar
                              </Button>
 
                             <Separator className="my-6"/> {/* Separador añadido */}

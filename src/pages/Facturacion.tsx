@@ -72,7 +72,7 @@ const Facturacion = () => {
   const handleFormSubmit = async (data: FacturaInputData) => {
      try {
       if (facturaToEdit) {
-        await updateFacturaMutation.mutateAsync({ $id: facturaToEdit.$id, data: data as UpdateFacturaInput });
+        await updateFacturaMutation.mutateAsync({ id: facturaToEdit.$id, data: data as UpdateFacturaInput });
         toast({ title: "Documento actualizado" });
       } else {
         await createFacturaMutation.mutateAsync(data as CreateFacturaInput);
@@ -90,7 +90,7 @@ const Facturacion = () => {
   const handleAnularFactura = async (factura: Factura & Models.Document) => {
      if (window.confirm(`¿Estás seguro de anular el documento ${factura.numeroFactura}?`)) {
         try {
-            await updateFacturaMutation.mutateAsync({ $id: factura.$id, data: { estado: 'anulada' } });
+            await updateFacturaMutation.mutateAsync({ id: factura.$id, data: { estado: 'anulada' } });
             toast({ title: "Documento anulado" });
             // refetchFacturas(); // InvalidateQueries lo hace
         } catch (err) {
@@ -119,7 +119,7 @@ const Facturacion = () => {
             };
 
             // 3. Ejecutar actualización
-            await updateFacturaMutation.mutateAsync({ $id: presupuesto.$id, data: updateData });
+            await updateFacturaMutation.mutateAsync({ id: presupuesto.$id, data: updateData });
 
             toast({ title: "Presupuesto Aceptado", description: `Se ha generado la factura ${numeroCompleto}.` });
 

@@ -79,7 +79,7 @@ export const getArticulos = async (familiaId?: string): Promise<(Articulo & Mode
 
   return response.documents.map(articulo => ({
       ...articulo,
-      familia: familiaMap.get(articulo.familia_id) // "Poblamos" la familia
+      familia: familiaMap.get(typeof articulo.familia === 'string' ? articulo.familia : articulo.familia?.$id) // "Poblamos" la familia
   }));
 };
 
@@ -95,12 +95,17 @@ export const createArticulo = (articuloInput: CreateArticuloInput) => {
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,
     ID.unique(),
-    articuloToSave
+    articuloToSave as any
   ) as Promise<Articulo & Models.Document>;
 };
 
 export const updateArticulo = (id: string, articuloInput: UpdateArticuloInput) => {
-   const articuloToUpdate = { ...articuloInput };
+   const articuloToUpdate: any = { ...articuloInput };
+   // Mapear familia_id del input a familia para Appwrite
+   if (articuloInput.familia_id !== undefined) {
+       articuloToUpdate.familia = articuloInput.familia_id;
+       delete articuloToUpdate.familia_id;
+   }
   return databases.updateDocument(
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { ClienteForm } from '@/components/forms/ClienteForm';
 import { useToast } from '@/hooks/use-toast';
-import { useDebounce } from '@/hooks/useDebounce'; // <-- (Asumimos que existe un hook useDebounce)
+import { useDebounce } from '@/hooks/useDebounce';
 
 // --- (Si no existe useDebounce, usar este simple) ---
 // import { useEffect } from 'react';

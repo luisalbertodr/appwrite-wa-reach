@@ -48,7 +48,7 @@ const Empleados = () => {
   const handleFormSubmit = async (data: LipooutUserInput<Empleado>) => {
     try {
       if (empleadoToEdit) {
-        await updateEmpleadoMutation.mutateAsync({ $id: empleadoToEdit.$id, data });
+        await updateEmpleadoMutation.mutateAsync({ id: empleadoToEdit.$id, data });
         toast({ title: "Empleado actualizado" });
       } else {
         // TODO: Crear usuario en Appwrite Auth si es necesario?
@@ -67,7 +67,7 @@ const Empleados = () => {
   const handleToggleActivo = async (empleado: Empleado & Models.Document) => {
       const nuevoEstado = !empleado.activo;
       try {
-          await updateEmpleadoMutation.mutateAsync({ $id: empleado.$id, data: { activo: nuevoEstado } });
+          await updateEmpleadoMutation.mutateAsync({ id: empleado.$id, data: { activo: nuevoEstado } });
           toast({ title: `Empleado ${nuevoEstado ? 'activado' : 'desactivado'}` });
           // refetchEmpleados(); // invalidateQueries lo hace
       } catch (err) {

@@ -40,7 +40,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
       descripcion: articuloInicial.descripcion || '',
       precio: articuloInicial.precio || 0,
       tipo: articuloInicial.tipo || 'servicio',
-      familia_id: articuloInicial.familia?.$id || articuloInicial.familia_id || '', // Manejar ambos casos
+      familia_id: articuloInicial.familia?.$id || '', // Solo acceder a familia.$id
       stock: articuloInicial.stock || 0,
       sesiones_bono: articuloInicial.sesiones_bono || 0,
       activo: articuloInicial.activo ?? true,
@@ -60,8 +60,8 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
         ...data,
         // Asegurar que los campos opcionales sean undefined si no aplican o están vacíos
         descripcion: data.descripcion || undefined,
-        stock: data.tipo === 'producto' ? data.stock : undefined,
-        sesiones_bono: data.tipo === 'bono' ? data.sesiones_bono : undefined,
+        stock: data.tipo === 'producto' ? (data.stock ?? undefined) : undefined,
+        sesiones_bono: data.tipo === 'bono' ? (data.sesiones_bono ?? undefined) : undefined,
     };
     await onSubmit(finalData);
   };
@@ -117,10 +117,10 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
 
             {/* Campos condicionales */}
             {tipoSeleccionado === 'producto' && (
-                <FormField control={form.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock (Uds)</FormLabel> <FormControl><Input type="number" step="1" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} /></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock (Uds)</FormLabel> <FormControl><Input type="number" step="1" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value) || 0)} /></FormControl> <FormMessage /> </FormItem> )}/>
             )}
              {tipoSeleccionado === 'bono' && (
-                <FormField control={form.control} name="sesiones_bono" render={({ field }) => ( <FormItem> <FormLabel>Nº Sesiones (Bono)</FormLabel> <FormControl><Input type="number" step="1" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} /></FormControl> <FormMessage /> </FormItem> )}/>
+                <FormField control={form.control} name="sesiones_bono" render={({ field }) => ( <FormItem> <FormLabel>Nº Sesiones (Bono)</FormLabel> <FormControl><Input type="number" step="1" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value) || 0)} /></FormControl> <FormMessage /> </FormItem> )}/>
             )}
 
             <FormField

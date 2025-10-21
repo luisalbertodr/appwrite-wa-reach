@@ -1,11 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ClienteFormData, clienteSchema } from '@/lib/validators'; // Importar esquema y tipo
+import { ClienteFormData, clienteSchema, calculateAge } from '@/lib/validators'; // Importar esquema y tipo
 import { Cliente, LipooutUserInput } from '@/types'; // Importar tipo Cliente completo
 import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'; // shadcn form components
@@ -85,6 +84,8 @@ export const ClienteForm = ({ clienteInicial, onSubmit, isSubmitting }: ClienteF
         fecalta: fecaltaISO,
         nombre_completo,
         edad,
+        enviar: (data.enviar === 0 || data.enviar === 1) ? data.enviar : undefined, // Asegurar literal type 0 | 1
+        facturacion: data.facturacion ?? 0, // Asegurar que tenga valor por defecto
         // Asegurarse de que los campos opcionales vacíos sean undefined
         email: data.email || undefined,
         dnicli: data.dnicli || undefined,

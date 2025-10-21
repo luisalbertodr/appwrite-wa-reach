@@ -7,7 +7,7 @@
         "$id": "clientes",
         "name": "clientes",
         "$permissions": [
-          "read(\"any\")", // Ajustar permisos según roles reales
+          "read(\"any\")",
           "create(\"users\")",
           "update(\"users\")",
           "delete(\"users\")"
@@ -50,7 +50,7 @@
       {
         "$id": "empleados",
         "name": "empleados",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
@@ -70,7 +70,7 @@
       {
         "$id": "familias",
         "name": "familias",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
@@ -84,14 +84,14 @@
       {
         "$id": "articulos",
         "name": "articulos",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
           { "key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false },
           { "key": "precio", "type": "float", "required": true, "array": false },
           { "key": "tipo", "type": "string", "size": 50, "required": true, "elements": ["producto", "servicio", "bono"], "array": false },
-          { "key": "familia_id", "type": "string", "size": 50, "required": true, "array": false }, // Relación manual
+          { "key": "familia_id", "type": "string", "size": 50, "required": true, "array": false },
           { "key": "stock", "type": "integer", "required": false, "array": false },
           { "key": "sesiones_bono", "type": "integer", "required": false, "array": false },
           { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
@@ -106,7 +106,7 @@
       {
         "$id": "citas",
         "name": "citas",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "fecha_hora_inicio", "type": "datetime", "required": true, "array": false },
@@ -130,7 +130,7 @@
       {
         "$id": "facturas",
         "name": "facturas",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "numeroFactura", "type": "string", "size": 50, "required": true, "array": false },
@@ -139,7 +139,7 @@
           { "key": "estado", "type": "string", "size": 50, "required": true, "elements": ["borrador", "finalizada", "cobrada", "anulada", "presupuesto"], "array": false },
           { "key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false },
           { "key": "empleado_id", "type": "string", "size": 50, "required": false, "array": false },
-          { "key": "lineas", "type": "string", "size": 10000, "required": true, "array": false }, // JSON String
+          { "key": "lineas", "type": "string", "size": 10000, "required": true, "array": false },
           { "key": "baseImponible", "type": "float", "required": true, "array": false },
           { "key": "totalIva", "type": "float", "required": true, "array": false },
           { "key": "totalFactura", "type": "float", "required": true, "array": false },
@@ -159,9 +159,9 @@
         ]
       },
       {
-        "$id": "configuration", // ID corregido
-        "name": "configuration", // Nombre corregido
-        "$permissions": ["read(\"users\")", "update(\"users\")"], // Ajustar, solo admins?
+        "$id": "configuration",
+        "name": "configuration",
+        "$permissions": ["read(\"users\")", "update(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombreClinica", "type": "string", "size": 255, "required": false, "array": false },
@@ -175,13 +175,12 @@
           { "key": "ultimoNumeroPresupuesto", "type": "integer", "required": false, "default": 0, "array": false },
           { "key": "tipoIvaPredeterminado", "type": "float", "required": false, "default": 21, "array": false }
         ],
-        "indexes": [] // No se especificaron índices
+        "indexes": []
       },
-      // --- Colecciones WhatsApp (Mantenidas de PoC) ---
       {
         "$id": "config",
         "name": "config",
-        "$permissions": ["read(\"users\")", "update(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "update(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "apiUrl", "type": "url", "size": 255, "required": true, "array": false },
@@ -203,7 +202,7 @@
       {
         "$id": "templates",
         "name": "templates",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
@@ -217,19 +216,19 @@
       {
         "$id": "campaigns",
         "name": "campaigns",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"], // Ajustar
+        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
           { "key": "templateId", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "filters", "type": "string", "size": 1024, "required": false, "array": false }, // JSON String
+          { "key": "filters", "type": "string", "size": 1024, "required": false, "array": false },
           { "key": "scheduledDate", "type": "datetime", "required": false, "array": false },
           { "key": "scheduledTime", "type": "string", "size": 5, "required": false, "array": false },
           { "key": "selectedMessageIndex", "type": "integer", "required": false, "array": false },
           { "key": "selectedImageIndex", "type": "integer", "required": false, "array": false },
-          { "key": "status", "type": "string", "size": 50, "required": true, "array": false }, // Podría ser Enum
+          { "key": "status", "type": "string", "size": 50, "required": true, "array": false },
           { "key": "audienceCount", "type": "integer", "required": true, "array": false },
-          { "key": "createdAt", "type": "datetime", "required": true, "array": false }, // Appwrite puede gestionarlo
+          { "key": "createdAt", "type": "datetime", "required": true, "array": false },
           { "key": "startTime", "type": "string", "size": 5, "required": false, "array": false },
           { "key": "endTime", "type": "string", "size": 5, "required": false, "array": false }
         ],
@@ -241,19 +240,19 @@
        {
         "$id": "campaign_progress",
         "name": "campaign_progress",
-        "$permissions": ["read(\"users\")", "update(\"users\")"], // Función actualiza, Front lee
+        "$permissions": ["read(\"users\")", "update(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "currentClientName", "type": "string", "size": 255, "required": false, "array": false },
           { "key": "currentClientPhone", "type": "string", "size": 20, "required": false, "array": false }
-          // $id = campaignId
+  
         ],
         "indexes": []
       },
       {
         "$id": "message_logs",
         "name": "message_logs",
-        "$permissions": ["read(\"users\")", "create(\"functions\")"], // Función crea, Front lee
+        "$permissions": ["read(\"users\")", "create(\"functions\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "campaignId", "type": "string", "size": 50, "required": true, "array": false },
@@ -261,7 +260,7 @@
           { "key": "clientName", "type": "string", "size": 255, "required": false, "array": false },
           { "key": "phone", "type": "string", "size": 20, "required": true, "array": false },
           { "key": "timestamp", "type": "datetime", "required": true, "array": false },
-          { "key": "status", "type": "string", "size": 20, "required": true, "array": false }, // Podría ser Enum
+          { "key": "status", "type": "string", "size": 20, "required": true, "array": false },
           { "key": "error", "type": "string", "size": 1024, "required": false, "array": false },
           { "key": "messageContent", "type": "string", "size": 4096, "required": false, "array": false },
           { "key": "imageUrlSent", "type": "url", "size": 2048, "required": false, "array": false }
@@ -276,7 +275,7 @@
        {
         "$id": "import_logs",
         "name": "import_logs",
-        "$permissions": ["read(\"users\")", "create(\"functions\")"], // Función crea, Front lee
+        "$permissions": ["read(\"users\")", "create(\"functions\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "timestamp", "type": "datetime", "required": true, "array": false },
@@ -284,22 +283,21 @@
           { "key": "successfulImports", "type": "integer", "required": true, "array": false },
           { "key": "totalProcessed", "type": "integer", "required": true, "array": false },
           { "key": "errors", "type": "string", "size": 10000, "required": false, "array": true },
-          { "key": "status", "type": "string", "size": 50, "required": true, "array": false } // Podría ser Enum
+          { "key": "status", "type": "string", "size": 50, "required": true, "array": false }
         ],
         "indexes": [
            { "key": "timestamp_desc", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"] }
         ]
       },
-      // --- Colecciones Placeholder (Añadidas desde setup.md) ---
        {
         "$id": "proveedores",
         "name": "proveedores",
-        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "$permissions": ["read(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
           { "key": "cif", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "email", "type": "email", "required": false, "array": false },
+          { "key": "email", "type": "email", "size": 255, "required": false, "array": false },
           { "key": "telefono", "type": "string", "size": 20, "required": false, "array": false },
           { "key": "direccion", "type": "string", "size": 511, "required": false, "array": false }
         ],
@@ -310,11 +308,11 @@
       {
         "$id": "recursos",
         "name": "recursos",
-        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "$permissions": ["read(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "tipo", "type": "string", "size": 50, "required": false, "array": false }, // Podría ser Enum
+          { "key": "tipo", "type": "string", "size": 50, "required": false, "array": false },
           { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
         ],
         "indexes": [
@@ -325,13 +323,13 @@
       {
         "$id": "asistencia",
         "name": "asistencia",
-        "$permissions": ["read(\"users\")"], // Ajustar si se implementa CRUD
+        "$permissions": ["read(\"users\")"],
         "documentSecurity": false, "enabled": true,
         "attributes": [
           { "key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false },
           { "key": "fecha_hora_entrada", "type": "datetime", "required": true, "array": false },
           { "key": "fecha_hora_salida", "type": "datetime", "required": false, "array": false },
-          { "key": "tipo", "type": "string", "size": 20, "required": false, "array": false } // Podría ser Enum
+          { "key": "tipo", "type": "string", "size": 20, "required": false, "array": false }
         ],
         "indexes": [
           { "key": "empleado_fecha", "type": "key", "attributes": ["empleado_id", "fecha_hora_entrada"], "orders": ["ASC", "ASC"] }

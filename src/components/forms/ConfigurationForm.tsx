@@ -63,6 +63,8 @@ export const ConfigurationForm = ({ configInicial, onSubmit, isSubmitting, isLoa
         serieFactura: data.serieFactura,
         seriePresupuesto: data.seriePresupuesto,
         tipoIvaPredeterminado: data.tipoIvaPredeterminado,
+        ultimoNumeroFactura: configInicial?.ultimoNumeroFactura ?? 0,
+        ultimoNumeroPresupuesto: configInicial?.ultimoNumeroPresupuesto ?? 0,
     };
     await onSubmit(finalData);
   };

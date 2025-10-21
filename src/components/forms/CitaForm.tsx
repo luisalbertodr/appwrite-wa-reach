@@ -90,9 +90,9 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
     return {
       fecha_hora_inicio: citaInicial.fecha_hora_inicio || '',
       fecha_hora_fin: citaInicial.fecha_hora_fin || '',
-      cliente_id: citaInicial.cliente?.$id || citaInicial.cliente_id || '',
-      empleado_id: citaInicial.empleado?.$id || citaInicial.empleado_id || '',
-      articulo_id: citaInicial.articulo?.$id || citaInicial.articulo_id || '',
+      cliente_id: citaInicial.cliente?.$id || '',
+      empleado_id: citaInicial.empleado?.$id || '',
+      articulo_id: citaInicial.articulo?.$id || '',
       estado: citaInicial.estado || 'agendada',
       notas_internas: citaInicial.notas_internas || '',
       notas_cliente: citaInicial.notas_cliente || '',
@@ -332,7 +332,7 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
                             <SelectItem value="agendada">Agendada</SelectItem>
                             <SelectItem value="confirmada">Confirmada</SelectItem>
                             <SelectItem value="realizada">Realizada</SelectItem>
-                            <SelectItem value="cancelada">Cancelada</Sistema>
+                            <SelectItem value="cancelada">Cancelada</SelectItem>
                             <SelectItem value="no_asistio">No Asistió</SelectItem>
                         </SelectContent>
                     </Select>

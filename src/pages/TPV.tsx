@@ -1,24 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTpvStore, LineaTicket } from '@/stores/tpvStore';
+import { useTpvStore } from '@/stores/tpvStore';
 import { useGetClientes } from '@/hooks/useClientes';
 import { useGetArticulos } from '@/hooks/useArticulos';
 import { useCreateFactura } from '@/hooks/useFacturas';
 import { useGetConfiguration, useGenerarSiguienteNumero } from '@/hooks/useConfiguration'; // <-- Nombre corregido
-import { Cliente, Articulo, LineaFactura, FacturaInputData, CreateFacturaInput, Factura, Configuracion } from '@/types'; // <-- Añadir Factura, Configuracion
+import { LineaFactura, FacturaInputData, CreateFacturaInput, Factura } from '@/types'; // <-- Añadir Factura
 import { Models } from 'appwrite'; // <-- Añadir Models
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { User, X, Plus, Minus, Trash2, CreditCard, Percent, Banknote, Download } from 'lucide-react'; // <-- Añadir Download
+import { User, X, Trash2, CreditCard, Percent, Download } from 'lucide-react'; // <-- Añadir Download
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { DownloadFacturaPDF } from '@/components/pdf/DownloadFacturaPDF'; // <-- Importar PDF
 import { useToast } from '@/hooks/use-toast';
-import { formatISO, format } from 'date-fns';
+import { formatISO } from 'date-fns';
 import { cn } from '@/lib/utils'; // <-- Importar cn
 
 // Componente EditableNumberCell (sin cambios)
@@ -63,7 +63,6 @@ const TPV = () => {
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [busquedaArticulo, setBusquedaArticulo] = useState('');
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
-  const [articuloPopoverOpen, setArticuloPopoverOpen] = useState(false); // <-- Estado de popover de artículos (del código GitHub)
   const { toast } = useToast();
 
   // <-- Estado para el último ticket generado -->
@@ -109,7 +108,7 @@ const TPV = () => {
                         <CommandInput placeholder="Buscar cliente..." value={busquedaCliente} onValueChange={setBusquedaCliente}/>
                         <CommandList>
                              {loadingClientes && <CommandItem disabled><LoadingSpinner/></CommandItem>}
-                             <CommandEmpty>No encontrado.</CommandItem>
+                             <CommandEmpty>No encontrado.</CommandEmpty>
                              <CommandGroup>
                                  {clientes?.map((cliente) => (
                                  <CommandItem
@@ -250,11 +249,12 @@ const TPV = () => {
       // Guardamos la factura devuelta para el PDF
       const nuevaFactura = await createFacturaMutation.mutateAsync(facturaData as CreateFacturaInput);
       
-      // Añadimos el cliente (necesario para el PDF)
+      // Añadimos el cliente y parseamos las líneas (necesario para el PDF)
       const facturaCompleta = {
           ...nuevaFactura,
-          cliente: clienteSeleccionado, 
-      } as (Factura & Models.Document);
+          cliente: clienteSeleccionado,
+          lineas: JSON.parse(nuevaFactura.lineas as string) as LineaFactura[], // Parsear JSON a array
+      };
       
       setUltimaFacturaGenerada(facturaCompleta); // Guardar para imprimir
 

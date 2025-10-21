@@ -106,3 +106,13 @@ export interface Configuracion extends LipooutDocument {
   ultimoNumeroPresupuesto: number; // Campo requerido según el setup
   tipoIvaPredeterminado?: number;
 }
+
+// --- Tipo para Logs de Importación (AÑADIDO) ---
+export interface ImportLog extends LipooutDocument {
+  timestamp: string;
+  filename: string;
+  successfulImports: number;
+  totalProcessed: number;
+  errors?: string[];
+  status: 'completed' | 'completed_with_errors' | 'failed';
+}

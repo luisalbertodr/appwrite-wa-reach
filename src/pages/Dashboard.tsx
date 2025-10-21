@@ -73,9 +73,9 @@ const Dashboard = () => {
               <TableCell className="font-medium">
                 {format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}
               </TableCell>
-              <TableCell>{cita.cliente?.nombre_completo || cita.cliente_id}</TableCell>
-              <TableCell>{cita.articulo?.nombre || cita.articulo_id}</TableCell>
-              <TableCell>{cita.empleado?.nombre_completo || cita.empleado_id}</TableCell>
+              <TableCell>{cita.cliente?.nombre_completo || 'Cliente no encontrado'}</TableCell>
+              <TableCell>{cita.articulo?.nombre || 'Artículo no encontrado'}</TableCell>
+              <TableCell>{cita.empleado?.nombre_completo || 'Empleado no encontrado'}</TableCell>
               <TableCell>{cita.estado}</TableCell>
             </TableRow>
           ))}

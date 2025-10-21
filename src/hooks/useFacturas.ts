@@ -4,9 +4,8 @@ import {
   createFactura,
   updateFactura,
   deleteFactura,
-  CreateFacturaInput,
-  UpdateFacturaInput,
 } from '@/services/appwrite-facturas'; // Importamos el servicio
+import { CreateFacturaInput, UpdateFacturaInput } from '@/types/factura.types'; // Importamos los tipos
 
 const FACTURAS_QUERY_KEY = 'facturas';
 
