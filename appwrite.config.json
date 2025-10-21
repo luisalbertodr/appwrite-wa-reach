@@ -1,19 +1,64 @@
 {
-    "$id": "LipooutDB",
-    "name": "LipooutDB",
-    "enabled": true,
-    "collections": [
-      {
-        "$id": "clientes",
-        "name": "clientes",
-        "$permissions": [
-          "read(\"any\")",
-          "create(\"users\")",
-          "update(\"users\")",
-          "delete(\"users\")"
-        ],
-        "documentSecurity": false,
-        "enabled": true,
+    "projectId": "68a8bb45000adadfb279",
+    "projectName": "Lipoout",
+    "settings": {
+        "services": {
+            "account": true,
+            "avatars": true,
+            "databases": true,
+            "locale": true,
+            "health": true,
+            "storage": true,
+            "teams": true,
+            "users": true,
+            "sites": true,
+            "functions": true,
+            "graphql": true,
+            "messaging": true
+        },
+        "auth": {
+            "methods": {
+                "jwt": true,
+                "phone": true,
+                "invites": true,
+                "anonymous": true,
+                "email-otp": true,
+                "magic-url": true,
+                "email-password": true
+            },
+            "security": {
+                "duration": 31536000,
+                "limit": 0,
+                "sessionsLimit": 10,
+                "passwordHistory": 0,
+                "passwordDictionary": false,
+                "personalDataCheck": false,
+                "sessionAlerts": false,
+                "mockNumbers": []
+            }
+        }
+    },
+    "tablesDB": [
+        {
+            "$id": "68b1d7530028045d94d3",
+            "name": "Lipoout",
+            "enabled": true
+        }
+    ],
+    "tables": [
+        {
+            "$id": "clientes",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Clientes",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
         "attributes": [
           { "key": "codcli", "type": "string", "size": 6, "required": true, "array": false },
           { "key": "nomcli", "type": "string", "size": 255, "required": false, "array": false },
@@ -35,305 +80,1026 @@
           { "key": "facturacion", "type": "float", "required": true, "default": 0, "array": false },
           { "key": "intereses", "type": "string", "size": 1024, "required": false, "array": true },
           { "key": "importErrors", "type": "string", "size": 4096, "required": false, "array": true }
-        ],
-        "indexes": [
-          { "key": "codcli_unique", "type": "unique", "attributes": ["codcli"], "orders": ["ASC"] },
-          { "key": "nombre_completo_fulltext", "type": "fulltext", "attributes": ["nombre_completo"], "orders": ["ASC"] },
-          { "key": "email", "type": "key", "attributes": ["email"], "orders": ["ASC"] },
-          { "key": "dnicli", "type": "key", "attributes": ["dnicli"], "orders": ["ASC"] },
-          { "key": "tel2cli", "type": "key", "attributes": ["tel2cli"], "orders": ["ASC"] },
-          { "key": "edad", "type": "key", "attributes": ["edad"], "orders": ["ASC"] },
-          { "key": "facturacion", "type": "key", "attributes": ["facturacion"], "orders": ["ASC"] },
-          { "key": "intereses_fulltext", "type": "fulltext", "attributes": ["intereses"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "empleados",
-        "name": "empleados",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "apellidos", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "nombre_completo", "type": "string", "size": 511, "required": false, "array": false },
-          { "key": "email", "type": "email", "size": 255, "required": true, "array": false },
-          { "key": "telefono", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "rol", "type": "string", "size": 50, "required": true, "elements": ["Admin", "Médico", "Recepción", "Lectura"], "array": false },
-          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
-        ],
-        "indexes": [
-          { "key": "email_unique", "type": "unique", "attributes": ["email"], "orders": ["ASC"] },
-          { "key": "activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"] },
-          { "key": "rol", "type": "key", "attributes": ["rol"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "familias",
-        "name": "familias",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false },
-          { "key": "icono", "type": "string", "size": 50, "required": false, "array": false }
-        ],
-        "indexes": [
-          { "key": "nombre_unique", "type": "unique", "attributes": ["nombre"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "articulos",
-        "name": "articulos",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "descripcion", "type": "string", "size": 1024, "required": false, "array": false },
-          { "key": "precio", "type": "float", "required": true, "array": false },
-          { "key": "tipo", "type": "string", "size": 50, "required": true, "elements": ["producto", "servicio", "bono"], "array": false },
-          { "key": "familia_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "stock", "type": "integer", "required": false, "array": false },
-          { "key": "sesiones_bono", "type": "integer", "required": false, "array": false },
-          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
-        ],
-        "indexes": [
-          { "key": "nombre_fulltext", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"] },
-          { "key": "tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"] },
-          { "key": "familia_id", "type": "key", "attributes": ["familia_id"], "orders": ["ASC"] },
-          { "key": "activo", "type": "key", "attributes": ["activo"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "citas",
-        "name": "citas",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "fecha_hora_inicio", "type": "datetime", "required": true, "array": false },
-          { "key": "fecha_hora_fin", "type": "datetime", "required": true, "array": false },
-          { "key": "duracion_minutos", "type": "integer", "required": false, "array": false },
-          { "key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "articulo_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "estado", "type": "string", "size": 50, "required": true, "elements": ["agendada", "confirmada", "realizada", "cancelada", "no_asistio"], "array": false },
-          { "key": "notas_internas", "type": "string", "size": 4096, "required": false, "array": false },
-          { "key": "notas_cliente", "type": "string", "size": 1024, "required": false, "array": false }
-        ],
-        "indexes": [
-          { "key": "fecha_inicio", "type": "key", "attributes": ["fecha_hora_inicio"], "orders": ["ASC"] },
-          { "key": "cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"] },
-          { "key": "empleado_id", "type": "key", "attributes": ["empleado_id"], "orders": ["ASC"] },
-          { "key": "estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"] },
-          { "key": "fecha_empleado", "type": "key", "attributes": ["fecha_hora_inicio", "empleado_id"], "orders": ["ASC", "ASC"] }
-        ]
-      },
-      {
-        "$id": "facturas",
-        "name": "facturas",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "numeroFactura", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "fechaEmision", "type": "datetime", "required": true, "array": false },
-          { "key": "fechaVencimiento", "type": "datetime", "required": false, "array": false },
-          { "key": "estado", "type": "string", "size": 50, "required": true, "elements": ["borrador", "finalizada", "cobrada", "anulada", "presupuesto"], "array": false },
-          { "key": "cliente_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "empleado_id", "type": "string", "size": 50, "required": false, "array": false },
-          { "key": "lineas", "type": "string", "size": 10000, "required": true, "array": false },
-          { "key": "baseImponible", "type": "float", "required": true, "array": false },
-          { "key": "totalIva", "type": "float", "required": true, "array": false },
-          { "key": "totalFactura", "type": "float", "required": true, "array": false },
-          { "key": "descuentoGlobalPorcentaje", "type": "float", "required": false, "default": 0, "array": false },
-          { "key": "importeDescuentoGlobal", "type": "float", "required": false, "default": 0, "array": false },
-          { "key": "totalAPagar", "type": "float", "required": true, "array": false },
-          { "key": "metodoPago", "type": "string", "size": 100, "required": false, "array": false },
-          { "key": "notas", "type": "string", "size": 4096, "required": false, "array": false },
-          { "key": "facturaRectificada_id", "type": "string", "size": 50, "required": false, "array": false }
-        ],
-        "indexes": [
-          { "key": "numeroFactura_unique", "type": "unique", "attributes": ["numeroFactura"], "orders": ["ASC"] },
-          { "key": "fechaEmision_desc", "type": "key", "attributes": ["fechaEmision"], "orders": ["DESC"] },
-          { "key": "cliente_id", "type": "key", "attributes": ["cliente_id"], "orders": ["ASC"] },
-          { "key": "estado", "type": "key", "attributes": ["estado"], "orders": ["ASC"] },
-          { "key": "fecha_estado", "type": "key", "attributes": ["fechaEmision", "estado"], "orders": ["ASC", "ASC"] }
-        ]
-      },
-      {
-        "$id": "configuration",
-        "name": "configuration",
-        "$permissions": ["read(\"users\")", "update(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombreClinica", "type": "string", "size": 255, "required": false, "array": false },
-          { "key": "direccion", "type": "string", "size": 511, "required": false, "array": false },
-          { "key": "cif", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "emailContacto", "type": "email", "size": 255, "required": false, "array": false },
-          { "key": "telefonoContacto", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "serieFactura", "type": "string", "size": 10, "required": false, "default": "FRA", "array": false },
-          { "key": "seriePresupuesto", "type": "string", "size": 10, "required": false, "default": "PRE", "array": false },
-          { "key": "ultimoNumeroFactura", "type": "integer", "required": false, "default": 0, "array": false },
-          { "key": "ultimoNumeroPresupuesto", "type": "integer", "required": false, "default": 0, "array": false },
-          { "key": "tipoIvaPredeterminado", "type": "float", "required": false, "default": 21, "array": false }
-        ],
-        "indexes": []
-      },
-      {
-        "$id": "config",
-        "name": "config",
-        "$permissions": ["read(\"users\")", "update(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "apiUrl", "type": "url", "size": 255, "required": true, "array": false },
-          { "key": "apiKey", "type": "string", "size": 255, "required": false, "array": false },
-          { "key": "session", "type": "string", "size": 100, "required": false, "default": "default", "array": false },
-          { "key": "minDelayMs", "type": "integer", "required": false, "array": false },
-          { "key": "maxDelayMs", "type": "integer", "required": false, "array": false },
-          { "key": "batchSizeMin", "type": "integer", "required": false, "array": false },
-          { "key": "batchSizeMax", "type": "integer", "required": false, "array": false },
-          { "key": "batchDelayMsMin", "type": "integer", "required": false, "array": false },
-          { "key": "batchDelayMsMax", "type": "integer", "required": false, "array": false },
-          { "key": "adminPhoneNumbers", "type": "string", "size": 1024, "required": false, "array": true },
-          { "key": "notificationInterval", "type": "integer", "required": false, "array": false },
-          { "key": "startTime", "type": "string", "size": 5, "required": false, "array": false },
-          { "key": "endTime", "type": "string", "size": 5, "required": false, "array": false }
-        ],
-        "indexes": []
-      },
-      {
-        "$id": "templates",
-        "name": "templates",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "messages", "type": "string", "size": 4096, "required": true, "array": true },
-          { "key": "imageUrls", "type": "url", "size": 2048, "required": false, "array": true }
-        ],
-        "indexes": [
-            { "key": "name", "type": "key", "attributes": ["name"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "campaigns",
-        "name": "campaigns",
-        "$permissions": ["read(\"users\")", "create(\"users\")", "update(\"users\")", "delete(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "name", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "templateId", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "filters", "type": "string", "size": 1024, "required": false, "array": false },
-          { "key": "scheduledDate", "type": "datetime", "required": false, "array": false },
-          { "key": "scheduledTime", "type": "string", "size": 5, "required": false, "array": false },
-          { "key": "selectedMessageIndex", "type": "integer", "required": false, "array": false },
-          { "key": "selectedImageIndex", "type": "integer", "required": false, "array": false },
-          { "key": "status", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "audienceCount", "type": "integer", "required": true, "array": false },
-          { "key": "createdAt", "type": "datetime", "required": true, "array": false },
-          { "key": "startTime", "type": "string", "size": 5, "required": false, "array": false },
-          { "key": "endTime", "type": "string", "size": 5, "required": false, "array": false }
-        ],
-        "indexes": [
-           { "key": "createdAt_desc", "type": "key", "attributes": ["createdAt"], "orders": ["DESC"] },
-           { "key": "status", "type": "key", "attributes": ["status"], "orders": ["ASC"] }
-        ]
-      },
-       {
-        "$id": "campaign_progress",
-        "name": "campaign_progress",
-        "$permissions": ["read(\"users\")", "update(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "currentClientName", "type": "string", "size": 255, "required": false, "array": false },
-          { "key": "currentClientPhone", "type": "string", "size": 20, "required": false, "array": false }
-  
-        ],
-        "indexes": []
-      },
-      {
-        "$id": "message_logs",
-        "name": "message_logs",
-        "$permissions": ["read(\"users\")", "create(\"functions\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "campaignId", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "clientId", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "clientName", "type": "string", "size": 255, "required": false, "array": false },
-          { "key": "phone", "type": "string", "size": 20, "required": true, "array": false },
-          { "key": "timestamp", "type": "datetime", "required": true, "array": false },
-          { "key": "status", "type": "string", "size": 20, "required": true, "array": false },
-          { "key": "error", "type": "string", "size": 1024, "required": false, "array": false },
-          { "key": "messageContent", "type": "string", "size": 4096, "required": false, "array": false },
-          { "key": "imageUrlSent", "type": "url", "size": 2048, "required": false, "array": false }
-        ],
-        "indexes": [
-          { "key": "campaignId", "type": "key", "attributes": ["campaignId"], "orders": ["ASC"] },
-          { "key": "clientId", "type": "key", "attributes": ["clientId"], "orders": ["ASC"] },
-          { "key": "status", "type": "key", "attributes": ["status"], "orders": ["ASC"] },
-          { "key": "timestamp_desc", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"] }
-        ]
-      },
-       {
-        "$id": "import_logs",
-        "name": "import_logs",
-        "$permissions": ["read(\"users\")", "create(\"functions\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "timestamp", "type": "datetime", "required": true, "array": false },
-          { "key": "filename", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "successfulImports", "type": "integer", "required": true, "array": false },
-          { "key": "totalProcessed", "type": "integer", "required": true, "array": false },
-          { "key": "errors", "type": "string", "size": 10000, "required": false, "array": true },
-          { "key": "status", "type": "string", "size": 50, "required": true, "array": false }
-        ],
-        "indexes": [
-           { "key": "timestamp_desc", "type": "key", "attributes": ["timestamp"], "orders": ["DESC"] }
-        ]
-      },
-       {
-        "$id": "proveedores",
-        "name": "proveedores",
-        "$permissions": ["read(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "cif", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "email", "type": "email", "size": 255, "required": false, "array": false },
-          { "key": "telefono", "type": "string", "size": 20, "required": false, "array": false },
-          { "key": "direccion", "type": "string", "size": 511, "required": false, "array": false }
-        ],
-        "indexes": [
-           { "key": "nombre_fulltext", "type": "fulltext", "attributes": ["nombre"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "recursos",
-        "name": "recursos",
-        "$permissions": ["read(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "nombre", "type": "string", "size": 255, "required": true, "array": false },
-          { "key": "tipo", "type": "string", "size": 50, "required": false, "array": false },
-          { "key": "activo", "type": "boolean", "required": true, "default": true, "array": false }
-        ],
-        "indexes": [
-           { "key": "nombre", "type": "key", "attributes": ["nombre"], "orders": ["ASC"] },
-           { "key": "tipo", "type": "key", "attributes": ["tipo"], "orders": ["ASC"] }
-        ]
-      },
-      {
-        "$id": "asistencia",
-        "name": "asistencia",
-        "$permissions": ["read(\"users\")"],
-        "documentSecurity": false, "enabled": true,
-        "attributes": [
-          { "key": "empleado_id", "type": "string", "size": 50, "required": true, "array": false },
-          { "key": "fecha_hora_entrada", "type": "datetime", "required": true, "array": false },
-          { "key": "fecha_hora_salida", "type": "datetime", "required": false, "array": false },
-          { "key": "tipo", "type": "string", "size": 20, "required": false, "array": false }
-        ],
-        "indexes": [
-          { "key": "empleado_fecha", "type": "key", "attributes": ["empleado_id", "fecha_hora_entrada"], "orders": ["ASC", "ASC"] }
-        ]
-      }
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "apellidos",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 200,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "dni",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "genero",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "elements": [
+                        "M",
+                        "F",
+                        "Otro"
+                    ],
+                    "format": "enum",
+                    "default": null
+                },
+                {
+                    "key": "fechaNacimiento",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "ocupacion",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 100,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "telefono_principal",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "telefono_adicional",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "email",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "format": "email",
+                    "default": null
+                },
+                {
+                    "key": "direccion_calle",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "direccion_ciudad",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "direccion_codigo_postal",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 10,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "fecha_registro",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "notas",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "userId",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "phone_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "telefono_principal"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "email_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "email"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "active_filter",
+                    "type": "key",
+                    "status": "available",
+                    "columns": [
+                        "activo"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "empleados",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Empleados",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "apellidos",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 200,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "dni",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "telefono",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "email",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "format": "email",
+                    "default": null
+                },
+                {
+                    "key": "fecha_nacimiento",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "codigo_asistencia",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 10,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "horario_semanal",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 2000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "fecha_alta",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "usuario_id",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "dni_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "dni"
+                    ],
+                    "orders": []
+                },
+                {
+                    "key": "codigo_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "codigo_asistencia"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "articulos",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Artículos",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "codigo",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 200,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "tipo",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "elements": [
+                        "[producto,servicio,bono]"
+                    ],
+                    "format": "enum",
+                    "default": null
+                },
+                {
+                    "key": "familia_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "precio",
+                    "type": "double",
+                    "required": true,
+                    "array": false,
+                    "min": -1.7976931348623157e+308,
+                    "max": 1.7976931348623157e+308,
+                    "default": null
+                },
+                {
+                    "key": "stock",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "duracion",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "descripcion",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "foto",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 2048,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "icono",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "recursos_necesarios",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "componentes",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 2000,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "codigo_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "codigo"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "citas",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Citas",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "cliente_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "empleado_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "fecha_hora",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "duracion",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "estado",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "elements": [
+                        "[agendada,pendiente,finalizada,cancelada]"
+                    ],
+                    "format": "enum",
+                    "default": null
+                },
+                {
+                    "key": "articulos",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 2000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "recursos_cabina",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "recursos_aparatos",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "comentarios",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "datos_clinicos",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 5000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "precio_total",
+                    "type": "double",
+                    "required": true,
+                    "array": false,
+                    "min": -1.7976931348623157e+308,
+                    "max": 1.7976931348623157e+308,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "facturas",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Facturas",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "numero",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "fecha",
+                    "type": "datetime",
+                    "required": true,
+                    "array": false,
+                    "format": "",
+                    "default": null
+                },
+                {
+                    "key": "cliente_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "empleado_id",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "lineas",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 5000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "subtotal",
+                    "type": "double",
+                    "required": true,
+                    "array": false,
+                    "min": -1.7976931348623157e+308,
+                    "max": 1.7976931348623157e+308,
+                    "default": null
+                },
+                {
+                    "key": "iva",
+                    "type": "double",
+                    "required": true,
+                    "array": false,
+                    "min": -1.7976931348623157e+308,
+                    "max": 1.7976931348623157e+308,
+                    "default": null
+                },
+                {
+                    "key": "total",
+                    "type": "double",
+                    "required": true,
+                    "array": false,
+                    "min": -1.7976931348623157e+308,
+                    "max": 1.7976931348623157e+308,
+                    "default": null
+                },
+                {
+                    "key": "forma_pago",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "elements": [
+                        "[efectivo,tarjeta,mixto]"
+                    ],
+                    "format": "enum",
+                    "default": null
+                },
+                {
+                    "key": "estado",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "elements": [
+                        "[pendiente,pagada,cancelada]"
+                    ],
+                    "format": "enum",
+                    "default": null
+                },
+                {
+                    "key": "cita_id",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "notas",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "numero_unique",
+                    "type": "unique",
+                    "status": "available",
+                    "columns": [
+                        "numero"
+                    ],
+                    "orders": []
+                }
+            ]
+        },
+        {
+            "$id": "salas",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Salas",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "descripcion",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "capacidad",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "equipamiento",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "color_calendario",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "disponible_desde",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 5,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "disponible_hasta",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 5,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "dias_disponibles",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "configuracion_horario",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Configuracion Horario",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "hora_apertura",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 5,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "hora_cierre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 5,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "dias_trabajo",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "duracion_cita_default",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "intervalo_entre_citas",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "max_citas_simultaneas",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "recordatorio_email",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "recordatorio_sms",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "tiempo_recordatorio",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "limite_cancelacion",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": -9223372036854775808,
+                    "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "politica_cancelacion",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "familias",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Familias",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "codigo",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 20,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 100,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "activa",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "orden",
+                    "type": "integer",
+                    "required": true,
+                    "array": false,
+                    "min": 0,
+                    "max": 9223372036854775807,
+                    "default": null
+                }
+            ],
+            "indexes": []
+        },
+        {
+            "$id": "proveedores",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Proveedores",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [],
+            "indexes": []
+        },
+        {
+            "$id": "recursos",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Recursos",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [],
+            "indexes": []
+        },
+        {
+            "$id": "asistencia",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Asistencia",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [],
+            "indexes": []
+        },
+        {
+            "$id": "configuracion",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Configuración",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [],
+            "indexes": []
+        }
     ]
-  }
+}
