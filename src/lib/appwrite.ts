@@ -13,8 +13,8 @@ export const account = new Account(client);
 export const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
 
 // === IDS BASE DE DATOS ===
-// Asumimos un único DATABASE_ID para Lipoout.
-export const DATABASE_ID = '68d78cb20028fac621d4'; // (Mantenido de la PoC, ajustar si Lipoout usa otro DB_ID)
+// Base de datos del proyecto Lipoout
+export const DATABASE_ID = '68b1d7530028045d94d3'; // Lipoout Database
 
 // === COLECCIONES LIPOOUT (NUEVAS) ===
 // Basado en Planning 2.md
