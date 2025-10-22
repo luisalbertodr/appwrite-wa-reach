@@ -4,13 +4,13 @@ export const client = new Client();
 export const storage = new Storage(client);
 
 client
-  .setEndpoint(import.meta.env.VITE_APPWRITE_PUBLIC_ENDPOINT)
-  .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
+  .setEndpoint(import.meta.env.VITE_APP_ENDPOINT)
+  .setProject(import.meta.env.VITE_APP_PROJECT_ID);
 
 export const databases = new Databases(client);
 export const account = new Account(client);
 
-export const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+export const PROJECT_ID = import.meta.env.VITE_APP_PROJECT_ID;
 
 // === IDS BASE DE DATOS ===
 // Base de datos de WhatsApp/Marketing (funcionalidad original de main)
