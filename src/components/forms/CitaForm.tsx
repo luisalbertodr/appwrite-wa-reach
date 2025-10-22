@@ -136,8 +136,8 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
         const [inicioH, inicioM] = horaInicio.split(':').map(Number);
         const [finH, finM] = horaFin.split(':').map(Number);
 
-        let inicio = setSeconds(setMinutes(setHours(selectedDate, inicioH), inicioM), 0);
-        let fin = setSeconds(setMinutes(setHours(selectedDate, finH), finM), 0);
+        const inicio = setSeconds(setMinutes(setHours(selectedDate, inicioH), inicioM), 0);
+        const fin = setSeconds(setMinutes(setHours(selectedDate, finH), finM), 0);
         
         // Validación simple de horas
         if (fin <= inicio) {

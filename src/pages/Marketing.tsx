@@ -344,7 +344,7 @@ const Marketing = () => {
               <TableBody>
                 {logContent.map(log => {
                   // Hacemos cast al tipo MessageLog definido en index.ts
-                  const messageLog = log as MessageLog;
+                  const messageLog = log as unknown as MessageLog;
                   return (
                     <TableRow key={messageLog.$id}>
                       <TableCell>{messageLog.clientId}</TableCell>

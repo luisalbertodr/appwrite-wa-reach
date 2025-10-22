@@ -22,7 +22,7 @@ import { calculateAge } from '@/lib/validators';
 
 const functions = new Functions(client);
 
-interface Progress {
+interface ProgressData {
   sent: number;
   failed: number;
   skipped: number;
@@ -34,22 +34,30 @@ interface CampaignProgress extends Models.Document {
     currentClientPhone: string;
 }
 
-const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
-const CAMPAIGN_TIMEOUT_MS = 3600000; // 1 hora de timeout de seguridad
+interface MessageLog extends Models.Document {
+    clientId: string;
+    clientName: string;
+    timestamp: string;
+    status: string;
+    error?: string;
+    campaignId: string;
+}
 
-// NUEVO: Objeto de traducciones
+const FILTERS_STORAGE_KEY_MARKETING_CLIENTES = 'marketing-clientes-filters';
+const CAMPAIGN_TIMEOUT_MS = 3600000;
+
 const statusTranslations: { [key: string]: string } = {
     pending: 'Pendiente',
     sending: 'Enviando',
     scheduled: 'Programada',
     failed: 'Fallida',
     completed: 'Completada',
-    sent: 'Completada', // 'sent' se trata como 'completed' en el historial
+    sent: 'Completada',
     completed_with_errors: 'Completada con errores',
 };
 
-export function CampaignsTab() {
-  const { data: clients, total, loading: loadingClients, applyQueries: applyClientQueries, update: updateClient, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_CAMPAIGNS, true);
+export function MarketingClientesTab() {
+  const { data: clients, total, loading: loadingClients, applyQueries: applyClientQueries, update: updateClient, reload: reloadClients } = useAppwriteCollection<Client>(CLIENTS_COLLECTION_ID, FILTERS_STORAGE_KEY_MARKETING_CLIENTES, true);
   const { data: templates, create: createTemplate, update: updateTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
   const { data: campaigns, create: createCampaign, update: updateCampaign, loading: loadingCampaigns, reload: reloadCampaigns } = useAppwriteCollection<Campaign>(CAMPAIGNS_COLLECTION_ID);
   const { data: configs } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
@@ -65,7 +73,7 @@ export function CampaignsTab() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
-  const [progress, setProgress] = useState<Progress>({ sent: 0, failed: 0, skipped: 0, total: 0 });
+  const [progress, setProgress] = useState<ProgressData>({ sent: 0, failed: 0, skipped: 0, total: 0 });
   const [selectedClients, setSelectedClients] = useState<Map<string, Client>>(new Map());
 
   const [scheduledDate, setScheduledDate] = useState('');
@@ -76,11 +84,10 @@ export function CampaignsTab() {
   
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null);
   const [showLogDialog, setShowLogDialog] = useState(false);
-  const [logContent, setLogContent] = useState<Models.Document[]>([]);
+  const [logContent, setLogContent] = useState<MessageLog[]>([]);
 
   const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
   
-  // NUEVO: Función para traducir
   const translateStatus = (status: string) => statusTranslations[status] || status;
 
   const estimatedDuration = useMemo(() => {
@@ -122,12 +129,12 @@ export function CampaignsTab() {
     if(filters.pobcli) newQueries.push(Query.search('pobcli', filters.pobcli));
     if(filters.procli) newQueries.push(Query.search('procli', filters.procli));
 
-    localStorage.setItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values', JSON.stringify(filters));
+    localStorage.setItem(FILTERS_STORAGE_KEY_MARKETING_CLIENTES + '_values', JSON.stringify(filters));
     applyClientQueries(newQueries);
   }, [filters, applyClientQueries]);
 
   useEffect(() => {
-    const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY_CAMPAIGNS + '_values');
+    const savedFiltersJSON = localStorage.getItem(FILTERS_STORAGE_KEY_MARKETING_CLIENTES + '_values');
     if (savedFiltersJSON) {
         try {
             const savedFilters = JSON.parse(savedFiltersJSON);
@@ -147,7 +154,7 @@ export function CampaignsTab() {
           [Query.equal('status', 'sending'), Query.limit(1)]
         );
         if (response.documents.length > 0) {
-          const activeCampaign = response.documents[0] as Campaign & Models.Document;
+          const activeCampaign = response.documents[0] as unknown as Campaign & Models.Document;
           setActiveCampaignId(activeCampaign.$id);
           setProgress(prev => ({ ...prev, total: activeCampaign.audienceCount }));
         }
@@ -186,12 +193,11 @@ export function CampaignsTab() {
         const skipped = response.documents.filter(d => d.status === 'skipped').length;
         setProgress(prev => ({ ...prev, sent, failed, skipped }));
         
-        // CORREGIDO: Añadido chequeo de progress.total > 0
         if (progress.total > 0 && (sent + failed + skipped >= progress.total)) {
           toast({ title: 'Campaña Completada' });
           setActiveCampaignId(null);
           setCampaignProgress(null);
-          reloadCampaigns(); // Recargar para mostrar el estado final
+          reloadCampaigns();
         }
       } catch (error) { clearInterval(interval); }
     }, 5000);
@@ -350,7 +356,7 @@ export function CampaignsTab() {
             MESSAGE_LOGS_COLLECTION_ID,
             [Query.equal('campaignId', campaignId), Query.limit(5000)]
         );
-        setLogContent(response.documents);
+        setLogContent(response.documents as unknown as MessageLog[]);
         setShowLogDialog(true);
 
     } catch (error) {
@@ -612,7 +618,6 @@ export function CampaignsTab() {
                             {logContent.map(log => (
                                 <TableRow key={log.$id}>
                                     <TableCell>{log.clientId}</TableCell>
-                                    {/* CORREGIDO: Usar log.clientName directamente */}
                                     <TableCell>{log.clientName || 'N/A'}</TableCell>
                                     <TableCell>{new Date(log.timestamp).toLocaleTimeString()}</TableCell>
                                     <TableCell>{log.status}</TableCell>

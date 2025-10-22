@@ -1,3 +1,9 @@
+import { Models } from 'appwrite';
+
+// ============================================
+// TIPOS WAHA / MARKETING (funcionalidad original de main)
+// ============================================
+
 export interface Client {
   $id?: string;
   codcli: string; 
@@ -30,7 +36,7 @@ export interface WhatsAppFunctionPayload {
 
 export interface WhatsAppFunctionResponse {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -59,8 +65,8 @@ export interface Campaign {
   status: 'pending' | 'sent' | 'scheduled' | 'failed' | 'sending' | 'completed_with_errors';
   audienceCount: number;
   createdAt: string;
-  startTime?: string; // <--- AÑADIDO
-  endTime?: string;   // <--- AÑADIDO
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface WahaConfig {
@@ -79,3 +85,37 @@ export interface WahaConfig {
   startTime?: string;
   endTime?: string;
 }
+
+export interface MessageLog {
+  $id?: string;
+  campaignId: string;
+  clientId: string;
+  clientName?: string;
+  timestamp: string;
+  status: 'success' | 'failed' | 'skipped';
+  error?: string;
+}
+
+export interface CampaignProgress extends Models.Document {
+  currentClientName: string;
+  currentClientPhone: string;
+}
+
+// ============================================
+// TIPOS LIPOOUT (nuevas funcionalidades de Migration)
+// ============================================
+
+// Type alias para documentos de Lipoout con metadata de Appwrite
+export type LipooutDocument = Models.Document;
+
+// Helper type to remove Appwrite metadata for creation/update inputs
+export type LipooutUserInput<T> = Omit<T, keyof Models.Document>;
+
+// --- Tipos Core Lipoout ---
+export * from './cliente.types';
+export * from './articulo.types';
+export * from './familia.types';
+export * from './empleado.types';
+export * from './cita.types';
+export * from './factura.types';
+export * from './configuracion.types';

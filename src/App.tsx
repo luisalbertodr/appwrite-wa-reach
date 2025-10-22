@@ -1,51 +1,65 @@
-import { useState, useEffect } from 'react';
+import React, { Suspense, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Index from '@/pages/Index';
-import Configuracion from '@/pages/Configuracion';
-import NotFound from '@/pages/NotFound';
 import { Toaster } from '@/components/ui/toaster';
-import { account } from '@/lib/appwrite';
 import AuthForm from './components/AuthForm';
-import { AppwriteException } from 'appwrite';
+import { useUser } from './hooks/useAuth';
+import LoadingSpinner from './components/LoadingSpinner';
+import AppLayout from './components/layout/AppLayout';
+
+// Lazy loading para optimización
+const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
+const Clientes = React.lazy(() => import('@/pages/Clientes'));
+const Articulos = React.lazy(() => import('@/pages/Articulos'));
+const Empleados = React.lazy(() => import('@/pages/Empleados'));
+const Marketing = React.lazy(() => import('@/pages/Marketing'));
+const Configuracion = React.lazy(() => import('@/pages/Configuracion'));
+const NotFound = React.lazy(() => import('@/pages/NotFound'));
+const Agenda = React.lazy(() => import('@/pages/Agenda'));
+const TPV = React.lazy(() => import('@/pages/TPV'));
+const Facturacion = React.lazy(() => import('@/pages/Facturacion'));
+const MarketingWaha = React.lazy(() => import('@/pages/MarketingWaha'));
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Estado para controlar la carga inicial
+  const { data: user, isLoading } = useUser();
+  const [, setCurrentUser] = useState<any>(null);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        await account.get();
-        setIsLoggedIn(true);
-      } catch (e) {
-        if (e instanceof AppwriteException && e.code !== 401) {
-          console.error("Error checking session:", e);
-        }
-        setIsLoggedIn(false);
-      } finally {
-        setIsLoading(false); // Finaliza la carga después de verificar
-      }
-    };
-    checkSession();
-  }, []);
-
-  // Muestra un mensaje de carga mientras se verifica la sesión
   if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div>Cargando...</div>
-      </div>
+      <>
+        <AuthForm onLoginSuccess={setCurrentUser} />
+        <Toaster />
+      </>
     );
   }
 
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={isLoggedIn ? <Navigate to="/" /> : <AuthForm />} />
-        <Route path="/" element={isLoggedIn ? <Index /> : <Navigate to="/login" />} />
-        <Route path="/configuracion" element={isLoggedIn ? <Configuracion /> : <Navigate to="/login" />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          {/* Rutas con AppLayout (nuevas funcionalidades Lipoout) */}
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/articulos" element={<Articulos />} />
+            <Route path="/empleados" element={<Empleados />} />
+            <Route path="/agenda" element={<Agenda />} />
+            <Route path="/tpv" element={<TPV />} />
+            <Route path="/facturacion" element={<Facturacion />} />
+            <Route path="/marketing" element={<Marketing />} />
+            <Route path="/configuracion" element={<Configuracion />} />
+          </Route>
+          
+          {/* Ruta sin AppLayout - Funcionalidad original de main (Marketing WhatsApp) */}
+          <Route path="/marketing-waha" element={<MarketingWaha />} />
+          
+          {/* Ruta 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
       <Toaster />
     </Router>
   );
