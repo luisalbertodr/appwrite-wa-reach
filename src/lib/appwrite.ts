@@ -36,7 +36,10 @@ export const TEMPLATES_COLLECTION_ID = 'templates';
 export const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
 export const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress';
 export const WAHA_CONFIG_COLLECTION_ID = 'config'; // Config de sesiones WAHA (se mantiene de la PoC)
-export const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
+
+// --- CORRECCIÓN AQUÍ ---
+// Ahora esta colección 'import_logs' ya existe porque la creaste en el Paso 1
+export const IMPORT_LOGS_COLLECTION_ID = 'import_logs'; 
 
 // === BUCKETS (Almacenamiento) ===
 export const BUCKET_ID = 'lipoout'; // Bucket principal de Lipoout

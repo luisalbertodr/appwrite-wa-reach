@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { WahaConfig, LipooutUserInput } from '@/types';
-import type { Configuracion } from '@/types'; // Import tipo-only para evitar conflicto
+import { WahaConfig, LipooutUserInput, Configuracion, Template } from '@/types'; // <-- Importar Template
+import type { ImportLog } from '@/types'; // Import tipo-only
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,37 +9,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server } from 'lucide-react';
+import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server, MessageSquare, Plus, Trash } from 'lucide-react'; // <-- Iconos añadidos
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
-import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration'; // <-- Importar Hooks Clínica
-import { Separator } from '@/components/ui/separator'; // <-- Importar Separator
+import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   WAHA_CONFIG_COLLECTION_ID,
   IMPORT_LOGS_COLLECTION_ID,
+  TEMPLATES_COLLECTION_ID, // <-- Importar ID de plantillas
   databases,
   DATABASE_ID,
   storage,
   IMPORT_BUCKET_ID,
   client,
-  // CONFIGURATION_COLLECTION_ID // Ya importado indirectamente por hooks
 } from '@/lib/appwrite';
-import { Functions, Models } from 'appwrite'; // <-- Añadir Models
+import { Functions, Models, ID } from 'appwrite'; // <-- Añadir Models e ID
 import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea'; // <-- Importar Textarea
+import { templateSchema } from '@/lib/validators'; // <-- Importar validador
 
 const functions = new Functions(client);
-
-// Helper para tipo ImportLog (si no está definido globalmente)
-interface ImportLog extends Models.Document {
-    timestamp: string;
-    filename: string;
-    successfulImports: number;
-    totalProcessed: number;
-    errors?: string[];
-    status: 'completed' | 'completed_with_errors' | 'failed';
-}
-
 
 const Configuracion = () => {
   const { toast } = useToast();
@@ -51,8 +42,8 @@ const Configuracion = () => {
   const [isSavingWaha, setIsSavingWaha] = useState(false);
 
   // --- Estado y Hooks para Importación CSV ---
-  const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
-  const importLogs = importLogsData as ImportLog[]; // Cast para asegurar el tipo
+  const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID, undefined, false); // Manual
+  const importLogs = importLogsData as ImportLog[];
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -60,7 +51,12 @@ const Configuracion = () => {
   const { data: clinicConfig, isLoading: loadingClinicConfig } = useGetConfiguration();
   const updateClinicMutation = useUpdateConfiguration();
 
-  // Cargar configuración WAHA inicial en el estado local
+  // --- Estado y Hooks para Plantillas de Marketing (NUEVO) ---
+  const { data: templates, create: createTemplate, update: updateTemplate, remove: deleteTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
+  const [editingTemplate, setEditingTemplate] = useState<Partial<Template> | null>(null);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  // Cargar configuración WAHA inicial
   useEffect(() => {
     if (configs.length > 0) {
       setWahaSettings(configs[0]);
@@ -74,15 +70,16 @@ const Configuracion = () => {
 
   // Guardar configuración WAHA
   const handleSaveWahaConfig = async () => {
-    if (!configs[0]?.$id) return;
+    if (!configs[0]?.$id) {
+        toast({ title: 'Error', description: 'No se encontró el documento de configuración WAHA para actualizar.', variant: 'destructive' });
+        return;
+    }
     setIsSavingWaha(true);
     try {
-      // Usamos LipooutUserInput para asegurar que no enviamos metadatos
       const dataToSave: LipooutUserInput<WahaConfig> = {
-          apiUrl: wahaSettings.apiUrl || '', // Asegurar que es string
+          apiUrl: wahaSettings.apiUrl || '',
           apiKey: wahaSettings.apiKey,
           session: wahaSettings.session,
-          // Añadir resto de campos si existen en el estado y son editables
       };
       await updateWahaConfig(configs[0].$id, dataToSave);
       toast({ title: 'Configuración WAHA guardada' });
@@ -100,14 +97,20 @@ const Configuracion = () => {
     setLoadingSessions(true);
     try {
       const result = await functions.createExecution('getWahaSessionsFunction', '{}', false);
-      if (result.status === 'completed') {
-        const responseData = JSON.parse(result.responseBody);
-        setSessions(responseData);
-      } else {
-        throw new Error(result.responseBody || 'Error desconocido');
-      }
+      // El JSON parseado es directamente el array de sesiones
+      setSessions(JSON.parse(result.responseBody));
     } catch (error) {
-      toast({ title: 'Error al obtener sesiones', description: (error as Error).message, variant: 'destructive' });
+      const errorBody = (error as any).response?.body;
+      let description = (error as Error).message;
+      if (errorBody) {
+          try {
+              const parsedBody = JSON.parse(errorBody);
+              description = parsedBody.error || errorBody;
+          } catch (e) {
+              description = errorBody;
+          }
+      }
+      toast({ title: 'Error al obtener sesiones', description, variant: 'destructive' });
       setSessions([]);
     } finally {
       setLoadingSessions(false);
@@ -131,7 +134,6 @@ const Configuracion = () => {
       await storage.createFile(IMPORT_BUCKET_ID, 'unique()', selectedFile);
       toast({ title: 'Archivo subido', description: 'La importación se procesará en segundo plano.' });
       setSelectedFile(null);
-      // Opcional: Recargar logs tras un delay
       setTimeout(reloadLogs, 5000);
     } catch (error) {
       toast({ title: 'Error al subir archivo', description: (error as Error).message, variant: 'destructive' });
@@ -154,6 +156,77 @@ const Configuracion = () => {
         }
   };
 
+  // --- Lógica de Plantillas (NUEVO) ---
+  const handleTemplateChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (!editingTemplate) return;
+      const { name, value } = e.target;
+      if (name === 'variables') {
+          setEditingTemplate({ ...editingTemplate, variables: value.split(',').map(v => v.trim()).filter(Boolean) });
+      } else {
+          setEditingTemplate({ ...editingTemplate, [name]: value });
+      }
+  };
+
+  const handleSaveTemplate = async () => {
+      if (!editingTemplate) return;
+
+      const validation = templateSchema.safeParse(editingTemplate);
+      if (!validation.success) {
+          toast({ title: "Error de validación", description: validation.error.errors[0].message, variant: 'destructive' });
+          return;
+      }
+      
+      setIsSavingTemplate(true);
+      try {
+          const dataToSave: LipooutUserInput<Template> = {
+              name: validation.data.name,
+              text: validation.data.text,
+              variables: validation.data.variables || [],
+          };
+
+          if (editingTemplate.$id) {
+              await updateTemplate(editingTemplate.$id, dataToSave);
+              toast({ title: "Plantilla actualizada" });
+          } else {
+              await createTemplate(dataToSave);
+              toast({ title: "Plantilla creada" });
+          }
+          setEditingTemplate(null);
+          reloadTemplates();
+      } catch (e) {
+          toast({ title: "Error al guardar plantilla", description: (e as Error).message, variant: 'destructive' });
+      } finally {
+          setIsSavingTemplate(false);
+      }
+  };
+
+  const handleNewTemplate = () => {
+      setEditingTemplate({ name: '', text: '', variables: [] });
+  };
+
+  const handleEditTemplate = (template: Template & Models.Document) => {
+      setEditingTemplate(template);
+  };
+  
+  const handleDeleteTemplate = async (id: string) => {
+      if (window.confirm('¿Estás seguro de que quieres eliminar esta plantilla?')) {
+          try {
+              await deleteTemplate(id);
+              toast({ title: "Plantilla eliminada" });
+              reloadTemplates();
+          } catch (e) {
+              toast({ title: "Error al eliminar", description: (e as Error).message, variant: 'destructive' });
+          }
+      }
+  };
+  
+  // Recargar logs al entrar en la pestaña
+  const onTabChange = (value: string) => {
+      if (value === 'import' && importLogs.length === 0) {
+          reloadLogs();
+      }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -162,11 +235,12 @@ const Configuracion = () => {
         <p className="text-muted-foreground">Ajustes generales del sistema.</p>
        </div>
 
-      <Tabs defaultValue="waha">
-        <TabsList className="mb-4 grid w-full grid-cols-3"> {/* Ajustado para 3 pestañas */}
+      <Tabs defaultValue="clinica" onValueChange={onTabChange}>
+        <TabsList className="mb-4 grid w-full grid-cols-4"> {/* Ajustado para 4 pestañas */}
           <TabsTrigger value="clinica"> <Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
           <TabsTrigger value="waha"> <Server className="w-4 h-4 mr-2"/> WhatsApp (WAHA)</TabsTrigger>
-          <TabsTrigger value="import"> <Upload className="w-4 h-4 mr-2"/> Importar Clientes (CSV)</TabsTrigger>
+          <TabsTrigger value="import"> <Upload className="w-4 h-4 mr-2"/> Importar Clientes</TabsTrigger>
+          <TabsTrigger value="plantillas"> <MessageSquare className="w-4 h-4 mr-2"/> Plantillas</TabsTrigger>
         </TabsList>
 
         {/* --- Contenido Pestaña Clínica --- */}
@@ -211,12 +285,11 @@ const Configuracion = () => {
                                     <Input id="session" name="session" value={wahaSettings.session || ''} onChange={handleWahaChange} />
                                 </div>
                             </div>
-                             {/* TODO: Añadir resto de campos de WahaConfig si es necesario (delays, etc.) */}
-                             <Button onClick={handleSaveWahaConfig} disabled={isSavingWaha}>
+                             <Button onClick={handleSaveWahaConfig} disabled={isSavingWaha || !configs[0]?.$id}>
                                 {isSavingWaha ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Guardar
                              </Button>
 
-                            <Separator className="my-6"/> {/* Separador añadido */}
+                            <Separator className="my-6"/>
 
                              <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-medium">Estado de Sesiones WAHA</h3>
@@ -261,7 +334,7 @@ const Configuracion = () => {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between"> {/* Ajuste para botón */}
+              <CardHeader className="flex flex-row items-center justify-between">
                 <div className="space-y-1">
                   <CardTitle>Historial de Importaciones</CardTitle>
                   <CardDescription>Últimas importaciones realizadas.</CardDescription>
@@ -295,7 +368,6 @@ const Configuracion = () => {
                             {log.successfulImports}/{log.totalProcessed}
                             {log.errors && log.errors.length > 0 && <span className="text-destructive"> ({log.errors.length} err.)</span>}
                           </TableCell>
-                          {/* Opcional: Añadir botón para ver errores */}
                         </TableRow>
                       )) : (
                           <TableRow>
@@ -309,6 +381,84 @@ const Configuracion = () => {
             </Card>
           </div>
         </TabsContent>
+        
+        {/* --- Contenido Pestaña Plantillas (NUEVO) --- */}
+        <TabsContent value="plantillas">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                   <div>
+                       <CardTitle>Gestor de Plantillas</CardTitle>
+                       <CardDescription>Crea y edita las plantillas para las campañas de marketing.</CardDescription>
+                   </div>
+                   <Button onClick={handleNewTemplate}><Plus className="w-4 h-4 mr-2"/> Nueva Plantilla</Button>
+                </CardHeader>
+                <CardContent>
+                    {loadingTemplates ? <LoadingSpinner /> : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Formulario de Edición */}
+                            <div>
+                                {editingTemplate ? (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>{editingTemplate.$id ? 'Editar Plantilla' : 'Nueva Plantilla'}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div>
+                                                <Label htmlFor="name">Nombre</Label>
+                                                <Input id="name" name="name" value={editingTemplate.name || ''} onChange={handleTemplateChange} />
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="text">Texto de la Plantilla</Label>
+                                                <Textarea id="text" name="text" value={editingTemplate.text || ''} onChange={handleTemplateChange} rows={6} />
+                                                <p className="text-xs text-muted-foreground mt-1">Usa `{"{{name}}"}`, `{"{{var1}}"}`, `{"{{var2}}"}`, etc. para variables.</p>
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="variables">Variables (separadas por coma)</Label>
+                                                <Input id="variables" name="variables" value={editingTemplate.variables?.join(', ') || ''} onChange={handleTemplateChange} />
+                                                <p className="text-xs text-muted-foreground mt-1">Ej: var1, var2, var3</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button onClick={handleSaveTemplate} disabled={isSavingTemplate}>
+                                                    {isSavingTemplate ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+                                                    Guardar
+                                                </Button>
+                                                <Button variant="outline" onClick={() => setEditingTemplate(null)}>Cancelar</Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                                        <p>Selecciona una plantilla para editarla o crea una nueva.</p>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Lista de Plantillas */}
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-medium">Plantillas Guardadas</h3>
+                                {templates.map(template => (
+                                    <Card key={template.$id} className="flex items-center justify-between p-4">
+                                        <div>
+                                            <p className="font-semibold">{template.name}</p>
+                                            <p className="text-sm text-muted-foreground truncate max-w-xs">{template.text}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" onClick={() => handleEditTemplate(template)}>Editar</Button>
+                                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTemplate(template.$id)}>
+                                                <Trash className="w-4 h-4"/>
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                ))}
+                                {templates.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">No hay plantillas creadas.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   );

@@ -1,118 +1,75 @@
 import { Models } from 'appwrite';
 
-// Interfaz base para todos los documentos de Lipoout
-export interface LipooutDocument extends Models.Document {
-  // Aquí podemos añadir campos comunes si los hubiera
-}
-
-// Helper type to remove Appwrite metadata for creation/update inputs
-// Adjusted the helper type to be more flexible
-export type LipooutUserInput<T> = Omit<T, keyof Models.Document>;
-
-
-// --- Tipos Core Lipoout ---
-export * from './cliente.types'; // Verificado
+// --- Tipos existentes de AGENDA ---
+export * from './cliente.types';
+export * from './empleado.types';
 export * from './articulo.types';
 export * from './familia.types';
-export * from './empleado.types';
 export * from './cita.types';
-export * from './factura.types'; // <-- Añadido
-// (Próximamente se añadirán: Proveedor, Recurso)
+export * from './factura.types';
 
-// Exportar tipos Input específicos (Si se definen en los archivos correspondientes)
-// export type { CitaInput } from './cita.types'; // Example if defined
-// export type { ArticuloInput } from './articulo.types'; // Example if defined
-// export type { CreateFacturaInput, UpdateFacturaInput } from './factura.types'; // Example if defined
+// --- Tipos importados de MAIN (Marketing) ---
 
-
-// --- Tipos Módulo WhatsApp (Migrados de la PoC) ---
-
-// Definimos MessageLog aquí
-export interface MessageLog extends LipooutDocument { // Inherit from LipooutDocument
-  clientId: string;
-  clientName?: string;
-  timestamp: string;
-  status: 'sent' | 'failed' | 'skipped';
-  error?: string;
-  campaignId?: string;
-}
-
-
-export interface WhatsAppFunctionPayload {
-  recipient: string;
-  message: string;
-  imageUrl?: string;
-}
-
-export interface WhatsAppFunctionResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-}
-
-export interface Template extends LipooutDocument {
-  name: string;
-  messages: string[];
-  imageUrls: string[];
-}
-
-export interface Campaign extends LipooutDocument {
-  name: string;
-  templateId: string;
-  filters?: {
-    edadMin?: number;
-    edadMax?: number;
-    facturacionMin?: number;
-    facturacionMax?: number;
-    intereses?: string[];
-  };
-  scheduledDate?: string;
-  scheduledTime?: string;
-  selectedMessageIndex?: number;
-  selectedImageIndex?: number;
-  status: 'pending' | 'sent' | 'scheduled' | 'failed' | 'sending' | 'completed_with_errors';
-  audienceCount: number;
-  createdAt: string; // Mantenido como string ISO
-  startTime?: string;
-  endTime?: string;
-}
-
-export interface WahaConfig extends LipooutDocument {
+// Configuración de WAHA (ya existe en Agenda, pero la estandarizamos)
+export interface WahaConfig extends Models.Document {
   apiUrl: string;
   apiKey?: string;
   session?: string;
-  minDelayMs?: number;
-  maxDelayMs?: number;
-  batchSizeMin?: number;
-  batchSizeMax?: number;
-  batchDelayMsMin?: number;
-  batchDelayMsMax?: number;
-  adminPhoneNumbers?: string[];
-  notificationInterval?: number;
-  startTime?: string;
-  endTime?: string;
 }
 
-// --- Tipo Configuración Clínica (AÑADIDO) ---
-export interface Configuracion extends LipooutDocument {
-  nombreClinica?: string;
-  direccion?: string;
-  cif?: string;
-  emailContacto?: string;
-  telefonoContacto?: string;
-  serieFactura?: string;
-  seriePresupuesto?: string;
-  ultimoNumeroFactura: number; // Campo requerido según el setup
-  ultimoNumeroPresupuesto: number; // Campo requerido según el setup
-  tipoIvaPredeterminado?: number;
+// Plantillas de mensajes
+export interface Template extends Models.Document {
+  name: string;
+  text: string;
+  variables: string[];
 }
 
-// --- Tipo para Logs de Importación (AÑADIDO) ---
-export interface ImportLog extends LipooutDocument {
-  timestamp: string;
-  filename: string;
-  successfulImports: number;
-  totalProcessed: number;
-  errors?: string[];
-  status: 'completed' | 'completed_with_errors' | 'failed';
+// Campañas de marketing
+export interface Campaign extends Models.Document {
+  name: string;
+  templateId: string;
+  // Almacena los IDs de los clientes de la colección 'clientes'
+  clientIds: string[]; 
+  sendTime: string; // ISO string
+  status: 'pending' | 'sent' | 'failed';
+}
+
+// Log de mensajes individuales
+export interface MessageLog extends Models.Document {
+  campaignId: string;
+  // ID del cliente de la colección 'clientes'
+  clientId: string; 
+  phone: string;
+  status: 'sent' | 'failed';
+  timestamp: string; // ISO string
+  error?: string;
+  wahaMessageId?: string;
+}
+
+// Progreso de la campaña (para la UI)
+export interface CampaignProgress extends Models.Document {
+    campaignId: string;
+    totalMessages: number;
+    sentMessages: number;
+    failedMessages: number;
+    status: 'processing' | 'completed' | 'failed';
+}
+
+// Tipo genérico para evitar enviar metadatos de Appwrite
+// (Ya existe en Agenda, solo nos aseguramos de que esté)
+export type LipooutUserInput<T> = Omit<T, keyof Models.Document | '$id'>;
+
+// Tipo para el documento de configuración de la clínica
+// (Ya existe en Agenda)
+export interface Configuracion extends Models.Document {
+  nombreClinica: string;
+  direccion: string;
+  cif: string;
+  emailContacto: string;
+  telefonoContacto: string;
+  serieFactura: string;
+  seriePresupuesto: string;
+  ultimoNumeroFactura: number;
+  ultimoNumeroPresupuesto: number;
+  tipoIvaPredeterminado: number;
 }
