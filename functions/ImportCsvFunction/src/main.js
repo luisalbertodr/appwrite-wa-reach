@@ -21,7 +21,7 @@ module.exports = async ({ req, res, log, error }) => {
     // ---------------------------
 
     const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
-    const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
+    const IMPORT_BUCKET_ID = 'lipoout';
 
     let successfulImports = 0;
     let totalProcessed = 0;

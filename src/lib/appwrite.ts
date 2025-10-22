@@ -39,9 +39,8 @@ export const WAHA_CONFIG_COLLECTION_ID = 'config'; // Config de sesiones WAHA (s
 export const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
 
 // === BUCKETS (Almacenamiento) ===
-export const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b'; // (Mantenido de la PoC para CSV)
-// Añadir buckets para Lipoout si es necesario (ej. fotos clientes, documentos)
-// export const CLIENTES_BUCKET_ID = 'documentos_clientes';
+export const BUCKET_ID = 'lipoout'; // Bucket principal de Lipoout
+export const IMPORT_BUCKET_ID = 'lipoout'; // Bucket para importación de CSV (usa el mismo bucket principal)
 
 // === COLECCIONES DEPRECADAS (de la PoC) ===
 // Se reemplaza por CLIENTES_COLLECTION_ID ('clientes')
