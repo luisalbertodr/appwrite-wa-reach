@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Upload, Loader2, Save, Settings, Server } from 'lucide-react';
+import { Upload, Loader2, Save, Settings, Server } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
 import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration';
@@ -18,7 +18,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   CONFIG_COLLECTION_ID,
   IMPORT_LOGS_COLLECTION_ID,
-  databases,
   DATABASE_ID_WAHA,
   storage,
   IMPORT_BUCKET_ID,
@@ -217,14 +216,18 @@ const Configuracion = () => {
                                 </Button>
                              </div>
                              {loadingSessions ? <LoadingSpinner /> : (
-                                <ul className="list-disc pl-5 space-y-1">
-                                    {sessions.length > 0 ? sessions.map(s => (
-                                        <li key={s.name}>
-                                            <span className="font-medium">{s.name}:</span>{' '}
-                                            <Badge variant={s.status === 'STARTED' ? 'default' : 'outline'}>{s.status}</Badge>
-                                        </li>
-                                    )) : <p className="text-muted-foreground">No se encontraron sesiones o error al cargar.</p>}
-                                </ul>
+                                sessions.length > 0 ? (
+                                    <ul className="list-disc pl-5 space-y-1">
+                                        {sessions.map(s => (
+                                            <li key={s.name}>
+                                                <span className="font-medium">{s.name}:</span>{' '}
+                                                <Badge variant={s.status === 'STARTED' ? 'default' : 'outline'}>{s.status}</Badge>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground">No se encontraron sesiones o error al cargar.</p>
+                                )
                              )}
                         </>
                     )}

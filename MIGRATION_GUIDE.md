@@ -5,9 +5,11 @@
 Esta guía documenta la integración de las funcionalidades de la rama **Agenda** (commit `ac1d37f` - "Migration") en la rama **main**, manteniendo **100% intacta** la funcionalidad original de WhatsApp Marketing.
 
 ### Principio Fundamental
+
 **NO se modifica nada de la funcionalidad actual de main, SOLO se añaden nuevas funcionalidades.**
 
 ### Bases de Datos
+
 - **DATABASE_ID_WAHA**: `68d78cb20028fac621d4` - Base de datos original (WhatsApp Marketing)
 - **DATABASE_ID**: `68b1d7530028045d94d3` - Base de datos Lipoout (nuevas funcionalidades)
 
@@ -18,6 +20,7 @@ Esta guía documenta la integración de las funcionalidades de la rama **Agenda*
 ### Archivos CREADOS
 
 #### 1. **src/pages/MarketingWaha.tsx**
+
 - **Origen**: Renombrado desde `src/pages/Index.tsx` de main
 - **Propósito**: Preserva 100% la funcionalidad original de marketing WhatsApp
 - **Ruta**: `/marketing-waha`
@@ -27,8 +30,10 @@ Esta guía documenta la integración de las funcionalidades de la rama **Agenda*
   - Funcionalidad idéntica a la página original `/` de main
 
 #### 2. **src/types/configuracion.types.ts**
+
 - **Propósito**: Define el tipo `Configuracion` para la configuración de la clínica
 - **Contenido**:
+
 ```typescript
 export interface Configuracion {
   nombreClinica: string;
@@ -45,9 +50,11 @@ export interface Configuracion {
 ```
 
 #### 3. Nuevos archivos de funcionalidad Lipoout
+
 Los siguientes archivos fueron añadidos desde el commit Migration:
 
 **Páginas:**
+
 - `src/pages/Dashboard.tsx` - Nueva home en `/`
 - `src/pages/Agenda.tsx` - Gestión de citas
 - `src/pages/Clientes.tsx` - Gestión de clientes Lipoout
@@ -59,6 +66,7 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 - `src/pages/NotFound.tsx` - Página 404
 
 **Componentes:**
+
 - `src/components/layout/AppLayout.tsx` - Layout principal con navegación
 - `src/components/layout/Header.tsx` - Cabecera de aplicación
 - `src/components/layout/BottomNavigation.tsx` - Navegación inferior móvil
@@ -73,6 +81,7 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 - `src/components/AuthForm.tsx` - Formulario de autenticación
 
 **Hooks:**
+
 - `src/hooks/useAgenda.ts` - Hook para gestión de agenda
 - `src/hooks/useEmpleados.ts` - Hook para empleados
 - `src/hooks/useArticulos.ts` - Hook para artículos
@@ -81,6 +90,7 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 - `src/hooks/useDebounce.ts` - Hook para debounce
 
 **Servicios:**
+
 - `src/services/appwrite-agenda.ts` - Operaciones de agenda en Appwrite
 - `src/services/appwrite-empleados.ts` - Operaciones de empleados
 - `src/services/appwrite-articulos.ts` - Operaciones de artículos
@@ -88,6 +98,7 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 - `src/services/appwrite-configuration.ts` - Operaciones de configuración
 
 **Tipos:**
+
 - `src/types/cita.types.ts` - Tipos de citas
 - `src/types/empleado.types.ts` - Tipos de empleados
 - `src/types/articulo.types.ts` - Tipos de artículos
@@ -95,22 +106,27 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 - `src/types/familia.types.ts` - Tipos de familias
 
 **Stores:**
+
 - `src/stores/tpvStore.ts` - Store Zustand para TPV
 
 **Bibliotecas:**
+
 - `src/lib/validators.ts` - Esquemas Zod de validación
 - `src/lib/appwrite_schema.ts` - Esquemas de Appwrite
 
 ### Archivos MODIFICADOS
 
 #### 1. **src/App.tsx**
+
 **Cambios principales:**
+
 - Implementación de enrutamiento híbrido con HashRouter
 - Rutas Lipoout con AppLayout wrapper
 - Ruta MarketingWaha sin wrapper (preserva funcionalidad original)
 - Dashboard como nueva home en `/`
 
 **Estructura de rutas:**
+
 ```typescript
 <Route path="/" element={<AppLayout />}>
   <Route index element={<Dashboard />} />
@@ -128,7 +144,9 @@ Los siguientes archivos fueron añadidos desde el commit Migration:
 ```
 
 #### 2. **src/lib/appwrite.ts**
+
 **Cambios críticos:**
+
 - Añadida constante `DATABASE_ID_WAHA` para base de datos original
 - Constante `DATABASE_ID` apunta a base de datos Lipoout
 - Ambas bases de datos coexisten en la misma configuración
@@ -139,7 +157,9 @@ export const DATABASE_ID = '68b1d7530028045d94d3';
 ```
 
 #### 3. **src/types/index.ts**
+
 **Cambios:**
+
 - Exportación de `configuracion.types.ts`
 - Añadidos tipos `MessageLog` y `CampaignProgress`:
 
@@ -159,43 +179,57 @@ export interface CampaignProgress extends Models.Document {
   currentClientPhone: string;
 }
 ```
+
 - Mantiene separación clara entre tipos WAHA y Lipoout
 - Export adicional: `export * from './configuracion.types';`
 
 #### 4. **src/pages/Configuracion.tsx**
+
 **Cambios:**
+
 - Estructura de 3 pestañas: `clinica` (nueva), `waha` (original), `import` (original)
 - Pestaña clínica usa DATABASE_ID (Lipoout)
 - Pestañas waha e import usan DATABASE_ID_WAHA (original)
 
 #### 5. **src/components/CampaignsTab.tsx**
+
 **Cambios:**
+
 - Todas las referencias de `DATABASE_ID` cambiadas a `DATABASE_ID_WAHA`
 - Preserva funcionalidad 100% original de campañas WhatsApp
 
 #### 6. **src/pages/Marketing.tsx**
+
 **Cambios:**
+
 - Corregido cast TypeScript en línea 347: `log as unknown as MessageLog`
 - Usa tipos híbridos: Cliente (compatible con ambas BD), MessageLog, CampaignProgress
 
 #### 7. **src/main.tsx**
+
 **Cambios menores:**
+
 - Importaciones actualizadas para nuevos componentes
 - Configuración React Query mantenida
 
 #### 8. **src/index.css**
+
 **Cambios:**
+
 - Estilos adicionales para nuevos componentes Lipoout
 - Estilos originales preservados intactos
 
 #### 9. **package.json**
+
 **Dependencias añadidas:**
+
 - Bibliotecas para funcionalidad Lipoout (React PDF, Zustand, etc.)
 - Todas las dependencias originales preservadas
 
 ### Archivos ELIMINADOS
 
 #### **src/pages/Index.tsx**
+
 - **Motivo**: Reemplazado por `src/pages/MarketingWaha.tsx`
 - **Funcionalidad preservada**: 100% en MarketingWaha.tsx
 
@@ -228,7 +262,9 @@ El sistema ahora opera con **dos bases de datos separadas** en Appwrite:
 ## 🛣️ Estructura de Rutas
 
 ### Rutas con AppLayout (Lipoout)
+
 Estas rutas usan el layout completo con navegación:
+
 - `/` - Dashboard (nueva home)
 - `/clientes` - Gestión de clientes
 - `/agenda` - Gestión de citas
@@ -240,10 +276,13 @@ Estas rutas usan el layout completo con navegación:
 - `/marketing` - Marketing híbrido
 
 ### Rutas Standalone (WAHA original)
+
 Estas rutas NO usan AppLayout:
+
 - `/marketing-waha` - Marketing WhatsApp original (preserva 100% funcionalidad)
 
 ### Ruta 404
+
 - `*` - NotFound.tsx
 
 ---
@@ -282,6 +321,7 @@ npm run build
 ### 2. Variables de Entorno
 
 Verificar que `.env` contiene:
+
 ```env
 VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
 VITE_APPWRITE_PROJECT_ID=tu_project_id
@@ -309,6 +349,7 @@ npm run deploy
 ### Checklist de Pruebas
 
 #### Funcionalidad WAHA Original (DATABASE_ID_WAHA)
+
 - [ ] Acceder a `/marketing-waha`
 - [ ] Verificar carga de clientes desde DB WAHA
 - [ ] Crear una campaña de prueba
@@ -318,6 +359,7 @@ npm run deploy
 - [ ] Importar CSV de prueba (pestaña import)
 
 #### Funcionalidad Lipoout Nueva (DATABASE_ID)
+
 - [ ] Acceder a `/` (Dashboard)
 - [ ] Navegar a `/clientes` - crear/editar/eliminar cliente
 - [ ] Navegar a `/agenda` - crear/editar/eliminar cita
@@ -329,12 +371,14 @@ npm run deploy
 - [ ] Comprobar PDF de facturas se generan correctamente
 
 #### Marketing Híbrido
+
 - [ ] Acceder a `/marketing`
 - [ ] Verificar que muestra clientes de ambas bases de datos
 - [ ] Crear campaña y verificar que funciona correctamente
 - [ ] Comprobar que los logs se guardan en DATABASE_ID_WAHA
 
 #### Navegación y Layout
+
 - [ ] Verificar navegación superior en desktop
 - [ ] Verificar navegación inferior en móvil
 - [ ] Probar todos los enlaces del menú
@@ -346,6 +390,7 @@ npm run deploy
 ## 🔑 Puntos Críticos de la Integración
 
 ### 1. Separación de Bases de Datos
+
 **CRÍTICO**: Nunca confundir las dos bases de datos. Cada funcionalidad debe usar su base de datos correspondiente.
 
 ```typescript
@@ -359,6 +404,7 @@ databases.listDocuments(DATABASE_ID_WAHA, 'clients');
 ```
 
 ### 2. Estructura de Rutas
+
 **CRÍTICO**: Las rutas Lipoout DEBEN estar dentro del elemento AppLayout, mientras que MarketingWaha NO debe tenerlo.
 
 ```typescript
@@ -371,10 +417,13 @@ databases.listDocuments(DATABASE_ID_WAHA, 'clients');
 ```
 
 ### 3. Tipos Compartidos
+
 Algunos tipos como `Cliente` son compartidos entre ambas funcionalidades, pero cada una lee de su propia base de datos.
 
 ### 4. Configuración
+
 La página Configuracion.tsx ahora tiene 3 pestañas:
+
 - **clinica**: Configuración nueva (DATABASE_ID)
 - **waha**: Configuración WAHA original (DATABASE_ID_WAHA)
 - **import**: Importación CSV original (DATABASE_ID_WAHA)
@@ -398,18 +447,23 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 ## 🐛 Solución de Problemas
 
 ### Error: "Cannot find module '@/types/configuracion.types'"
+
 **Solución**: Verificar que existe `src/types/configuracion.types.ts` y está exportado en `src/types/index.ts`
 
 ### Error: "Database not found"
+
 **Solución**: Verificar las variables de entorno y que las constantes DATABASE_ID y DATABASE_ID_WAHA están correctamente definidas.
 
 ### Rutas no funcionan
+
 **Solución**: Verificar que se está usando HashRouter y que las rutas están correctamente anidadas en App.tsx
 
 ### MarketingWaha muestra layout de Lipoout
+
 **Solución**: Verificar que la ruta `/marketing-waha` está FUERA del elemento AppLayout en App.tsx
 
 ### Clientes no se cargan en Marketing
+
 **Solución**: Verificar que Marketing.tsx está haciendo fetch de ambas bases de datos correctamente.
 
 ---
@@ -417,6 +471,7 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 ## ✅ Resumen de la Integración
 
 ### Lo que se PRESERVÓ (100% intacto)
+
 - ✅ Funcionalidad completa de WhatsApp Marketing
 - ✅ Base de datos WAHA original (68d78cb20028fac621d4)
 - ✅ Componentes CampaignsTab, WhatsappConfigTab, ImportClientsTab
@@ -425,6 +480,7 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 - ✅ Logs de mensajes
 
 ### Lo que se AÑADIÓ (nuevas funcionalidades)
+
 - ✅ Base de datos Lipoout (68b1d7530028045d94d3)
 - ✅ Sistema de gestión clínica completo
 - ✅ Dashboard nuevo como home
@@ -437,6 +493,7 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 - ✅ Marketing híbrido (accede a ambas bases de datos)
 
 ### Cambios en Enrutamiento
+
 - ✅ `/` → Dashboard (antes era marketing WAHA)
 - ✅ `/marketing-waha` → Marketing WAHA original (antes era `/`)
 - ✅ Todas las rutas Lipoout con AppLayout
@@ -447,10 +504,12 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 ## 📚 Recursos Adicionales
 
 ### Documentación de Appwrite
+
 - [Appwrite Databases](https://appwrite.io/docs/products/databases)
 - [Appwrite Collections](https://appwrite.io/docs/products/databases/collections)
 
 ### Dependencias Principales
+
 - [React Router v6](https://reactrouter.com/)
 - [React Query](https://tanstack.com/query/latest)
 - [Zod](https://zod.dev/)
@@ -464,6 +523,7 @@ La página Configuracion.tsx ahora tiene 3 pestañas:
 La integración se ha completado exitosamente manteniendo **100% intacta** la funcionalidad original de WhatsApp Marketing mientras se añaden todas las nuevas funcionalidades de gestión clínica Lipoout.
 
 **Próximos pasos recomendados:**
+
 1. Ejecutar pruebas completas según el checklist
 2. Realizar commit de todos los cambios
 3. Hacer merge a main si todo funciona correctamente

@@ -1,5 +1,4 @@
-import { databases, DATABASE_ID, CLIENTES_COLLECTION_ID } from '@/lib/appwrite';
-import { Cliente, LipooutUserInput } from '@/types';
+import { Cliente } from '@/types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Models } from 'appwrite';
 // (NUEVO) Importamos las funciones del servicio

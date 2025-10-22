@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, ChangeEvent, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetClientes, useUpdateCliente } from '@/hooks/useClientes';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
 // Aseguramos importar todos los tipos necesarios desde index.ts
@@ -9,33 +9,20 @@ import { Label } from '@/components/ui/label';
 
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Filter, Download, Loader2, Search, ImagePlus, Save, Edit, FileText, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   TEMPLATES_COLLECTION_ID,
   CAMPAIGNS_COLLECTION_ID,
   WAHA_CONFIG_COLLECTION_ID,
-  client,
-  databases,
-  DATABASE_ID,
-  MESSAGE_LOGS_COLLECTION_ID,
-  storage,
-  IMPORT_BUCKET_ID,
-  CAMPAIGN_PROGRESS_COLLECTION_ID,
   // CLIENTES_COLLECTION_ID ya no se usa directamente aquí
 } from '@/lib/appwrite';
-import { Functions, Query, ID, Models } from 'appwrite';
-import Papa from 'papaparse';
+import { Models } from 'appwrite';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { calculateAge } from '@/lib/validators'; // Asumimos que calculateAge está en validators
 
-const functions = new Functions(client);
 
 interface Progress {
   sent: number;
@@ -49,17 +36,7 @@ interface CampaignProgress extends Models.Document {
   currentClientPhone: string;
 }
 
-const FILTERS_STORAGE_KEY_CAMPAIGNS = 'campaign-filters';
-const CAMPAIGN_TIMEOUT_MS = 3600000;
 
-const statusTranslations: { [key: string]: string } = {
-    pending: 'Pendiente',
-    scheduled: 'Programada',
-    sending: 'Enviando',
-    sent: 'Enviada',
-    failed: 'Fallida',
-    paused: 'Pausada',
-};
 
 // Definimos el tipo para el estado de la plantilla
 type TemplateInput = LipooutUserInput<Template>;
@@ -70,15 +47,13 @@ const initialTemplateState: TemplateInput = {
 
 
 const Marketing = () => {
-  const [filters, setFilters] = useState({ edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: '', sexo: '' });
+  const [_filters, _setFilters] = useState({ edadMin: '', edadMax: '', facturacionMin: '', facturacionMax: '', intereses: '', sexo: '' });
   const [searchQuery, setSearchQuery] = useState("");
-  const { data: clientesData, isLoading: loadingClients, refetch: reloadClients } = useGetClientes(searchQuery);
+  const { data: clientesData } = useGetClientes(searchQuery);
   const { mutateAsync: updateClientMutation } = useUpdateCliente();
-  const clientes: Cliente[] = clientesData || [];
-  const total = clientes.length;
 
-  const { data: templates, create: createTemplate, update: updateTemplate, loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
-  const { data: campaigns, create: createCampaign, update: updateCampaign, loading: loadingCampaigns, reload: reloadCampaigns } = useAppwriteCollection<Campaign>(CAMPAIGNS_COLLECTION_ID);
+  const { loading: loadingTemplates, reload: reloadTemplates } = useAppwriteCollection<Template>(TEMPLATES_COLLECTION_ID);
+  const { loading: loadingCampaigns, reload: reloadCampaigns } = useAppwriteCollection<Campaign>(CAMPAIGNS_COLLECTION_ID);
   const { data: configs } = useAppwriteCollection<WahaConfig>(WAHA_CONFIG_COLLECTION_ID);
   const { toast } = useToast();
 
@@ -100,12 +75,8 @@ const Marketing = () => {
   const [showLogDialog, setShowLogDialog] = useState(false);
   const [logContent, setLogContent] = useState<Models.Document[]>([]);
 
-  const wahaConfig = useMemo<WahaConfig | null>(() => (configs.length > 0 ? configs[0] : null), [configs]);
 
-  const translateStatus = (status: string) => statusTranslations[status] || status;
 
-  const estimatedDuration = useMemo(() => { /* ... Lógica existente ... */ return 0; }, [wahaConfig, selectedClients.size]);
-  const handleApplyFilters = useCallback(() => { /* ... Lógica existente ... */ }, [filters]);
 
   useEffect(() => { /* ... Lógica existente ... */ }, []);
   useEffect(() => { /* ... Lógica existente ... */ }, []);
@@ -113,110 +84,11 @@ const Marketing = () => {
   useEffect(() => { /* ... Lógica existente ... */ }, [activeCampaignId, progress.total, toast, reloadCampaigns]);
 
 
-  const handleSaveTemplate = async () => {
-    // El estado 'newTemplate' ya es del tipo correcto (TemplateInput)
-    const finalTemplate: TemplateInput = {
-      ...newTemplate,
-      messages: newTemplate.messages.filter(m => m.trim() !== ''),
-      imageUrls: newTemplate.imageUrls.filter(u => u.trim() !== '')
-    };
-
-    if (!finalTemplate.name || (finalTemplate.messages.length === 0 && finalTemplate.imageUrls.length === 0)) {
-      toast({ title: 'Error', description: 'La plantilla debe tener un nombre y al menos un mensaje o imagen.', variant: 'destructive'});
-      return;
-    }
-
-    try {
-      if (selectedTemplateId) {
-        await updateTemplate(selectedTemplateId, finalTemplate);
-        toast({ title: 'Plantilla actualizada' });
-      } else {
-        await createTemplate(finalTemplate);
-        toast({ title: 'Plantilla creada' });
-      }
-      setNewTemplate(initialTemplateState); // Reiniciar al estado inicial
-      setSelectedTemplateId('');
-      reloadTemplates();
-    } catch(e) { toast({ title: 'Error al guardar plantilla', variant: 'destructive' }); }
-  };
-
-  const handleLoadTemplate = (templateId: string) => {
-    const template = templates.find(t => t.$id === templateId);
-    if (template) {
-      setSelectedTemplateId(template.$id!);
-      // Mapeamos los campos del documento al tipo Input para el estado
-      setNewTemplate({
-        name: template.name,
-        messages: [...template.messages, '', '', '', ''].slice(0, 4),
-        imageUrls: [...template.imageUrls, '', '', '', ''].slice(0, 4),
-      });
-    }
-  };
-
-  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>, index: number) => { /* ... Lógica existente ... */ };
-  const handleSelectClient = (client: Cliente, isSelected: boolean) => { /* ... Lógica existente ... */ };
-  const handleSelectAll = (isSelected: boolean) => { /* ... Lógica existente ... */ };
-  const areAllFilteredSelected = clientes.length > 0 && clientes.every(client => selectedClients.has(client.$id!));
-
-  const startCampaign = async () => {
-     const selectedTemplate = templates.find(t => t.$id === selectedTemplateId);
-     const finalAudience = Array.from(selectedClients.values());
-
-     if (!selectedTemplate || finalAudience.length === 0 || !wahaConfig) {
-       toast({ title: 'Error', description: 'Selecciona una plantilla y al menos un cliente.', variant: 'destructive' });
-       return;
-     }
-
-     setIsSending(true);
-     try {
-       // El tipo para createCampaign es LipooutUserInput<Campaign>
-       const campaignInput: LipooutUserInput<Campaign> = {
-          name: `Campaña: ${selectedTemplate.name}`,
-          templateId: selectedTemplateId,
-          status: scheduledDate && scheduledTime ? 'scheduled' : 'pending',
-          audienceCount: finalAudience.length,
-          createdAt: new Date().toISOString(), // createdAt no debería ir aquí si Appwrite lo genera
-          scheduledDate: scheduledDate || undefined, // Usar undefined si está vacío
-          scheduledTime: scheduledTime || undefined,
-          startTime: startTime || undefined,
-          endTime: endTime || undefined,
-          // filters?: // Añadir si se implementa
-       };
-
-       // Quitamos createdAt si lo genera Appwrite automáticamente
-       // delete campaignInput.createdAt;
-
-       const campaignDoc = await createCampaign(campaignInput);
-       const campaignId = campaignDoc.$id;
-       setActiveCampaignId(campaignId);
-       setProgress({ sent: 0, failed: 0, skipped: 0, total: finalAudience.length });
-
-       toast({ title: 'Iniciando Campaña...', description: `Enviando a ${finalAudience.length} clientes.` });
-
-       await functions.createExecution(
-         'sendWhatsAppFunction',
-         JSON.stringify({
-           clients: finalAudience,
-           template: selectedTemplate,
-           config: wahaConfig,
-           campaignId: campaignId,
-         }),
-         true
-       );
-
-       reloadCampaigns();
-
-     } catch (error) {
-       toast({ title: 'Error al Iniciar Campaña', description: (error as Error).message, variant: 'destructive' });
-       setIsSending(false); // Asegurar que se resetea en caso de error
-       setActiveCampaignId(null); // Reseteamos ID si falla la creación/ejecución
-     }
-  };
 
 
-  const forceFailCampaign = useCallback(async (campaignId: string) => { /* ... Lógica existente ... */ }, [updateCampaign, reloadCampaigns, toast]);
-  const handleExport = () => { /* ... Lógica existente ... */ };
-  const handleShowCampaignLog = async (campaignId: string) => { /* ... Lógica existente ... */ };
+
+
+
 
 
   const handleUpdateClient = async () => {
@@ -258,8 +130,6 @@ const Marketing = () => {
 
   if (loadingTemplates || loadingCampaigns) return <div className="p-6">Cargando...</div>;
 
-  const processedCount = progress.sent + progress.failed + progress.skipped;
-  const progressPercentage = progress.total > 0 ? (processedCount / progress.total) * 100 : 0;
 
   // --- Renderizado JSX ---
   return (

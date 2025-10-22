@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, ChangeEvent, useCallback } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
-import { Client, Template, Campaign, WahaConfig } from '@/types';
+import { Client, Template, Campaign, WahaConfig, MessageLog } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -147,7 +147,8 @@ export function CampaignsTab() {
           [Query.equal('status', 'sending'), Query.limit(1)]
         );
         if (response.documents.length > 0) {
-          const activeCampaign = response.documents[0] as Campaign & Models.Document;
+          // Properly cast the document to unknown first as per lint suggestion
+          const activeCampaign = response.documents[0] as unknown as Campaign & Models.Document;
           setActiveCampaignId(activeCampaign.$id);
           setProgress(prev => ({ ...prev, total: activeCampaign.audienceCount }));
         }
@@ -609,16 +610,18 @@ export function CampaignsTab() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {logContent.map(log => (
+                            {logContent.map((doc: any) => {
+                                const log: MessageLog = doc;
+                                return (
                                 <TableRow key={log.$id}>
                                     <TableCell>{log.clientId}</TableCell>
-                                    {/* CORREGIDO: Usar log.clientName directamente */}
                                     <TableCell>{log.clientName || 'N/A'}</TableCell>
-                                    <TableCell>{new Date(log.timestamp).toLocaleTimeString()}</TableCell>
+                                    <TableCell>{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'N/A'}</TableCell>
                                     <TableCell>{log.status}</TableCell>
-                                    <TableCell>{log.error}</TableCell>
+                                    <TableCell>{log.error || 'N/A'}</TableCell>
                                 </TableRow>
-                            ))}
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </ScrollArea>
