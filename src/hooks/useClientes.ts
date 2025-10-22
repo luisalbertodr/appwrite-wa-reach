@@ -13,11 +13,11 @@ import {
 
 const CLIENTES_QUERY_KEY = 'clientes';
 
-// Hook para OBTENER todos los clientes (MODIFICADO)
-export const useGetClientes = (searchQuery: string = "") => {
-  return useQuery<(Cliente & Models.Document)[]>({ // Tipo actualizado
-    queryKey: [CLIENTES_QUERY_KEY, searchQuery],
-    queryFn: () => getClientesByNombre(searchQuery), // Usa el servicio
+// Hook para OBTENER todos los clientes (MODIFICADO para paginación)
+export const useGetClientes = (searchQuery: string = "", limit: number = 25, offset: number = 0) => {
+  return useQuery<Models.DocumentList<Cliente & Models.Document>>({ // --- CORRECCIÓN: Tipo actualizado
+    queryKey: [CLIENTES_QUERY_KEY, searchQuery, limit, offset], // --- CORRECCIÓN: Key actualizada
+    queryFn: () => getClientesByNombre(searchQuery, limit, offset), // --- CORRECCIÓN: Usa el servicio con paginación
     staleTime: 1000 * 60 * 5,
   });
 };

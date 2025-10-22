@@ -30,8 +30,10 @@ module.exports = async ({ res, log, error }) => {
     
     log(`Se encontraron las siguientes sesiones: ${sessionNames.join(', ')}`);
     
-    // ✅ Solución Definitiva: Usar res.send() con el string JSON y el header correcto.
-    return res.send(JSON.stringify(sessionNames), 200, { 'Content-Type': 'application/json' });
+    // --- CORRECCIÓN ---
+    // Simplificado a res.json()
+    return res.json(sessionNames, 200);
+    // --- FIN CORRECCIÓN ---
 
   } catch (err) {
     error(`Error inesperado al obtener sesiones de Waha: ${err.message}`);

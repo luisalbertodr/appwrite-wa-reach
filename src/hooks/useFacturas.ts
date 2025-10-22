@@ -5,16 +5,22 @@ import {
   updateFactura,
   deleteFactura,
 } from '@/services/appwrite-facturas'; // Importamos el servicio
-import { CreateFacturaInput, UpdateFacturaInput } from '@/types/factura.types'; // Importamos los tipos
+import { CreateFacturaInput, UpdateFacturaInput, Factura } from '@/types'; // Importamos los tipos
+import { Models } from 'appwrite'; // Importar Models
 
 const FACTURAS_QUERY_KEY = 'facturas';
 
-// Hook para OBTENER facturas con filtros opcionales
-export const useGetFacturas = (searchQuery?: string, estado?: string) => {
-  return useQuery({
-    // La queryKey incluye los filtros
-    queryKey: [FACTURAS_QUERY_KEY, { searchQuery, estado }],
-    queryFn: () => getFacturas(searchQuery, estado), // Pasamos filtros al servicio
+// Hook para OBTENER facturas con filtros opcionales y paginación
+export const useGetFacturas = (
+    searchQuery?: string, 
+    estado?: string,
+    limit: number = 25,
+    offset: number = 0
+) => {
+  return useQuery<Models.DocumentList<Factura>>({ // --- CORRECCIÓN: Tipo actualizado
+    // La queryKey incluye los filtros y paginación
+    queryKey: [FACTURAS_QUERY_KEY, { searchQuery, estado, limit, offset }], // --- CORRECCIÓN: Key actualizada
+    queryFn: () => getFacturas(searchQuery, estado, limit, offset), // --- CORRECCIÓN: Pasamos filtros al servicio
     staleTime: 1000 * 60 * 2, // 2 minutos de caché
   });
 };

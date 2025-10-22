@@ -8,9 +8,19 @@ export type UpdateClienteInput = Partial<CreateClienteInput>;
 
 // --- Funciones de Servicio (Usadas por hooks y otros servicios) ---
 
-// OBTENER Clientes (con búsqueda)
-export const getClientesByNombre = async (searchQuery: string = ""): Promise<(Cliente & Models.Document)[]> => {
-    const queries = [Query.limit(100)]; // Límite simple por ahora
+// OBTENER Clientes (con búsqueda y paginación)
+export const getClientesByNombre = async (
+    searchQuery: string = "",
+    limit: number = 25, // Valor por defecto
+    offset: number = 0 // Valor por defecto
+): Promise<Models.DocumentList<Cliente & Models.Document>> => { // --- CORRECCIÓN: Devolver DocumentList
+    
+    const queries = [
+        Query.limit(limit), // --- CORRECCIÓN: Usar paginación
+        Query.offset(offset), // --- CORRECCIÓN: Usar paginación
+        Query.orderDesc('$createdAt') // Añadir un orden por defecto
+    ]; 
+    
     if (searchQuery) {
         // Asumimos que 'nombre_completo' tiene un índice Fulltext
         queries.push(Query.search('nombre_completo', searchQuery));
@@ -21,7 +31,10 @@ export const getClientesByNombre = async (searchQuery: string = ""): Promise<(Cl
         CLIENTES_COLLECTION_ID,
         queries
     );
-    return response.documents;
+    
+    // --- CORRECCIÓN: Devolver la respuesta completa (incluye total)
+    return response; 
+    // --- FIN CORRECCIÓN ---
 };
 
 // CREAR Cliente

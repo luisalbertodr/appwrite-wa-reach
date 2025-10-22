@@ -15,7 +15,10 @@ module.exports = async ({ req, res, log, error }) => {
 
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
     const CLIENTS_COLLECTION_ID = process.env.APPWRITE_CLIENTS_COLLECTION_ID;
-    const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
+    // --- CORRECCIÓN ---
+    // Usar la variable de entorno en lugar de un string literal
+    const IMPORT_LOGS_COLLECTION_ID = process.env.APPWRITE_IMPORT_LOGS_COLLECTION_ID; 
+    // --- FIN CORRECCIÓN ---
     const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
 
     let successfulImports = 0;
@@ -138,6 +141,10 @@ module.exports = async ({ req, res, log, error }) => {
     };
 
     try {
+        if (!DATABASE_ID || !CLIENTS_COLLECTION_ID || !IMPORT_LOGS_COLLECTION_ID) {
+            throw new Error('Variables de entorno de Appwrite (Database, Clients, ImportLogs) no están configuradas.');
+        }
+
         log('Searching for the latest file in the import bucket...');
         const fileList = await storage.listFiles(IMPORT_BUCKET_ID, [
             Query.orderDesc('$createdAt'),
@@ -262,10 +269,15 @@ module.exports = async ({ req, res, log, error }) => {
         error(`Unhandled error during import: ${err.message}`);
         const errorMessage = (err instanceof AppwriteException) ? `${err.message} (Type: ${err.type})` : err.message;
         try {
-            await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), {
-                timestamp, filename: fileName, successfulImports: 0, totalProcessed,
-                errors: [`Error no controlado: ${errorMessage}`], status: 'failed',
-            });
+            // Asegurarse de que IMPORT_LOGS_COLLECTION_ID no sea nulo antes de intentar registrar el error
+            if (IMPORT_LOGS_COLLECTION_ID) {
+                await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), {
+                    timestamp, filename: fileName, successfulImports: 0, totalProcessed,
+                    errors: [`Error no controlado: ${errorMessage}`], status: 'failed',
+                });
+            } else {
+                error('Failed to save failure log: IMPORT_LOGS_COLLECTION_ID is not set.');
+            }
         } catch (logError) {
             error(`Failed to save failure log: ${logError.message}`);
         }

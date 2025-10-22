@@ -1,33 +1,58 @@
-import { Outlet } from 'react-router-dom';
-import Header from './Header';
-import { BottomNavigation } from './BottomNavigation';
-import { useUser } from '@/hooks/useAuth';
-import AuthForm from '@/components/AuthForm';
-import LoadingSpinner from '../LoadingSpinner';
+import { Models } from 'appwrite';
+import { Sidebar, SidebarProvider } from '@/components/ui/sidebar'; 
+import Header from './Header'; 
+import { BottomNavigation } from './BottomNavigation'; 
 
-export const AppLayout = () => {
-  const { data: user, isLoading: loading } = useUser();
+type AppLayoutProps = {
+  isSidebarOpen: boolean;
+  setIsSidebarOpen: (isOpen: boolean) => void;
+  onNavigate: (path: string) => void;
+  currentUser: Models.User<Models.Preferences>;
+  children: React.ReactNode; 
+};
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthForm onLoginSuccess={() => {}} />;
-  }
+export const AppLayout = ({ 
+  isSidebarOpen, 
+  setIsSidebarOpen, 
+  onNavigate,
+  currentUser,
+  children 
+}: AppLayoutProps) => {
+  
+  const handleNavigate = (path: string) => {
+    onNavigate(path);
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted/40">
-      <Header />
-      {/* MODIFICACIÓN: Se cambió "pb-20 md:pb-6" por solo "pb-20" */}
-      <main className="flex-1 p-4 sm:p-6 pb-20">
-        <Outlet />
-      </main>
-      <BottomNavigation />
+    <div className="flex min-h-screen w-full flex-col bg-muted/40">
+      
+      <SidebarProvider 
+        isOpen={isSidebarOpen} 
+        onOpenChange={setIsSidebarOpen}
+      >
+        {/* --- MODIFICACIÓN --- */}
+        {/* Quitamos 'onNavigate' ya que los SidebarLink lo reciben del Provider/Contexto */}
+        <Sidebar 
+          onNavigate={handleNavigate} // Pasamos onNavigate aquí
+        />
+        {/* --- FIN MODIFICACIÓN --- */}
+      </SidebarProvider>
+
+      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+        <Header 
+          onSidebarToggle={() => setIsSidebarOpen(prev => !prev)}
+          currentUser={currentUser}
+        />
+        
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
+          {children}
+        </main>
+        
+        <BottomNavigation />
+      </div>
     </div>
   );
 };
