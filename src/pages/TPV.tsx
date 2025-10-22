@@ -4,8 +4,8 @@ import { useGetClientes } from '@/hooks/useClientes';
 import { useGetArticulos } from '@/hooks/useArticulos';
 import { useCreateFactura } from '@/hooks/useFacturas';
 import { useGetConfiguration, useGenerarSiguienteNumero } from '@/hooks/useConfiguration'; // <-- Nombre corregido
-import { LineaFactura, FacturaInputData, CreateFacturaInput, Factura } from '@/types'; // <-- Añadir Factura
-import { Models } from 'appwrite'; // <-- Añadir Models
+import { LineaFactura, FacturaInputData, CreateFacturaInput, FacturaConDatos } from '@/types';
+import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,7 +66,7 @@ const TPV = () => {
   const { toast } = useToast();
 
   // <-- Estado para el último ticket generado -->
-  const [ultimaFacturaGenerada, setUltimaFacturaGenerada] = useState<(Factura & Models.Document) | null>(null);
+  const [ultimaFacturaGenerada, setUltimaFacturaGenerada] = useState<(FacturaConDatos & Models.Document) | null>(null);
 
   const { data: clientes, isLoading: loadingClientes } = useGetClientes(clientePopoverOpen ? busquedaCliente : "");
   const { data: articulos, isLoading: loadingArticulos } = useGetArticulos(); // <-- Usar getArticulos sin filtro aquí
@@ -249,14 +249,14 @@ const TPV = () => {
       // Guardamos la factura devuelta para el PDF
       const nuevaFactura = await createFacturaMutation.mutateAsync(facturaData as CreateFacturaInput);
       
-      // Añadimos el cliente y parseamos las líneas (necesario para el PDF)
-      const facturaCompleta = {
+      // Construimos FacturaConDatos con cliente y líneas parseadas para el PDF
+      const facturaCompleta: FacturaConDatos & Models.Document = {
           ...nuevaFactura,
           cliente: clienteSeleccionado,
-          lineas: JSON.parse(nuevaFactura.lineas as string) as LineaFactura[], // Parsear JSON a array
+          lineas: JSON.parse(nuevaFactura.lineas as string) as LineaFactura[],
       };
       
-      setUltimaFacturaGenerada(facturaCompleta); // Guardar para imprimir
+      setUltimaFacturaGenerada(facturaCompleta);
 
       toast({
         title: "Venta Registrada",

@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CitaFormData, citaSchema } from '@/lib/validators';
-import { Cita, CitaInput, Empleado, LipooutUserInput } from '@/types';
+import { Cita, CitaInput, Empleado, Articulo } from '@/types';
 import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,20 +24,23 @@ import { cn } from '@/lib/utils';
 
 interface CitaFormProps {
   citaInicial?: (Cita & Models.Document) | null;
-  fechaInicial?: Date; // Para pre-rellenar la fecha desde la agenda
-  onSubmit: (data: LipooutUserInput<CitaInput>) => Promise<void>;
+  fechaInicial?: Date;
+  onSubmit: (data: CitaInput) => Promise<void>;
   isSubmitting: boolean;
 }
 
 const defaultValues: CitaFormData = {
-  fecha_hora_inicio: '',
-  fecha_hora_fin: '',
+  fecha_hora: '',
+  duracion: 60,
   cliente_id: '',
   empleado_id: '',
-  articulo_id: '',
+  articulos: '',
   estado: 'agendada',
-  notas_internas: '',
-  notas_cliente: '',
+  comentarios: '',
+  datos_clinicos: '',
+  precio_total: 0,
+  recursos_cabina: '',
+  recursos_aparatos: '',
 };
 
 // Helper para parsear ISO a HH:mm
@@ -45,7 +48,9 @@ const getHoraDeISO = (isoString: string | undefined) => {
   if (!isoString) return "09:00";
   try {
     return format(parseISO(isoString), 'HH:mm');
-  } catch (e) { return "09:00"; }
+  } catch (e) { 
+    return "09:00"; 
+  }
 };
 
 // Helper para parsear ISO a Date (para el calendario)
@@ -54,9 +59,10 @@ const getDateDeISO = (isoString: string | undefined, fechaInicial?: Date) => {
   try {
     const date = parseISO(isoString);
     return isValid(date) ? date : (fechaInicial || new Date());
-  } catch (e) { return fechaInicial || new Date(); }
+  } catch (e) { 
+    return fechaInicial || new Date(); 
+  }
 };
-
 
 export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: CitaFormProps) => {
 
@@ -66,36 +72,51 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [articuloPopoverOpen, setArticuloPopoverOpen] = useState(false);
   
-  // Estado para fecha y horas (más fácil de manejar que ISO strings)
+  // Estado para fecha y hora
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    getDateDeISO(citaInicial?.fecha_hora_inicio, fechaInicial)
+    getDateDeISO(citaInicial?.fecha_hora, fechaInicial)
   );
-  const [horaInicio, setHoraInicio] = useState(getHoraDeISO(citaInicial?.fecha_hora_inicio)); // "HH:mm"
-  const [horaFin, setHoraFin] = useState(getHoraDeISO(citaInicial?.fecha_hora_fin));       // "HH:mm"
+  const [horaInicio, setHoraInicio] = useState(getHoraDeISO(citaInicial?.fecha_hora));
+  
+  // Estado para artículos seleccionados (para precio total)
+  const [articulosSeleccionados, setArticulosSeleccionados] = useState<string[]>([]);
 
   // --- Carga de datos para selectores ---
   const { data: clientes, isLoading: loadingClientes } = useGetClientes(clienteSearch);
-  const { data: articulos, isLoading: loadingArticulos } = useGetArticulos(); // Traer todos
-  const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados(true); // Solo activos
+  const { data: articulos, isLoading: loadingArticulos } = useGetArticulos();
+  const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados(true);
 
   // --- Configuración del Formulario ---
   const getInitialFormValues = (): CitaFormData => {
     if (!citaInicial) {
-        return {
-            ...defaultValues,
-            fecha_hora_inicio: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', // Placeholder, se recalculará
-            fecha_hora_fin: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', // Placeholder, se recalculará
-        };
+      return {
+        ...defaultValues,
+        fecha_hora: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '',
+      };
     }
+
+    // Parsear articulos desde JSON string
+    let articulosArray: string[] = [];
+    try {
+      if (citaInicial.articulos) {
+        articulosArray = JSON.parse(citaInicial.articulos);
+      }
+    } catch (e) {
+      console.error('Error parsing articulos:', e);
+    }
+
     return {
-      fecha_hora_inicio: citaInicial.fecha_hora_inicio || '',
-      fecha_hora_fin: citaInicial.fecha_hora_fin || '',
-      cliente_id: citaInicial.cliente?.$id || '',
-      empleado_id: citaInicial.empleado?.$id || '',
-      articulo_id: citaInicial.articulo?.$id || '',
+      fecha_hora: citaInicial.fecha_hora || '',
+      duracion: citaInicial.duracion || 60,
+      cliente_id: citaInicial.cliente_id || '',
+      empleado_id: citaInicial.empleado_id || '',
+      articulos: citaInicial.articulos || '',
       estado: citaInicial.estado || 'agendada',
-      notas_internas: citaInicial.notas_internas || '',
-      notas_cliente: citaInicial.notas_cliente || '',
+      comentarios: citaInicial.comentarios || '',
+      datos_clinicos: citaInicial.datos_clinicos || '',
+      precio_total: citaInicial.precio_total || 0,
+      recursos_cabina: citaInicial.recursos_cabina || '',
+      recursos_aparatos: citaInicial.recursos_aparatos || '',
     };
   };
 
@@ -104,65 +125,105 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
     defaultValues: getInitialFormValues(),
   });
 
+  // Parsear artículos seleccionados al inicio
+  useEffect(() => {
+    if (citaInicial?.articulos) {
+      try {
+        const parsed = JSON.parse(citaInicial.articulos);
+        setArticulosSeleccionados(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        setArticulosSeleccionados([]);
+      }
+    }
+  }, [citaInicial]);
+
+  // --- Calcular precio total automáticamente ---
+  useEffect(() => {
+    if (!articulos || articulosSeleccionados.length === 0) {
+      form.setValue('precio_total', 0);
+      return;
+    }
+    
+    const total = articulosSeleccionados.reduce((sum, artId) => {
+      const articulo = articulos.find(a => a.$id === artId);
+      return sum + (articulo?.precio || 0);
+    }, 0);
+    
+    form.setValue('precio_total', total);
+  }, [articulosSeleccionados, articulos, form]);
+
   // --- Lógica de Búsqueda y Selección ---
   const nombreClienteSel = useMemo(() => {
     const id = form.getValues('cliente_id');
     if (!id) return 'Seleccionar Cliente...';
-    // Buscar en datos cargados
     const cliente = clientes?.find(c => c.$id === id);
-    if (cliente) return cliente.nombre_completo;
-    // Buscar en datos iniciales (si estamos editando)
-    return citaInicial?.cliente?.nombre_completo || id;
-  }, [form.watch('cliente_id'), clientes, citaInicial]);
+    return cliente?.nombre_completo || id;
+  }, [form.watch('cliente_id'), clientes]);
 
-  const nombreArticuloSel = useMemo(() => {
-    const id = form.getValues('articulo_id');
-    if (!id) return 'Seleccionar Tratamiento...';
-    const articulo = articulos?.find(a => a.$id === id);
-    if (articulo) return articulo.nombre;
-    return citaInicial?.articulo?.nombre || id;
-  }, [form.watch('articulo_id'), articulos, citaInicial]);
+  const nombreArticulosSel = useMemo(() => {
+    if (articulosSeleccionados.length === 0) return 'Seleccionar Tratamiento(s)...';
+    
+    const nombres = articulosSeleccionados.map(artId => {
+      const articulo = articulos?.find(a => a.$id === artId);
+      return articulo?.nombre || artId;
+    });
+    
+    return nombres.join(', ');
+  }, [articulosSeleccionados, articulos]);
+
+  // --- Toggle de selección de artículos ---
+  const toggleArticulo = (articuloId: string) => {
+    setArticulosSeleccionados(prev => {
+      const isSelected = prev.includes(articuloId);
+      const newSelection = isSelected 
+        ? prev.filter(id => id !== articuloId)
+        : [...prev, articuloId];
+      
+      // Actualizar el form field con JSON string
+      form.setValue('articulos', JSON.stringify(newSelection));
+      return newSelection;
+    });
+  };
 
   // --- Envío del Formulario ---
   const handleSubmit = async (data: CitaFormData) => {
     
-    // Combinar fecha y horas para crear ISO strings
+    // Validar fecha
     if (!selectedDate) {
-        form.setError("fecha_hora_inicio", { message: "Debe seleccionar una fecha" });
-        return;
+      form.setError("fecha_hora", { message: "Debe seleccionar una fecha" });
+      return;
     }
     
+    // Validar que hay al menos un artículo
+    if (articulosSeleccionados.length === 0) {
+      form.setError("articulos", { message: "Debe seleccionar al menos un tratamiento" });
+      return;
+    }
+
     try {
-        const [inicioH, inicioM] = horaInicio.split(':').map(Number);
-        const [finH, finM] = horaFin.split(':').map(Number);
+      const [hora, minutos] = horaInicio.split(':').map(Number);
+      const fechaHora = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
 
-        const inicio = setSeconds(setMinutes(setHours(selectedDate, inicioH), inicioM), 0);
-        const fin = setSeconds(setMinutes(setHours(selectedDate, finH), finM), 0);
-        
-        // Validación simple de horas
-        if (fin <= inicio) {
-             form.setError("fecha_hora_fin", { message: "La hora de fin debe ser posterior a la de inicio" });
-             return;
-        }
-
-        const duracionMs = fin.getTime() - inicio.getTime();
-        const duracionMinutos = Math.round(duracionMs / (1000 * 60));
-
-        // Crear el objeto final para Appwrite (CitaInput)
-        const finalData: LipooutUserInput<CitaInput> = {
-            ...data,
-            fecha_hora_inicio: inicio.toISOString(),
-            fecha_hora_fin: fin.toISOString(),
-            duracion_minutos: duracionMinutos,
-            notas_internas: data.notas_internas || undefined,
-            notas_cliente: data.notas_cliente || undefined,
-        };
-        
-        await onSubmit(finalData);
+      // Crear el objeto final para Appwrite (CitaInput)
+      const finalData: CitaInput = {
+        fecha_hora: fechaHora.toISOString(),
+        duracion: data.duracion,
+        cliente_id: data.cliente_id,
+        empleado_id: data.empleado_id,
+        articulos: JSON.stringify(articulosSeleccionados),
+        estado: data.estado,
+        comentarios: data.comentarios || undefined,
+        datos_clinicos: data.datos_clinicos || undefined,
+        precio_total: data.precio_total,
+        recursos_cabina: data.recursos_cabina || undefined,
+        recursos_aparatos: data.recursos_aparatos || undefined,
+      };
+      
+      await onSubmit(finalData);
 
     } catch (e) {
-        console.error("Error parsing dates/times", e);
-        form.setError("fecha_hora_inicio", { message: "Formato de hora inválido (HH:mm)" });
+      console.error("Error en el formulario", e);
+      form.setError("fecha_hora", { message: "Formato de hora inválido (HH:mm)" });
     }
   };
 
@@ -174,183 +235,335 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
 
             {/* --- Cliente (Buscador) --- */}
             <FormField
-                control={form.control}
-                name="cliente_id"
-                render={({ field }) => (
+              control={form.control}
+              name="cliente_id"
+              render={({ field }) => (
                 <FormItem className="flex flex-col md:col-span-2">
-                    <FormLabel>Cliente *</FormLabel>
-                    <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
-                        <PopoverTrigger asChild>
-                        <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("justify-between font-normal", !field.value && "text-muted-foreground")}>
-                                <span className="truncate">{nombreClienteSel}</span>
-                                <UserSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
-                            <Command shouldFilter={false}>
-                                <CommandInput placeholder="Buscar cliente..." value={clienteSearch} onValueChange={setClienteSearch}/>
-                                <CommandList>
-                                    {loadingClientes && <CommandItem disabled><LoadingSpinner/></CommandItem>}
-                                    <CommandEmpty>No encontrado.</CommandEmpty>
-                                    <CommandGroup>
-                                        {clientes?.map((cliente) => (
-                                        <CommandItem key={cliente.$id} value={cliente.nombre_completo || cliente.$id} onSelect={() => { field.onChange(cliente.$id); setClientePopoverOpen(false); }}>
-                                            {cliente.nombre_completo}
-                                        </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
-                    <FormMessage />
+                  <FormLabel>Cliente *</FormLabel>
+                  <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button 
+                          variant="outline" 
+                          role="combobox" 
+                          className={cn(
+                            "justify-between font-normal", 
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <span className="truncate">{nombreClienteSel}</span>
+                          <UserSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Buscar cliente..." 
+                          value={clienteSearch} 
+                          onValueChange={setClienteSearch}
+                        />
+                        <CommandList>
+                          {loadingClientes && <CommandItem disabled><LoadingSpinner/></CommandItem>}
+                          <CommandEmpty>No encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {clientes?.map((cliente) => (
+                              <CommandItem 
+                                key={cliente.$id} 
+                                value={cliente.nombre_completo || cliente.$id} 
+                                onSelect={() => { 
+                                  field.onChange(cliente.$id); 
+                                  setClientePopoverOpen(false); 
+                                }}
+                              >
+                                {cliente.nombre_completo}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
                 </FormItem>
-                )}
+              )}
             />
 
             {/* --- Fecha (Calendario) --- */}
             <FormItem className="flex flex-col">
-                <FormLabel>Fecha *</FormLabel>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <FormControl>
-                        <Button
-                        variant={"outline"}
-                        className={cn("pl-3 text-left font-normal", !selectedDate && "text-muted-foreground")}
-                        >
-                        {selectedDate ? format(selectedDate, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                    </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        initialFocus
-                        locale={es}
-                    />
-                    </PopoverContent>
-                </Popover>
-                <FormMessage />
+              <FormLabel>Fecha *</FormLabel>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "pl-3 text-left font-normal", 
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      {selectedDate ? (
+                        format(selectedDate, "PPP", { locale: es })
+                      ) : (
+                        <span>Selecciona fecha</span>
+                      )}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    initialFocus
+                    locale={es}
+                  />
+                </PopoverContent>
+              </Popover>
+              <FormMessage />
             </FormItem>
 
-             {/* --- Empleado (Selector) --- */}
-             <FormField
-                control={form.control}
-                name="empleado_id"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Profesional *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder={loadingEmpleados ? "Cargando..." : "Seleccionar..."} />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {!loadingEmpleados && empleados?.map((emp: Empleado) => (
-                            <SelectItem key={emp.$id} value={emp.$id}>{emp.nombre_completo}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
+            {/* --- Empleado (Selector) --- */}
+            <FormField
+              control={form.control}
+              name="empleado_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profesional *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingEmpleados ? "Cargando..." : "Seleccionar..."} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {!loadingEmpleados && empleados?.map((emp: Empleado) => (
+                        <SelectItem key={emp.$id} value={emp.$id}>
+                          {emp.nombre_completo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
-             {/* --- Hora Inicio y Fin --- */}
-             <FormItem>
-                <FormLabel>Hora Inicio *</FormLabel>
-                <FormControl>
-                    <Input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
-                </FormControl>
-                <FormMessage />
-             </FormItem>
-             <FormItem>
-                <FormLabel>Hora Fin *</FormLabel>
-                <FormControl>
-                    <Input type="time" value={horaFin} onChange={e => setHoraFin(e.target.value)} />
-                </FormControl>
-                 <FormMessage />
-             </FormItem>
+            {/* --- Hora Inicio --- */}
+            <FormItem>
+              <FormLabel>Hora Inicio *</FormLabel>
+              <FormControl>
+                <Input 
+                  type="time" 
+                  value={horaInicio} 
+                  onChange={e => setHoraInicio(e.target.value)} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
 
-
-            {/* --- Artículo (Buscador) --- */}
-             <FormField
-                control={form.control}
-                name="articulo_id"
-                render={({ field }) => (
-                <FormItem className="flex flex-col md:col-span-2">
-                    <FormLabel>Tratamiento/Servicio *</FormLabel>
-                    <Popover open={articuloPopoverOpen} onOpenChange={setArticuloPopoverOpen}>
-                        <PopoverTrigger asChild>
-                        <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("justify-between font-normal", !field.value && "text-muted-foreground")}>
-                                <span className="truncate">{nombreArticuloSel}</span>
-                                <PackageSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
-                            <Command shouldFilter={false}>
-                                <CommandInput placeholder="Buscar artículo..." value={articuloSearch} onValueChange={setArticuloSearch}/>
-                                <CommandList>
-                                    {loadingArticulos && <CommandItem disabled><LoadingSpinner/></CommandItem>}
-                                    <CommandEmpty>No encontrado.</CommandEmpty>
-                                    <CommandGroup>
-                                        {(articuloSearch ? articulos?.filter(a=>a.nombre.toLowerCase().includes(articuloSearch.toLowerCase())) : articulos)
-                                        ?.filter(a => a.tipo === 'servicio' || a.tipo === 'bono') // Filtramos solo servicios/bonos
-                                        .map((articulo) => (
-                                        <CommandItem key={articulo.$id} value={articulo.nombre} onSelect={() => { field.onChange(articulo.$id); setArticuloPopoverOpen(false); }}>
-                                            {articulo.nombre} ({articulo.precio.toFixed(2)}€)
-                                        </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
-                        </PopoverContent>
-                    </Popover>
-                    <FormMessage />
+            {/* --- Duración --- */}
+            <FormField
+              control={form.control}
+              name="duracion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duración (minutos) *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="15" 
+                      step="15" 
+                      {...field}
+                      onChange={e => field.onChange(parseInt(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-                )}
+              )}
+            />
+
+            {/* --- Artículos (Buscador multi-selección) --- */}
+            <FormField
+              control={form.control}
+              name="articulos"
+              render={() => (
+                <FormItem className="flex flex-col md:col-span-2">
+                  <FormLabel>Tratamiento(s)/Servicio(s) *</FormLabel>
+                  <Popover open={articuloPopoverOpen} onOpenChange={setArticuloPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button 
+                          variant="outline" 
+                          role="combobox" 
+                          className={cn(
+                            "justify-between font-normal", 
+                            articulosSeleccionados.length === 0 && "text-muted-foreground"
+                          )}
+                        >
+                          <span className="truncate">{nombreArticulosSel}</span>
+                          <PackageSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
+                      <Command shouldFilter={false}>
+                        <CommandInput 
+                          placeholder="Buscar artículo..." 
+                          value={articuloSearch} 
+                          onValueChange={setArticuloSearch}
+                        />
+                        <CommandList>
+                          {loadingArticulos && <CommandItem disabled><LoadingSpinner/></CommandItem>}
+                          <CommandEmpty>No encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {(articuloSearch 
+                              ? articulos?.filter(a => 
+                                  a.nombre.toLowerCase().includes(articuloSearch.toLowerCase())
+                                ) 
+                              : articulos
+                            )
+                              ?.filter(a => a.tipo === 'servicio' || a.tipo === 'bono')
+                              .map((articulo: Articulo) => (
+                                <CommandItem 
+                                  key={articulo.$id} 
+                                  value={articulo.nombre} 
+                                  onSelect={() => toggleArticulo(articulo.$id)}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>
+                                      {articulo.nombre} ({articulo.precio.toFixed(2)}€)
+                                    </span>
+                                    {articulosSeleccionados.includes(articulo.$id) && (
+                                      <span className="text-green-600">✓</span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* --- Precio Total (calculado automáticamente) --- */}
+            <FormField
+              control={form.control}
+              name="precio_total"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio Total *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      step="0.01"
+                      {...field}
+                      onChange={e => field.onChange(parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
             {/* --- Estado --- */}
-             <FormField
-                control={form.control}
-                name="estado"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Estado *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                        <SelectContent>
-                            <SelectItem value="agendada">Agendada</SelectItem>
-                            <SelectItem value="confirmada">Confirmada</SelectItem>
-                            <SelectItem value="realizada">Realizada</SelectItem>
-                            <SelectItem value="cancelada">Cancelada</SelectItem>
-                            <SelectItem value="no_asistio">No Asistió</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-             />
-             
-             <div /> {/* Espacio */}
+            <FormField
+              control={form.control}
+              name="estado"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estado *</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="agendada">Agendada</SelectItem>
+                      <SelectItem value="confirmada">Confirmada</SelectItem>
+                      <SelectItem value="realizada">Realizada</SelectItem>
+                      <SelectItem value="cancelada">Cancelada</SelectItem>
+                      <SelectItem value="no_asistio">No Asistió</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {/* --- Notas --- */}
-            <FormField control={form.control} name="notas_internas" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Notas Internas (No visible por cliente)</FormLabel> <FormControl><Textarea {...field} value={field.value ?? ''} rows={3} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={form.control} name="notas_cliente" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Notas Cliente (Recordatorio)</FormLabel> <FormControl><Textarea {...field} value={field.value ?? ''} rows={3} /></FormControl> <FormMessage /> </FormItem> )}/>
+            {/* --- Recursos (opcionales) --- */}
+            <FormField
+              control={form.control}
+              name="recursos_cabina"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recursos Cabina</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ''} placeholder="Ej: Cabina 1" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="recursos_aparatos"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recursos Aparatos</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ''} placeholder="Ej: Láser, Presoterapia" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* --- Comentarios (antes notas_internas) --- */}
+            <FormField 
+              control={form.control} 
+              name="comentarios" 
+              render={({ field }) => ( 
+                <FormItem className="md:col-span-2"> 
+                  <FormLabel>Comentarios (Notas internas)</FormLabel> 
+                  <FormControl>
+                    <Textarea {...field} value={field.value ?? ''} rows={3} />
+                  </FormControl> 
+                  <FormMessage /> 
+                </FormItem> 
+              )}
+            />
+
+            {/* --- Datos Clínicos (antes notas_cliente) --- */}
+            <FormField 
+              control={form.control} 
+              name="datos_clinicos" 
+              render={({ field }) => ( 
+                <FormItem className="md:col-span-2"> 
+                  <FormLabel>Datos Clínicos</FormLabel> 
+                  <FormControl>
+                    <Textarea {...field} value={field.value ?? ''} rows={3} />
+                  </FormControl> 
+                  <FormMessage /> 
+                </FormItem> 
+              )}
+            />
 
           </div>
         </ScrollArea>
         <div className="flex justify-end p-4 border-t">
-          <Button type="submit" disabled={isSubmitting || loadingClientes || loadingArticulos || loadingEmpleados}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting || loadingClientes || loadingArticulos || loadingEmpleados}
+          >
             {isSubmitting ? 'Guardando...' : (citaInicial ? 'Actualizar Cita' : 'Crear Cita')}
           </Button>
         </div>

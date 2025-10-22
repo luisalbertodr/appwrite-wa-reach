@@ -1,12 +1,12 @@
 import React from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { FacturaPDF } from './FacturaPDF';
-import { Factura, Configuracion } from '@/types';
+import { FacturaConDatos, Configuracion } from '@/types';
 import { Models } from 'appwrite';
 import LoadingSpinner from '../LoadingSpinner';
 
 interface DownloadFacturaPDFProps {
-  factura: Factura;
+  factura: FacturaConDatos;
   config: Configuracion & Models.Document;
   children: React.ReactNode;
   className?: string; // Para pasar el className al componente hijo

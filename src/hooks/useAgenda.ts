@@ -26,7 +26,7 @@ export const useCreateCita = () => {
   return useMutation({
     mutationFn: (newCita: CreateCitaInput) => createCita(newCita),
     onSuccess: (data) => {
-      const diaKey = formatISO(startOfDay(new Date(data.fecha_hora_inicio)));
+      const diaKey = formatISO(startOfDay(new Date(data.fecha_hora)));
       queryClient.invalidateQueries({ queryKey: [CITAS_QUERY_KEY, diaKey] });
     },
   });
@@ -36,11 +36,10 @@ export const useUpdateCita = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateCitaInput }) => {
-      // Idealmente, obtener la cita actual aquí si es necesario para calcular duración
       return updateCita(id, data);
     },
     onSuccess: (data) => {
-      const diaKey = formatISO(startOfDay(new Date(data.fecha_hora_inicio)));
+      const diaKey = formatISO(startOfDay(new Date(data.fecha_hora)));
       queryClient.invalidateQueries({ queryKey: [CITAS_QUERY_KEY, diaKey] });
     },
   });

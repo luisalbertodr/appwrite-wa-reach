@@ -28,17 +28,13 @@ export interface Factura extends LipooutDocument {
   fechaVencimiento?: string; // ISO 8601 string (YYYY-MM-DD)
   estado: EstadoFactura;
 
-  // Relaciones
-  cliente: Cliente; // Objeto anidado
+  // Relaciones (solo IDs, Appwrite no devuelve objetos anidados)
   cliente_id: string;
-  empleado?: Empleado; // Quien emite o realiza (opcional)
   empleado_id?: string;
   // cita_id?: string; // ID de la cita relacionada (opcional)
 
-  // Líneas (Almacenado como JSON string en Appwrite, parseado en el frontend/servicio)
-  // Appwrite no soporta arrays de objetos complejos directamente en atributos
-  // Alternativa: Colección separada 'lineas_factura'
-  lineas: LineaFactura[]; // En el frontend será un array parseado
+  // Líneas (Almacenado como JSON string en Appwrite)
+  lineas: string; // JSON.stringify(LineaFactura[])
 
   // Totales Calculados
   baseImponible: number; // Suma de totalSinIva de las líneas
@@ -78,3 +74,11 @@ export interface FacturaInputData {
 
 export type CreateFacturaInput = LipooutUserInput<FacturaInputData>;
 export type UpdateFacturaInput = Partial<CreateFacturaInput>;
+
+// Tipo extendido para facturas con datos poblados (para visualización y PDF)
+// Appwrite solo devuelve IDs, pero para el PDF y visualización necesitamos los objetos completos
+export interface FacturaConDatos extends Omit<Factura, 'lineas'> {
+  cliente?: Cliente; // Objeto cliente completo (populado manualmente)
+  empleado?: Empleado; // Objeto empleado completo (opcional)
+  lineas: LineaFactura[]; // Líneas parseadas como array (no string)
+}

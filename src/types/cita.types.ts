@@ -6,32 +6,39 @@ export type EstadoCita = 'agendada' | 'confirmada' | 'realizada' | 'cancelada' |
 
 // Tipo para LEER desde Appwrite (con relaciones pobladas)
 export interface Cita extends LipooutDocument {
-  fecha_hora_inicio: string; // ISO 8601 string
-  fecha_hora_fin: string; // ISO 8601 string
-  duracion_minutos: number; // Calculado
+  fecha_hora: string; // ISO 8601 string - fecha y hora de inicio
+  duracion: number; // Duración en minutos
 
-  // Relaciones (objetos completos cuando se leen de Appwrite)
-  cliente: any; // Cliente completo poblado por Appwrite
-  empleado: any; // Empleado completo poblado por Appwrite
-  articulo: any; // Articulo completo poblado por Appwrite
-
+  // IDs de las relaciones
+  cliente_id: string;
+  empleado_id: string;
+  articulos: string; // JSON string con array de artículos
+  
+  // Recursos (campos opcionales según el esquema)
+  recursos_cabina?: string;
+  recursos_aparatos?: string;
+  
   estado: EstadoCita;
-  notas_internas?: string;
-  notas_cliente?: string; // (Visible por el cliente si hay portal)
+  comentarios?: string;
+  datos_clinicos?: string;
+  precio_total: number;
 }
 
 // Tipo para CREAR/ACTUALIZAR (solo IDs)
 export interface CitaInput {
-  fecha_hora_inicio: string; // ISO 8601 string
-  fecha_hora_fin: string; // ISO 8601 string
-  duracion_minutos: number; // Calculado
+  fecha_hora: string; // ISO 8601 string
+  duracion: number; // Duración en minutos
 
   // Solo IDs para crear/actualizar
   cliente_id: string;
   empleado_id: string;
-  articulo_id: string;
+  articulos: string; // JSON string con array de artículos
+
+  recursos_cabina?: string;
+  recursos_aparatos?: string;
 
   estado: EstadoCita;
-  notas_internas?: string;
-  notas_cliente?: string; // (Visible por el cliente si hay portal)
+  comentarios?: string;
+  datos_clinicos?: string;
+  precio_total: number;
 }

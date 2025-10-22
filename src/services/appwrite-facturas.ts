@@ -1,21 +1,12 @@
 import { databases, DATABASE_ID, FACTURAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Factura, LineaFactura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Cliente } from '@/types';
+import { Factura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Cliente } from '@/types';
 import { ID, Query, Models } from 'appwrite';
 import { getClientesByNombre } from '@/services/appwrite-clientes'; // Importar servicio de clientes
 
 // --- API de Facturas ---
 
-const parseLineas = (lineasString?: string): LineaFactura[] => {
-  if (!lineasString) return [];
-  try {
-    return JSON.parse(lineasString);
-  } catch (e) {
-    return [];
-  }
-};
-
 // Obtener facturas (MODIFICADO para aceptar filtros)
-export const getFacturas = async (searchQuery?: string, estado?: string): Promise<Factura[]> => {
+export const getFacturas = async (searchQuery?: string, estado?: string): Promise<(Factura & Models.Document)[]> => {
   const queries = [
       Query.limit(100),
       Query.orderDesc('fechaEmision'),
@@ -47,55 +38,36 @@ export const getFacturas = async (searchQuery?: string, estado?: string): Promis
       queries.push(Query.or(searchQueries));
   }
 
-
-  const response = await databases.listDocuments<FacturaInputData & Models.Document>(
+  const response = await databases.listDocuments<Factura & Models.Document>(
     DATABASE_ID,
     FACTURAS_COLLECTION_ID,
     queries
   );
 
-  // --- Workaround para poblar Clientes (Ineficiente, pero necesario) ---
-  // Idealmente, cachearíamos clientes en el frontend
-  // O haríamos una query separada solo por los IDs necesarios
-  const todosLosClientes = await getClientesByNombre(''); // Obtener todos
-  const clienteMap = new Map(todosLosClientes.map((c: Cliente & Models.Document) => [c.$id, c]));
-
-  return response.documents.map((doc: FacturaInputData & Models.Document) => ({
-      ...doc,
-      lineas: parseLineas(doc.lineas),
-      // "Poblamos" el cliente
-      cliente: clienteMap.get(doc.cliente_id) || { $id: doc.cliente_id, nombre_completo: 'Cliente no encontrado' } as any,
-      empleado: doc.empleado_id ? { $id: doc.empleado_id } as any : undefined,
-  } as Factura ));
+  // Devolvemos directamente los documentos sin modificarlos
+  // lineas ya es string en Appwrite, coincide con tipo Factura
+  return response.documents;
 };
 
 // Crear una nueva factura
 export const createFactura = (facturaInput: CreateFacturaInput) => {
-  const facturaToSave = {
-      ...facturaInput,
-      lineas: typeof facturaInput.lineas === 'string' ? facturaInput.lineas : JSON.stringify(facturaInput.lineas || []),
-  };
-
-  return databases.createDocument<FacturaInputData & Models.Document>(
+  // lineas ya debe venir como string en facturaInput
+  return databases.createDocument<Factura & Models.Document>(
     DATABASE_ID,
     FACTURAS_COLLECTION_ID,
     ID.unique(),
-    facturaToSave
+    facturaInput
   );
 };
 
 // Actualizar una factura existente
 export const updateFactura = (id: string, facturaInput: UpdateFacturaInput) => {
-  const facturaToUpdate = { ...facturaInput };
-  if (facturaToUpdate.lineas && typeof facturaToUpdate.lineas !== 'string') {
-      facturaToUpdate.lineas = JSON.stringify(facturaToUpdate.lineas);
-  }
-
-  return databases.updateDocument<FacturaInputData & Models.Document>(
+  // lineas ya debe venir como string si se proporciona
+  return databases.updateDocument<Factura & Models.Document>(
     DATABASE_ID,
     FACTURAS_COLLECTION_ID,
     id,
-    facturaToUpdate
+    facturaInput
   );
 };
 

@@ -50,7 +50,7 @@ const Dashboard = () => {
     }
     
     // Filtramos en cliente por si la query trae de más (aunque getCitasPorDia debería ser precisa)
-     const citasFiltradas = citasHoy?.filter(cita => isToday(parseISO(cita.fecha_hora_inicio))) || [];
+    const citasFiltradas = citasHoy?.filter(cita => isToday(parseISO(cita.fecha_hora))) || [];
 
     if (citasFiltradas.length === 0) {
       return <p className="text-center text-muted-foreground py-8">No hay citas programadas para hoy.</p>;
@@ -71,11 +71,11 @@ const Dashboard = () => {
           {citasFiltradas.map((cita: Cita) => (
             <TableRow key={cita.$id}>
               <TableCell className="font-medium">
-                {format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}
+                {format(parseISO(cita.fecha_hora), 'HH:mm')}
               </TableCell>
-              <TableCell>{cita.cliente?.nombre_completo || 'Cliente no encontrado'}</TableCell>
-              <TableCell>{cita.articulo?.nombre || 'Artículo no encontrado'}</TableCell>
-              <TableCell>{cita.empleado?.nombre_completo || 'Empleado no encontrado'}</TableCell>
+              <TableCell>{cita.cliente_id}</TableCell>
+              <TableCell>{cita.articulos}</TableCell>
+              <TableCell>{cita.empleado_id}</TableCell>
               <TableCell>{cita.estado}</TableCell>
             </TableRow>
           ))}
@@ -99,7 +99,7 @@ const Dashboard = () => {
             <CalendarCheck2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loadingCitas ? '...' : citasHoy?.filter(c => isToday(parseISO(c.fecha_hora_inicio))).length ?? 0}</div>
+            <div className="text-2xl font-bold">{loadingCitas ? '...' : citasHoy?.filter(c => isToday(parseISO(c.fecha_hora))).length ?? 0}</div>
             <p className="text-xs text-muted-foreground">Citas programadas para hoy</p>
           </CardContent>
         </Card>

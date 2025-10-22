@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGetFacturas, useCreateFactura, useUpdateFactura, useDeleteFactura } from '@/hooks/useFacturas';
 import { useGetConfiguration, useGenerarSiguienteNumero } from '@/hooks/useConfiguration'; // <-- Nombre corregido
-import { Factura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Configuracion } from '@/types'; // Importar Configuracion
+import { Factura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Configuracion, FacturaConDatos, LineaFactura } from '@/types'; // Importar Configuracion
 import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,15 @@ const traducirEstadoFactura = (estado: string): string => {
         case 'presupuesto': return 'Presupuesto';
         default: return estado;
     }
+};
+
+// Helper para transformar Factura a FacturaConDatos para PDF
+const transformarFacturaParaPDF = (factura: Factura & Models.Document): FacturaConDatos & Models.Document => {
+    return {
+        ...factura,
+        lineas: JSON.parse(factura.lineas as string) as LineaFactura[],
+        // cliente es undefined - el PDF mostrará el cliente_id en su lugar
+    };
 };
 
 const Facturacion = () => {
@@ -156,7 +165,7 @@ const Facturacion = () => {
             <TableRow key={factura.$id}>
                <TableCell className="font-medium">{factura.numeroFactura}</TableCell>
                <TableCell>{factura.fechaEmision ? format(parseISO(factura.fechaEmision), 'dd/MM/yyyy', { locale: es }) : '-'}</TableCell>
-               <TableCell className="truncate max-w-xs">{factura.cliente?.nombre_completo || factura.cliente_id}</TableCell>
+               <TableCell className="truncate max-w-xs">{factura.cliente_id}</TableCell>
                <TableCell className="text-right">{(typeof factura.totalAPagar === 'number') ? factura.totalAPagar.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) : '-'}</TableCell>
                <TableCell>
                    <Badge variant={factura.estado === 'cobrada' ? 'default' : factura.estado === 'anulada' ? 'destructive' : 'outline'}>
@@ -191,7 +200,7 @@ const Facturacion = () => {
                         </DropdownMenuItem>
                     ) : (
                         <DownloadFacturaPDF
-                            factura={factura}
+                            factura={transformarFacturaParaPDF(factura)}
                             config={config}
                             // Pasamos las clases CSS esperadas por DropdownMenuItem como className
                             className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"

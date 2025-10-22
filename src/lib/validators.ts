@@ -163,14 +163,17 @@ export type ArticuloFormData = z.infer<typeof articuloSchema>;
 
 // 5. Cita
 export const citaSchema = z.object({
-  fecha_hora_inicio: z.string().min(1, "Fecha y hora de inicio obligatorias"), // Se enviará como ISO string
-  fecha_hora_fin: z.string().min(1, "Fecha y hora de fin obligatorias"), // Se enviará como ISO string
+  fecha_hora: z.string().min(1, "Fecha y hora obligatorias"), // Se enviará como ISO string
+  duracion: z.number().min(1, "Duración obligatoria"),
   cliente_id: z.string().min(1, "Cliente obligatorio"),
   empleado_id: z.string().min(1, "Empleado obligatorio"),
-  articulo_id: z.string().min(1, "Tratamiento obligatorio"),
+  articulos: z.string().min(1, "Artículos/Servicios obligatorios"), // JSON string
+  recursos_cabina: z.string().optional(),
+  recursos_aparatos: z.string().optional(),
   estado: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'no_asistio']),
-  notas_internas: z.string().optional(),
-  notas_cliente: z.string().optional(),
+  comentarios: z.string().optional(),
+  datos_clinicos: z.string().optional(),
+  precio_total: z.number().min(0, "Precio total obligatorio"),
 });
 export type CitaFormData = z.infer<typeof citaSchema>;
 

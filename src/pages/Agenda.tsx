@@ -60,9 +60,9 @@ const Agenda = () => {
   };
 
   const handleDeleteCita = async (cita: Cita & Models.Document) => {
-    if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}?`)) {
+    if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora), 'HH:mm')}?`)) {
       try {
-        await deleteCitaMutation.mutateAsync({ id: cita.$id, fechaCita: cita.fecha_hora_inicio });
+        await deleteCitaMutation.mutateAsync({ id: cita.$id, fechaCita: cita.fecha_hora });
         toast({ title: "Cita eliminada" });
         // refetchCitas(); // InvalidateQueries lo hace
       } catch (err) {
@@ -103,7 +103,7 @@ const Agenda = () => {
 
     // Filtramos de nuevo por si acaso la query trajo citas fuera del día exacto
     const citasFiltradas = citasDelDia.filter(cita =>
-        format(startOfDay(parseISO(cita.fecha_hora_inicio)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
+        format(startOfDay(parseISO(cita.fecha_hora)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
     );
 
      if (citasFiltradas.length === 0) {
@@ -127,11 +127,11 @@ const Agenda = () => {
           {citasFiltradas.map((cita: Cita & Models.Document) => (
             <TableRow key={cita.$id}>
               <TableCell className="font-medium">
-                {format(parseISO(cita.fecha_hora_inicio), 'HH:mm')}
+                {format(parseISO(cita.fecha_hora), 'HH:mm')}
               </TableCell>
-              <TableCell>{cita.cliente?.nombre_completo || 'Cliente no encontrado'}</TableCell>
-              <TableCell>{cita.articulo?.nombre || 'Artículo no encontrado'}</TableCell>
-              <TableCell>{cita.empleado?.nombre_completo || 'Empleado no encontrado'}</TableCell>
+              <TableCell>{cita.cliente_id}</TableCell>
+              <TableCell>{cita.articulos}</TableCell>
+              <TableCell>{cita.empleado_id}</TableCell>
               <TableCell>{cita.estado}</TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>

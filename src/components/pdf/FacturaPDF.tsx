@@ -1,5 +1,5 @@
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
-import { Configuracion, Factura, LineaFactura } from '@/types';
+import { Configuracion, FacturaConDatos, LineaFactura } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -162,15 +162,10 @@ const formatCurrency = (value: number) => {
 };
 
 // Componente del Documento PDF
-export const FacturaPDF = ({ factura, config }: { factura: Factura, config: Configuracion }) => {
+export const FacturaPDF = ({ factura, config }: { factura: FacturaConDatos, config: Configuracion }) => {
 
-    // Asegurarse de que las líneas estén parseadas (clave para TPV)
-    let lineasParseadas: LineaFactura[] = [];
-    if (typeof factura.lineas === 'string') {
-        try { lineasParseadas = JSON.parse(factura.lineas); } catch (e) { }
-    } else if (Array.isArray(factura.lineas)) {
-        lineasParseadas = factura.lineas;
-    }
+    // Las líneas ya vienen como array en FacturaConDatos
+    const lineasParseadas: LineaFactura[] = factura.lineas;
     
     const docTitle = factura.estado === 'presupuesto' ? 'PRESUPUESTO' : 'FACTURA';
 
@@ -200,7 +195,7 @@ export const FacturaPDF = ({ factura, config }: { factura: Factura, config: Conf
         <View style={styles.clientInfo}>
             <View style={styles.clientColumn}>
                 <Text style={styles.label}>Cliente:</Text>
-                <Text>{factura.cliente?.nombre_completo || 'Cliente no especificado'}</Text>
+                <Text>{factura.cliente?.nombre_completo || `ID: ${factura.cliente_id}`}</Text>
                 <Text>{factura.cliente?.dnicli || factura.cliente?.email || ''}</Text>
             </View>
              <View style={styles.clientColumn}>
