@@ -199,3 +199,40 @@ export const configurationSchema = z.object({
   ultimoNumeroPresupuesto: z.number().min(0).optional(),
 });
 export type ConfigurationFormData = z.infer<typeof configurationSchema>;
+
+// 8. Recurso
+export const recursoSchema = z.object({
+  nombre: z.string().min(1, "El nombre es obligatorio"),
+  descripcion: z.string().optional(),
+  tipo: z.enum(['sala', 'camilla', 'equipamiento', 'otro']),
+  activo: z.boolean(),
+});
+export type RecursoFormData = z.infer<typeof recursoSchema>;
+
+// 9. Aparato
+export const aparatoSchema = z.object({
+  nombre: z.string().min(1, "El nombre es obligatorio"),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  numero_serie: z.string().optional(),
+  fecha_compra: z.string().optional(),
+  fecha_proximo_mantenimiento: z.string().optional(),
+  proveedor_id: z.string().optional(),
+  activo: z.boolean(),
+});
+export type AparatoFormData = z.infer<typeof aparatoSchema>;
+
+// 10. Proveedor
+export const proveedorSchema = z.object({
+  nombre: z.string().min(1, "El nombre es obligatorio"),
+  cif: z.string().optional(),
+  telefono: z.string().optional(),
+  email: z.string().email("Email inválido").optional().or(z.literal('')),
+  direccion: z.string().optional(),
+  ciudad: z.string().optional(),
+  codigo_postal: z.string().optional(),
+  provincia: z.string().optional(),
+  contacto: z.string().optional(),
+  activo: z.boolean(),
+});
+export type ProveedorFormData = z.infer<typeof proveedorSchema>;

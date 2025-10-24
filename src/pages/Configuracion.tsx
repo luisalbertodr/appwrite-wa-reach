@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
 import { WahaConfig, LipooutUserInput } from '@/types';
-import type { Configuracion } from '@/types';
+import type { Configuracion, Empleado, Recurso, Aparato, Proveedor } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,10 +9,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Loader2, Save, Settings, Server } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Upload, Loader2, Save, Settings, Server, Users, Package, Wrench, Building2, Plus, Pencil, Trash2 } from 'lucide-react';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
+import { EmpleadoForm } from '@/components/forms/EmpleadoForm';
+import { RecursoForm } from '@/components/forms/RecursoForm';
+import { AparatoForm } from '@/components/forms/AparatoForm';
+import { ProveedorForm } from '@/components/forms/ProveedorForm';
 import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration';
+import { useGetEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado } from '@/hooks/useEmpleados';
+import { useGetRecursos, useCreateRecurso, useUpdateRecurso, useDeleteRecurso } from '@/hooks/useRecursos';
+import { useGetAparatos, useCreateAparato, useUpdateAparato, useDeleteAparato } from '@/hooks/useAparatos';
+import { useGetProveedores, useCreateProveedor, useUpdateProveedor, useDeleteProveedor } from '@/hooks/useProveedores';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -55,6 +64,40 @@ const Configuracion = () => {
   // --- Estado y Hooks para Configuración Clínica ---
   const { data: clinicConfig, isLoading: loadingClinicConfig } = useGetConfiguration();
   const updateClinicMutation = useUpdateConfiguration();
+
+  // --- Hooks para Gestión de Entidades ---
+  const { data: empleados, isLoading: loadingEmpleados } = useGetEmpleados();
+  const deleteEmpleadoMutation = useDeleteEmpleado();
+  
+  const { data: recursos, isLoading: loadingRecursos } = useGetRecursos();
+  const deleteRecursoMutation = useDeleteRecurso();
+  
+  const { data: aparatos, isLoading: loadingAparatos } = useGetAparatos();
+  const deleteAparatoMutation = useDeleteAparato();
+  
+  const { data: proveedores, isLoading: loadingProveedores } = useGetProveedores();
+  const deleteProveedorMutation = useDeleteProveedor();
+
+  // --- Estados para Sheets de Gestión ---
+  const [empleadoSheetOpen, setEmpleadoSheetOpen] = useState(false);
+  const [empleadoEditing, setEmpleadoEditing] = useState<Empleado | null>(null);
+  const createEmpleadoMutation = useCreateEmpleado();
+  const updateEmpleadoMutation = useUpdateEmpleado();
+
+  const [recursoSheetOpen, setRecursoSheetOpen] = useState(false);
+  const [recursoEditing, setRecursoEditing] = useState<Recurso | null>(null);
+  const createRecursoMutation = useCreateRecurso();
+  const updateRecursoMutation = useUpdateRecurso();
+
+  const [aparatoSheetOpen, setAparatoSheetOpen] = useState(false);
+  const [aparatoEditing, setAparatoEditing] = useState<Aparato | null>(null);
+  const createAparatoMutation = useCreateAparato();
+  const updateAparatoMutation = useUpdateAparato();
+
+  const [proveedorSheetOpen, setProveedorSheetOpen] = useState(false);
+  const [proveedorEditing, setProveedorEditing] = useState<Proveedor | null>(null);
+  const createProveedorMutation = useCreateProveedor();
+  const updateProveedorMutation = useUpdateProveedor();
 
   // Cargar configuración WAHA inicial en el estado local
   useEffect(() => {
@@ -146,6 +189,110 @@ const Configuracion = () => {
         }
   };
 
+  // --- Handlers para Empleados ---
+  const handleNuevoEmpleado = () => {
+    setEmpleadoEditing(null);
+    setEmpleadoSheetOpen(true);
+  };
+
+  const handleEditarEmpleado = (empleado: Empleado) => {
+    setEmpleadoEditing(empleado);
+    setEmpleadoSheetOpen(true);
+  };
+
+  const handleSaveEmpleado = async (data: any) => {
+    try {
+      if (empleadoEditing) {
+        await updateEmpleadoMutation.mutateAsync({ id: empleadoEditing.$id, data });
+        toast({ title: "Empleado actualizado" });
+      } else {
+        await createEmpleadoMutation.mutateAsync(data);
+        toast({ title: "Empleado creado" });
+      }
+      setEmpleadoSheetOpen(false);
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
+  // --- Handlers para Recursos ---
+  const handleNuevoRecurso = () => {
+    setRecursoEditing(null);
+    setRecursoSheetOpen(true);
+  };
+
+  const handleEditarRecurso = (recurso: Recurso) => {
+    setRecursoEditing(recurso);
+    setRecursoSheetOpen(true);
+  };
+
+  const handleSaveRecurso = async (data: any) => {
+    try {
+      if (recursoEditing) {
+        await updateRecursoMutation.mutateAsync({ id: recursoEditing.$id, data });
+        toast({ title: "Recurso actualizado" });
+      } else {
+        await createRecursoMutation.mutateAsync(data);
+        toast({ title: "Recurso creado" });
+      }
+      setRecursoSheetOpen(false);
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
+  // --- Handlers para Aparatos ---
+  const handleNuevoAparato = () => {
+    setAparatoEditing(null);
+    setAparatoSheetOpen(true);
+  };
+
+  const handleEditarAparato = (aparato: Aparato) => {
+    setAparatoEditing(aparato);
+    setAparatoSheetOpen(true);
+  };
+
+  const handleSaveAparato = async (data: any) => {
+    try {
+      if (aparatoEditing) {
+        await updateAparatoMutation.mutateAsync({ id: aparatoEditing.$id, data });
+        toast({ title: "Aparato actualizado" });
+      } else {
+        await createAparatoMutation.mutateAsync(data);
+        toast({ title: "Aparato creado" });
+      }
+      setAparatoSheetOpen(false);
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
+  // --- Handlers para Proveedores ---
+  const handleNuevoProveedor = () => {
+    setProveedorEditing(null);
+    setProveedorSheetOpen(true);
+  };
+
+  const handleEditarProveedor = (proveedor: Proveedor) => {
+    setProveedorEditing(proveedor);
+    setProveedorSheetOpen(true);
+  };
+
+  const handleSaveProveedor = async (data: any) => {
+    try {
+      if (proveedorEditing) {
+        await updateProveedorMutation.mutateAsync({ id: proveedorEditing.$id, data });
+        toast({ title: "Proveedor actualizado" });
+      } else {
+        await createProveedorMutation.mutateAsync(data);
+        toast({ title: "Proveedor creado" });
+      }
+      setProveedorSheetOpen(false);
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
        <div>
@@ -154,10 +301,14 @@ const Configuracion = () => {
        </div>
 
       <Tabs defaultValue="waha">
-        <TabsList className="mb-4 grid w-full grid-cols-3">
-          <TabsTrigger value="clinica"> <Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
-          <TabsTrigger value="waha"> <Server className="w-4 h-4 mr-2"/> WhatsApp (WAHA)</TabsTrigger>
-          <TabsTrigger value="import"> <Upload className="w-4 h-4 mr-2"/> Importar Clientes (CSV)</TabsTrigger>
+        <TabsList className="mb-4 grid w-full grid-cols-7 gap-1">
+          <TabsTrigger value="clinica"><Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
+          <TabsTrigger value="waha"><Server className="w-4 h-4 mr-2"/> WAHA</TabsTrigger>
+          <TabsTrigger value="import"><Upload className="w-4 h-4 mr-2"/> Import</TabsTrigger>
+          <TabsTrigger value="empleados"><Users className="w-4 h-4 mr-2"/> Empleados</TabsTrigger>
+          <TabsTrigger value="recursos"><Package className="w-4 h-4 mr-2"/> Recursos</TabsTrigger>
+          <TabsTrigger value="aparatos"><Wrench className="w-4 h-4 mr-2"/> Aparatos</TabsTrigger>
+          <TabsTrigger value="proveedores"><Building2 className="w-4 h-4 mr-2"/> Proveedores</TabsTrigger>
         </TabsList>
 
         {/* --- Contenido Pestaña Clínica --- */}
@@ -302,7 +453,280 @@ const Configuracion = () => {
             </Card>
           </div>
         </TabsContent>
+
+        {/* --- Contenido Pestaña Empleados --- */}
+        <TabsContent value="empleados">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Gestión de Empleados</CardTitle>
+                <CardDescription>Administra los empleados de la clínica.</CardDescription>
+              </div>
+              <Button onClick={handleNuevoEmpleado}><Plus className="w-4 h-4 mr-2"/> Nuevo Empleado</Button>
+            </CardHeader>
+            <CardContent>
+              {loadingEmpleados ? <LoadingSpinner /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {empleados && empleados.length > 0 ? empleados.map(emp => (
+                      <TableRow key={emp.$id}>
+                        <TableCell className="font-medium">{emp.nombre} {emp.apellidos}</TableCell>
+                        <TableCell>{emp.email}</TableCell>
+                        <TableCell>{emp.telefono}</TableCell>
+                        <TableCell>
+                          <Badge variant={emp.activo ? 'default' : 'secondary'}>
+                            {emp.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditarEmpleado(emp)}><Pencil className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            if (confirm('¿Eliminar empleado?')) {
+                              deleteEmpleadoMutation.mutate(emp.$id);
+                            }
+                          }}><Trash2 className="w-4 h-4"/></Button>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">No hay empleados registrados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Contenido Pestaña Recursos --- */}
+        <TabsContent value="recursos">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Gestión de Recursos</CardTitle>
+                <CardDescription>Administra salas, camillas y equipamiento.</CardDescription>
+              </div>
+              <Button onClick={handleNuevoRecurso}><Plus className="w-4 h-4 mr-2"/> Nuevo Recurso</Button>
+            </CardHeader>
+            <CardContent>
+              {loadingRecursos ? <LoadingSpinner /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recursos && recursos.length > 0 ? recursos.map(rec => (
+                      <TableRow key={rec.$id}>
+                        <TableCell className="font-medium">{rec.nombre}</TableCell>
+                        <TableCell><Badge variant="outline">{rec.tipo}</Badge></TableCell>
+                        <TableCell className="max-w-[200px] truncate">{rec.descripcion || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={rec.activo ? 'default' : 'secondary'}>
+                            {rec.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditarRecurso(rec)}><Pencil className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            if (confirm('¿Eliminar recurso?')) {
+                              deleteRecursoMutation.mutate(rec.$id);
+                            }
+                          }}><Trash2 className="w-4 h-4"/></Button>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">No hay recursos registrados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Contenido Pestaña Aparatos --- */}
+        <TabsContent value="aparatos">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Gestión de Aparatos</CardTitle>
+                <CardDescription>Administra los equipos médicos de la clínica.</CardDescription>
+              </div>
+              <Button onClick={handleNuevoAparato}><Plus className="w-4 h-4 mr-2"/> Nuevo Aparato</Button>
+            </CardHeader>
+            <CardContent>
+              {loadingAparatos ? <LoadingSpinner /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Marca/Modelo</TableHead>
+                      <TableHead>Nº Serie</TableHead>
+                      <TableHead>Próximo Mantenimiento</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aparatos && aparatos.length > 0 ? aparatos.map(ap => (
+                      <TableRow key={ap.$id}>
+                        <TableCell className="font-medium">{ap.nombre}</TableCell>
+                        <TableCell>{ap.marca ? `${ap.marca} ${ap.modelo || ''}` : '-'}</TableCell>
+                        <TableCell>{ap.numero_serie || '-'}</TableCell>
+                        <TableCell>{ap.fecha_proximo_mantenimiento ? format(new Date(ap.fecha_proximo_mantenimiento), 'dd/MM/yyyy') : '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={ap.activo ? 'default' : 'secondary'}>
+                            {ap.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditarAparato(ap)}><Pencil className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            if (confirm('¿Eliminar aparato?')) {
+                              deleteAparatoMutation.mutate(ap.$id);
+                            }
+                          }}><Trash2 className="w-4 h-4"/></Button>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">No hay aparatos registrados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Contenido Pestaña Proveedores --- */}
+        <TabsContent value="proveedores">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Gestión de Proveedores</CardTitle>
+                <CardDescription>Administra los proveedores de la clínica.</CardDescription>
+              </div>
+              <Button onClick={handleNuevoProveedor}><Plus className="w-4 h-4 mr-2"/> Nuevo Proveedor</Button>
+            </CardHeader>
+            <CardContent>
+              {loadingProveedores ? <LoadingSpinner /> : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>CIF</TableHead>
+                      <TableHead>Teléfono</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {proveedores && proveedores.length > 0 ? proveedores.map(prov => (
+                      <TableRow key={prov.$id}>
+                        <TableCell className="font-medium">{prov.nombre}</TableCell>
+                        <TableCell>{prov.cif || '-'}</TableCell>
+                        <TableCell>{prov.telefono || '-'}</TableCell>
+                        <TableCell>{prov.email || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={prov.activo ? 'default' : 'secondary'}>
+                            {prov.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditarProveedor(prov)}><Pencil className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            if (confirm('¿Eliminar proveedor?')) {
+                              deleteProveedorMutation.mutate(prov.$id);
+                            }
+                          }}><Trash2 className="w-4 h-4"/></Button>
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">No hay proveedores registrados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* --- Sheets para Gestión de Entidades --- */}
+      <Sheet open={empleadoSheetOpen} onOpenChange={setEmpleadoSheetOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{empleadoEditing ? 'Editar Empleado' : 'Nuevo Empleado'}</SheetTitle>
+          </SheetHeader>
+          <EmpleadoForm
+            empleadoInicial={empleadoEditing || undefined}
+            onSubmit={handleSaveEmpleado}
+            isSubmitting={createEmpleadoMutation.isPending || updateEmpleadoMutation.isPending}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={recursoSheetOpen} onOpenChange={setRecursoSheetOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{recursoEditing ? 'Editar Recurso' : 'Nuevo Recurso'}</SheetTitle>
+          </SheetHeader>
+          <RecursoForm
+            recursoInicial={recursoEditing || undefined}
+            onSubmit={handleSaveRecurso}
+            isSubmitting={createRecursoMutation.isPending || updateRecursoMutation.isPending}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={aparatoSheetOpen} onOpenChange={setAparatoSheetOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{aparatoEditing ? 'Editar Aparato' : 'Nuevo Aparato'}</SheetTitle>
+          </SheetHeader>
+          <AparatoForm
+            aparatoInicial={aparatoEditing || undefined}
+            onSubmit={handleSaveAparato}
+            isSubmitting={createAparatoMutation.isPending || updateAparatoMutation.isPending}
+          />
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={proveedorSheetOpen} onOpenChange={setProveedorSheetOpen}>
+        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{proveedorEditing ? 'Editar Proveedor' : 'Nuevo Proveedor'}</SheetTitle>
+          </SheetHeader>
+          <ProveedorForm
+            proveedorInicial={proveedorEditing || undefined}
+            onSubmit={handleSaveProveedor}
+            isSubmitting={createProveedorMutation.isPending || updateProveedorMutation.isPending}
+          />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

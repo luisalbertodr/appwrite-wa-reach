@@ -1449,6 +1449,273 @@
                 }
             ],
             "indexes": []
+        },
+        {
+            "$id": "recursos",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Recursos",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "tipo",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 50,
+                    "encrypt": false,
+                    "default": null,
+                    "format": "enum",
+                    "elements": [
+                        "sala",
+                        "camilla",
+                        "equipamiento",
+                        "otro"
+                    ]
+                },
+                {
+                    "key": "descripcion",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 1000,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": true
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "idx_recursos_nombre",
+                    "type": "key",
+                    "attributes": [
+                        "nombre"
+                    ]
+                }
+            ]
+        },
+        {
+            "$id": "aparatos",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Aparatos",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "marca",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "modelo",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "numero_serie",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "fecha_compra",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "fecha_proximo_mantenimiento",
+                    "type": "datetime",
+                    "required": false,
+                    "array": false,
+                    "default": null
+                },
+                {
+                    "key": "proveedor_id",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": true
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "idx_aparatos_nombre",
+                    "type": "key",
+                    "attributes": [
+                        "nombre"
+                    ]
+                }
+            ]
+        },
+        {
+            "$id": "proveedores",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68b1d7530028045d94d3",
+            "name": "Proveedores",
+            "enabled": true,
+            "documentSecurity": false,
+            "attributes": [
+                {
+                    "key": "nombre",
+                    "type": "string",
+                    "required": true,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "cif",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "telefono",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 50,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "email",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "direccion",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "ciudad",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 100,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "codigo_postal",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 20,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "provincia",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 100,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "contacto",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "activo",
+                    "type": "boolean",
+                    "required": true,
+                    "array": false,
+                    "default": true
+                }
+            ],
+            "indexes": [
+                {
+                    "key": "idx_proveedores_nombre",
+                    "type": "key",
+                    "attributes": [
+                        "nombre"
+                    ]
+                }
+            ]
         }
     ],
     "buckets": [

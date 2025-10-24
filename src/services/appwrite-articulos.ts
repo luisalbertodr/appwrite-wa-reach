@@ -79,33 +79,48 @@ export const getArticulos = async (familiaId?: string): Promise<(Articulo & Mode
 
   return response.documents.map(articulo => ({
       ...articulo,
-      familia: familiaMap.get(typeof articulo.familia === 'string' ? articulo.familia : articulo.familia?.$id) // "Poblamos" la familia
+      familia: familiaMap.get(articulo.familia_id) // "Poblamos" la familia usando familia_id
   }));
 };
 
 export const createArticulo = (articuloInput: CreateArticuloInput) => {
-   const articuloToSave = {
+   const articuloToSave: any = {
      ...articuloInput,
    };
+   
    if (articuloToSave.precio === undefined || !articuloToSave.tipo || !articuloToSave.familia_id) {
        throw new Error("Faltan campos requeridos para crear el artículo (nombre, precio, tipo, familia_id).");
    }
+   
+   // Limpiar campos undefined para evitar errores en Appwrite
+   Object.keys(articuloToSave).forEach(key => {
+     if (articuloToSave[key] === undefined) {
+       delete articuloToSave[key];
+     }
+   });
 
   return databases.createDocument(
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,
     ID.unique(),
-    articuloToSave as any
+    articuloToSave
   ) as Promise<Articulo & Models.Document>;
 };
 
 export const updateArticulo = (id: string, articuloInput: UpdateArticuloInput) => {
+   console.log('🔍 updateArticulo - Input recibido:', articuloInput);
    const articuloToUpdate: any = { ...articuloInput };
-   // Mapear familia_id del input a familia para Appwrite
-   if (articuloInput.familia_id !== undefined) {
-       articuloToUpdate.familia = articuloInput.familia_id;
-       delete articuloToUpdate.familia_id;
-   }
+   
+   // Limpiar campos undefined para evitar errores en Appwrite
+   Object.keys(articuloToUpdate).forEach(key => {
+     if (articuloToUpdate[key] === undefined) {
+       delete articuloToUpdate[key];
+     }
+   });
+   
+   console.log('📤 updateArticulo - Datos a enviar a Appwrite:', articuloToUpdate);
+   console.log('📋 updateArticulo - ID del documento:', id);
+   
   return databases.updateDocument(
     DATABASE_ID,
     ARTICULOS_COLLECTION_ID,

@@ -40,7 +40,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
       descripcion: articuloInicial.descripcion || '',
       precio: articuloInicial.precio || 0,
       tipo: articuloInicial.tipo || 'servicio',
-      familia_id: articuloInicial.familia?.$id || '', // Solo acceder a familia.$id
+      familia_id: articuloInicial.familia_id || articuloInicial.familia?.$id || '',
       stock: articuloInicial.stock || 0,
       sesiones_bono: articuloInicial.sesiones_bono || 0,
       activo: articuloInicial.activo ?? true,
@@ -55,6 +55,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
   const tipoSeleccionado = form.watch('tipo');
 
   const handleSubmit = async (data: ArticuloFormData) => {
+    console.log('📝 ArticuloForm - Datos del formulario:', data);
     // Convertir a ArticuloInput (tipo base para Appwrite)
     const finalData: LipooutUserInput<ArticuloInput> = {
         ...data,
@@ -63,6 +64,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
         stock: data.tipo === 'producto' ? (data.stock ?? undefined) : undefined,
         sesiones_bono: data.tipo === 'bono' ? (data.sesiones_bono ?? undefined) : undefined,
     };
+    console.log('✅ ArticuloForm - Datos finales a enviar:', finalData);
     await onSubmit(finalData);
   };
 

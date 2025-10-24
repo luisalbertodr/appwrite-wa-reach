@@ -119,3 +119,6 @@ export * from './empleado.types';
 export * from './cita.types';
 export * from './factura.types';
 export * from './configuracion.types';
+export * from './recurso.types';
+export * from './aparato.types';
+export * from './proveedor.types';

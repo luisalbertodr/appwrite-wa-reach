@@ -9,8 +9,9 @@ export interface Articulo extends LipooutDocument {
   precio: number;
   tipo: TipoArticulo;
 
-  // Relación con Familias (objeto completo cuando se lee de Appwrite)
-  familia: any; // Familia completa poblada por Appwrite
+  // Appwrite devuelve tanto el ID como el objeto poblado
+  familia_id: string; // ID original almacenado en Appwrite
+  familia: any; // Familia completa poblada manualmente en getArticulos
 
   // (Opcional) Campos para control de stock si 'tipo' es 'producto'
   stock?: number | null;

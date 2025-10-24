@@ -102,3 +102,21 @@ export const useDeleteArticulo = () => {
     },
   });
 };
+
+// --- Hook Consolidado ---
+// Hook principal que agrupa todas las funcionalidades de artículos
+export const useArticulos = (familiaId?: string) => {
+  const { data: articulos, isLoading, error } = useGetArticulos(familiaId);
+  const { mutateAsync: createAsync } = useCreateArticulo();
+  const { mutateAsync: updateAsync } = useUpdateArticulo();
+  const { mutateAsync: deleteAsync } = useDeleteArticulo();
+
+  return {
+    articulos: articulos || [],
+    isLoading,
+    error,
+    createArticulo: createAsync,
+    updateArticulo: updateAsync,
+    deleteArticulo: deleteAsync,
+  };
+};

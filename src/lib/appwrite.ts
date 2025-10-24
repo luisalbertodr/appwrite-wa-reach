@@ -35,3 +35,6 @@ export const FAMILIAS_COLLECTION_ID = 'familias';
 export const CITAS_COLLECTION_ID = 'citas';
 export const FACTURAS_COLLECTION_ID = 'facturas';
 export const CONFIGURATION_COLLECTION_ID = 'configuracion';
+export const RECURSOS_COLLECTION_ID = 'recursos';
+export const APARATOS_COLLECTION_ID = 'aparatos';
+export const PROVEEDORES_COLLECTION_ID = 'proveedores';
