@@ -23,8 +23,7 @@ export const AppLayout = () => {
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
       <Header />
-      {/* MODIFICACIÓN: Se cambió "pb-20 md:pb-6" por solo "pb-20" */}
-      <main className="flex-1 p-4 sm:p-6 pb-20">
+      <main className="flex-1 p-4 sm:p-6 pb-28">
         <Outlet />
       </main>
       <BottomNavigation />

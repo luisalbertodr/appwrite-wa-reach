@@ -15,8 +15,8 @@ module.exports = async ({ req, res, log, error }) => {
 
     const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
     const CLIENTS_COLLECTION_ID = process.env.APPWRITE_CLIENTS_COLLECTION_ID;
-    const IMPORT_LOGS_COLLECTION_ID = 'IMPORT_LOGS_COLLECTION_ID';
-    const IMPORT_BUCKET_ID = '68d7cd3a0019edb5703b';
+    const IMPORT_LOGS_COLLECTION_ID = 'import_logs';
+    const IMPORT_BUCKET_ID = 'lipoout';
 
     let successfulImports = 0;
     let totalProcessed = 0;
@@ -245,26 +245,38 @@ module.exports = async ({ req, res, log, error }) => {
             .concat(importErrors.map(String));
 
         const logDoc = { 
-            timestamp, 
-            filename: fileName, 
-            successfulImports, 
-            totalProcessed, 
-            errors: combinedLog.length > 3 ? combinedLog : ['Ninguno'], 
-            status: logStatus 
+            file_id: fileId,
+            file_name: fileName, 
+            status: logStatus === 'completed' ? 'completed' : (logStatus === 'completed_with_errors' ? 'completed' : 'failed'),
+            total_rows: totalProcessed,
+            processed_rows: totalProcessed,
+            successful_rows: successfulImports, 
+            failed_rows: importErrors.length,
+            error_message: combinedLog.join('\n').substring(0, 1999),
+            started_at: timestamp,
+            completed_at: new Date().toISOString()
         };
 
         await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), logDoc);
         log(`Import log saved for ${fileName}. Status: ${logStatus}`);
         
-        return res.json({ ok: true, message: `Importación finalizada.`, ...logDoc }, 200);
+        return res.json({ ok: true, message: `Importación finalizada.`, successfulImports, totalProcessed, status: logStatus }, 200);
 
     } catch (err) {
         error(`Unhandled error during import: ${err.message}`);
         const errorMessage = (err instanceof AppwriteException) ? `${err.message} (Type: ${err.type})` : err.message;
         try {
             await databases.createDocument(DATABASE_ID, IMPORT_LOGS_COLLECTION_ID, ID.unique(), {
-                timestamp, filename: fileName, successfulImports: 0, totalProcessed,
-                errors: [`Error no controlado: ${errorMessage}`], status: 'failed',
+                file_id: 'unknown',
+                file_name: fileName, 
+                status: 'failed',
+                total_rows: totalProcessed,
+                processed_rows: 0,
+                successful_rows: 0,
+                failed_rows: totalProcessed,
+                error_message: `Error no controlado: ${errorMessage}`.substring(0, 1999),
+                started_at: timestamp,
+                completed_at: new Date().toISOString()
             });
         } catch (logError) {
             error(`Failed to save failure log: ${logError.message}`);

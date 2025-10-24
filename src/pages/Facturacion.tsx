@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGetFacturas, useCreateFactura, useUpdateFactura, useDeleteFactura } from '@/hooks/useFacturas';
+import { useGetFacturas, useCreateFactura, useUpdateFactura } from '@/hooks/useFacturas';
 import { useGetConfiguration, useGenerarSiguienteNumero } from '@/hooks/useConfiguration'; // <-- Nombre corregido
 import { Factura, FacturaInputData, CreateFacturaInput, UpdateFacturaInput, Configuracion, FacturaConDatos, LineaFactura } from '@/types'; // Importar Configuracion
 import { Models } from 'appwrite';
@@ -57,7 +57,7 @@ const Facturacion = () => {
   const [estadoFilter, setEstadoFilter] = useState('todos'); // Valor inicial 'todos'
 
   // --- Hooks de Datos ---
-  const { data: facturas, isLoading, error, refetch: refetchFacturas } = useGetFacturas(searchTerm, estadoFilter === 'todos' ? '' : estadoFilter);
+  const { data: facturas, isLoading, error } = useGetFacturas(searchTerm, estadoFilter === 'todos' ? '' : estadoFilter);
   const createFacturaMutation = useCreateFactura();
   const updateFacturaMutation = useUpdateFactura();
   // const deleteFacturaMutation = useDeleteFactura(); // No usado directamente ahora

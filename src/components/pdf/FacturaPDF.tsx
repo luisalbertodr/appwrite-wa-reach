@@ -217,7 +217,7 @@ export const FacturaPDF = ({ factura, config }: { factura: FacturaConDatos, conf
                 <Text style={styles.tableHeaderCol}>Total</Text>
             </View>
             {/* Filas Tabla */}
-            {lineasParseadas.map(linea => (
+            {lineasParseadas.map((linea: LineaFactura) => (
                 <View style={styles.tableRow} key={linea.id}>
                     <Text style={styles.tableRowColDesc}>{linea.descripcion}</Text>
                     <Text style={styles.tableRowCol}>{linea.cantidad}</Text>
@@ -277,7 +277,7 @@ export const FacturaPDF = ({ factura, config }: { factura: FacturaConDatos, conf
 
 
         {/* --- 6. Números de Página --- */}
-        <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => (
+        <Text style={styles.pageNumber} render={({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => (
           `${pageNumber} / ${totalPages}`
         )} fixed />
         <Text style={styles.footer} fixed>

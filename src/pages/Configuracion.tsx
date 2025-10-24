@@ -18,7 +18,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   CONFIG_COLLECTION_ID,
   IMPORT_LOGS_COLLECTION_ID,
-  DATABASE_ID_WAHA,
   storage,
   IMPORT_BUCKET_ID,
   client,
@@ -41,14 +40,14 @@ const Configuracion = () => {
   const { toast } = useToast();
   
   // --- Estado y Hooks para Configuración WAHA ---
-  const { data: configs, update: updateWahaConfig, loading: loadingWahaConfig, reload: reloadWahaConfig } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID, DATABASE_ID_WAHA);
+  const { data: configs, update: updateWahaConfig, loading: loadingWahaConfig, reload: reloadWahaConfig } = useAppwriteCollection<WahaConfig>(CONFIG_COLLECTION_ID);
   const [wahaSettings, setWahaSettings] = useState<Partial<WahaConfig>>({});
   const [sessions, setSessions] = useState<{ name: string; status: string }[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [isSavingWaha, setIsSavingWaha] = useState(false);
 
   // --- Estado y Hooks para Importación CSV ---
-  const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID, DATABASE_ID_WAHA);
+  const { data: importLogsData, loading: loadingLogs, reload: reloadLogs } = useAppwriteCollection<ImportLog>(IMPORT_LOGS_COLLECTION_ID);
   const importLogs = importLogsData as ImportLog[];
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);

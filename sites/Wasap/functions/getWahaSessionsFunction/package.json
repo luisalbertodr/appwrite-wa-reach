@@ -1,0 +1,13 @@
+{
+   "name": "getwahasessionsfunction",
+    "version": "1.0.0",
+    "description": "Appwrite function to get active Waha sessions.",
+    "main": "src/main.js",
+    "type": "commonjs",
+    "scripts": {
+      "start": "node src/main.js"
+    },
+    "dependencies": {
+      "node-fetch": "^2.6.7"
+    }
+}

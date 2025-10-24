@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send, Filter, Download, Loader2, Search, ImagePlus, Save, Edit, FileText, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID_WAHA, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, CAMPAIGN_PROGRESS_COLLECTION_ID } from '@/lib/appwrite';
+import { CLIENTS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, CONFIG_COLLECTION_ID, client, databases, DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, storage, IMPORT_BUCKET_ID, CAMPAIGN_PROGRESS_COLLECTION_ID } from '@/lib/appwrite';
 import { Functions, Query, ID, Models } from 'appwrite';
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
@@ -142,7 +142,7 @@ export function CampaignsTab() {
     const checkForActiveCampaigns = async () => {
       try {
         const response = await databases.listDocuments(
-          DATABASE_ID_WAHA,
+          DATABASE_ID,
           CAMPAIGNS_COLLECTION_ID,
           [Query.equal('status', 'sending'), Query.limit(1)]
         );
@@ -172,14 +172,14 @@ export function CampaignsTab() {
         forceFailCampaign(activeCampaignId);
     }, CAMPAIGN_TIMEOUT_MS);
     
-    const unsubscribeProgress = client.subscribe(`databases.${DATABASE_ID_WAHA}.collections.${CAMPAIGN_PROGRESS_COLLECTION_ID}.documents.${activeCampaignId}`, response => {
+    const unsubscribeProgress = client.subscribe(`databases.${DATABASE_ID}.collections.${CAMPAIGN_PROGRESS_COLLECTION_ID}.documents.${activeCampaignId}`, response => {
         setCampaignProgress(response.payload as CampaignProgress);
     });
 
     const interval = setInterval(async () => {
       try {
         const response = await databases.listDocuments(
-          DATABASE_ID_WAHA, MESSAGE_LOGS_COLLECTION_ID,
+          DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID,
           [Query.equal('campaignId', activeCampaignId), Query.limit(5000)]
         );
         const sent = response.documents.filter(d => d.status === 'sent').length;
@@ -347,7 +347,7 @@ export function CampaignsTab() {
   const handleShowCampaignLog = async (campaignId: string) => {
     try {
         const response = await databases.listDocuments(
-            DATABASE_ID_WAHA,
+            DATABASE_ID,
             MESSAGE_LOGS_COLLECTION_ID,
             [Query.equal('campaignId', campaignId), Query.limit(5000)]
         );

@@ -9,12 +9,45 @@ export type UpdateCitaInput = Partial<CitaInput>;
 
 // Obtener citas para un día específico y opcionalmente un empleado
 export const getCitasPorDia = async (fecha: Date, empleadoId?: string): Promise<Cita[]> => {
-  const inicioDia = startOfDay(fecha).toISOString();
-  const finDia = endOfDay(fecha).toISOString();
+  const inicioDia = startOfDay(fecha);
+  const finDia = endOfDay(fecha);
+
+  // Convertir a formato ISO sin milisegundos y en UTC
+  const inicioDiaStr = inicioDia.toISOString().split('.')[0] + 'Z';
+  const finDiaStr = finDia.toISOString().split('.')[0] + 'Z';
 
   const queries = [
-    Query.greaterThanEqual('fecha_hora', inicioDia),
-    Query.lessThanEqual('fecha_hora', finDia),
+    Query.greaterThanEqual('fecha_hora', inicioDiaStr),
+    Query.lessThanEqual('fecha_hora', finDiaStr),
+    Query.orderAsc('fecha_hora'),
+    Query.limit(500),
+  ];
+
+  if (empleadoId) {
+    queries.push(Query.equal('empleado_id', empleadoId));
+  }
+
+  const response = await databases.listDocuments<Cita>(
+    DATABASE_ID,
+    CITAS_COLLECTION_ID,
+    queries
+  );
+  return response.documents;
+};
+
+// Obtener citas para un rango de fechas (útil para vista de calendario)
+export const getCitasPorRango = async (
+  fechaInicio: Date,
+  fechaFin: Date,
+  empleadoId?: string
+): Promise<Cita[]> => {
+  // Convertir a formato ISO sin milisegundos y en UTC
+  const fechaInicioStr = fechaInicio.toISOString().split('.')[0] + 'Z';
+  const fechaFinStr = fechaFin.toISOString().split('.')[0] + 'Z';
+
+  const queries = [
+    Query.greaterThanEqual('fecha_hora', fechaInicioStr),
+    Query.lessThanEqual('fecha_hora', fechaFinStr),
     Query.orderAsc('fecha_hora'),
     Query.limit(500),
   ];

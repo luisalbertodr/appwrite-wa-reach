@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTpvStore } from '@/stores/tpvStore';
+import { useTpvStore, LineaTicket } from '@/stores/tpvStore';
 import { useGetClientes } from '@/hooks/useClientes';
 import { useGetArticulos } from '@/hooks/useArticulos';
 import { useCreateFactura } from '@/hooks/useFacturas';
@@ -205,7 +205,7 @@ const TPV = () => {
     let baseImponibleTotal = 0;
     let ivaTotal = 0;
 
-    const lineasFactura: LineaFactura[] = lineas.map((lineaTpv) => {
+    const lineasFactura: LineaFactura[] = lineas.map((lineaTpv: LineaTicket) => {
       const baseLinea = lineaTpv.importeTotal;
       const ivaImporteLinea = baseLinea * (tipoIvaPredeterminado / 100);
       baseImponibleTotal += baseLinea;
@@ -296,11 +296,16 @@ const TPV = () => {
                            </TableRow>
                        </TableHeader>
                        <TableBody>
-                           {lineas.map(linea => (
+                           {lineas.map((linea: LineaFactura) => (
                                <TableRow key={linea.id}>
-                                   <TableCell className="font-medium truncate">{linea.articulo.nombre}</TableCell>
+                                   <TableCell className="font-medium truncate">
+                                       {linea.articulo?.nombre ?? <span className="text-destructive">Sin artículo</span>}
+                                   </TableCell>
                                    <TableCell>
-                                       <EditableNumberCell value={linea.cantidad} onChange={(val) => actualizarCantidadLinea(linea.id, val)} />
+                                       <EditableNumberCell
+                                           value={linea.cantidad}
+                                           onChange={(val) => actualizarCantidadLinea(linea.id, val)}
+                                       />
                                    </TableCell>
                                     <TableCell>
                                        <EditableNumberCell value={linea.precioUnitario} onChange={(val) => actualizarPrecioLinea(linea.id, val)} />

@@ -9,6 +9,7 @@ export type EstadoFactura = 'borrador' | 'finalizada' | 'cobrada' | 'anulada' | 
 // Definimos cómo será una línea dentro de la factura
 // Similar a LineaTicket, pero puede tener más detalles (ej. impuestos)
 export interface LineaFactura {
+  [x: string]: any;
   id: string; // ID único interno para la línea (UUID)
   articulo?: Articulo; // Objeto completo (opcional, para visualización)
   articulo_id: string;

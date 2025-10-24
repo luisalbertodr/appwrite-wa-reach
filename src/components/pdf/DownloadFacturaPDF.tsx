@@ -25,7 +25,7 @@ export const DownloadFacturaPDF = ({ factura, config, children, className }: Dow
       document={<FacturaPDF factura={factura} config={config} />}
       fileName={fileName}
     >
-      {({ blob, url, loading, error }) =>
+      {({ blob, url, loading, error }: { blob: Blob | null; url: string | null; loading: boolean; error: Error | null }) =>
         loading ? (
             // Clonamos el children (DropdownMenuItem) y le ponemos estado 'disabled'
              React.cloneElement(children as React.ReactElement, {

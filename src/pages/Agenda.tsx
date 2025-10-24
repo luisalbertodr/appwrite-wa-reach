@@ -32,7 +32,7 @@ const Agenda = () => {
   const { toast } = useToast();
 
   // Hooks de datos y mutaciones
-  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas, refetch: refetchCitas } = useGetCitasPorDia(
+  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas } = useGetCitasPorDia(
       selectedDate || new Date()
   );
   const createCitaMutation = useCreateCita();
@@ -60,14 +60,15 @@ const Agenda = () => {
   };
 
   const handleDeleteCita = async (cita: Cita & Models.Document) => {
-    if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora), 'HH:mm')}?`)) {
-      try {
+    try {
+      if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora), 'HH:mm')}?`)) {
+        // Pasar la fecha de la cita para invalidar queries
         await deleteCitaMutation.mutateAsync({ id: cita.$id, fechaCita: cita.fecha_hora });
         toast({ title: "Cita eliminada" });
         // refetchCitas(); // InvalidateQueries lo hace
-      } catch (err) {
-        toast({ title: "Error al eliminar la cita", description: (err as Error).message, variant: "destructive" });
       }
+    } catch (err) {
+      toast({ title: "Error al eliminar la cita", description: (err as Error).message, variant: "destructive" });
     }
   };
 
@@ -103,7 +104,7 @@ const Agenda = () => {
 
     // Filtramos de nuevo por si acaso la query trajo citas fuera del día exacto
     const citasFiltradas = citasDelDia.filter(cita =>
-        format(startOfDay(parseISO(cita.fecha_hora)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
+      format(startOfDay(parseISO(cita.fecha_hora)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
     );
 
      if (citasFiltradas.length === 0) {
@@ -127,7 +128,7 @@ const Agenda = () => {
           {citasFiltradas.map((cita: Cita & Models.Document) => (
             <TableRow key={cita.$id}>
               <TableCell className="font-medium">
-                {format(parseISO(cita.fecha_hora), 'HH:mm')}
+                  {format(parseISO(cita.fecha_hora), 'HH:mm')}
               </TableCell>
               <TableCell>{cita.cliente_id}</TableCell>
               <TableCell>{cita.articulos}</TableCell>
