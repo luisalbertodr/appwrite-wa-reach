@@ -74,7 +74,7 @@
             "name": "sendWhatsAppFunction",
             "enabled": true,
             "logging": true,
-            "runtime": "node-16.0",
+            "runtime": "node-18.0",
             "scopes": [
                 "databases.read",
                 "databases.write",
