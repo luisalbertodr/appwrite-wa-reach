@@ -65,13 +65,34 @@ export const getCitasPorRango = async (
 };
 
 // Crear una nueva cita
-export const createCita = (cita: CreateCitaInput) => {
-  return databases.createDocument(
-    DATABASE_ID,
-    CITAS_COLLECTION_ID,
-    ID.unique(),
-    cita
-  );
+export const createCita = async (cita: CreateCitaInput) => {
+  console.log('=== CREAR CITA - Datos enviados ===');
+  console.log('DATABASE_ID:', DATABASE_ID);
+  console.log('CITAS_COLLECTION_ID:', CITAS_COLLECTION_ID);
+  console.log('Datos de la cita:', JSON.stringify(cita, null, 2));
+  console.log('Tipo de cada campo:');
+  Object.entries(cita).forEach(([key, value]) => {
+    console.log(`  ${key}: ${typeof value} =`, value);
+  });
+  
+  try {
+    const result = await databases.createDocument(
+      DATABASE_ID,
+      CITAS_COLLECTION_ID,
+      ID.unique(),
+      cita
+    );
+    console.log('✓ Cita creada exitosamente:', result.$id);
+    return result;
+  } catch (error: any) {
+    console.error('=== ERROR AL CREAR CITA ===');
+    console.error('Error completo:', error);
+    console.error('Mensaje:', error.message);
+    console.error('Code:', error.code);
+    console.error('Type:', error.type);
+    console.error('Response:', error.response);
+    throw error;
+  }
 };
 
 // Actualizar una cita existente
