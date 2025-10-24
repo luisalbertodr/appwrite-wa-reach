@@ -205,19 +205,30 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       const fechaHora = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
 
       // Crear el objeto final para Appwrite (CitaInput)
-      const finalData: CitaInput = {
+      // Solo incluir campos opcionales si tienen valores
+      const finalData: any = {
         fecha_hora: fechaHora.toISOString(),
         duracion: data.duracion,
         cliente_id: data.cliente_id,
         empleado_id: data.empleado_id,
         articulos: JSON.stringify(articulosSeleccionados),
         estado: data.estado,
-        comentarios: data.comentarios || undefined,
-        datos_clinicos: data.datos_clinicos || undefined,
         precio_total: data.precio_total,
-        recursos_cabina: data.recursos_cabina || undefined,
-        recursos_aparatos: data.recursos_aparatos || undefined,
       };
+
+      // Agregar campos opcionales solo si tienen valor
+      if (data.comentarios && data.comentarios.trim()) {
+        finalData.comentarios = data.comentarios;
+      }
+      if (data.datos_clinicos && data.datos_clinicos.trim()) {
+        finalData.datos_clinicos = data.datos_clinicos;
+      }
+      if (data.recursos_cabina && data.recursos_cabina.trim()) {
+        finalData.recursos_cabina = data.recursos_cabina;
+      }
+      if (data.recursos_aparatos && data.recursos_aparatos.trim()) {
+        finalData.recursos_aparatos = data.recursos_aparatos;
+      }
       
       await onSubmit(finalData);
 

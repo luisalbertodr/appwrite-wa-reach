@@ -1500,7 +1500,7 @@
                 {
                     "key": "activo",
                     "type": "boolean",
-                    "required": true,
+                    "required": false,
                     "array": false,
                     "default": true
                 }
@@ -1590,7 +1590,7 @@
                 {
                     "key": "activo",
                     "type": "boolean",
-                    "required": true,
+                    "required": false,
                     "array": false,
                     "default": true
                 }
@@ -1702,7 +1702,7 @@
                 {
                     "key": "activo",
                     "type": "boolean",
-                    "required": true,
+                    "required": false,
                     "array": false,
                     "default": true
                 }
