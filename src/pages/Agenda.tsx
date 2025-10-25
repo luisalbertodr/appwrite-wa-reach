@@ -1,21 +1,36 @@
-import { useState } from 'react';
-import { useGetCitasPorDia, useCreateCita, useUpdateCita, useDeleteCita } from '@/hooks/useAgenda';
-import { Cita, CitaInput, LipooutUserInput } from '@/types';
+import { useState, useMemo, useEffect } from 'react';
 import { Models } from 'appwrite';
+import {
+  useGetCitasPorDia,
+  useCreateCita,
+  useUpdateCita,
+  useDeleteCita
+} from '@/hooks/useAgenda';
+import { useGetEmpleados } from '@/hooks/useEmpleados';
+// Asumiendo que useGetClientes devuelve Cliente[] | undefined
+import { useGetClientes } from '@/hooks/useClientes';
+import { Cita, CitaInput, LipooutUserInput } from '@/types';
+import { Cliente } from '@/types/cliente.types';
+import { Empleado } from '@/types/empleado.types';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { Calendar } from "@/components/ui/calendar";
-import { format, parseISO, startOfDay } from 'date-fns';
+
+import { Calendar as BigCalendar, dateFnsLocalizer, View, EventProps, Views } from 'react-big-calendar';
+import { format, parse, getDay, startOfWeek, startOfDay, parseISO, addMinutes, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PlusCircle, MoreHorizontal, Edit, Trash2 } from 'lucide-react'; // Añadir iconos
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -23,196 +38,367 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CitaForm } from '@/components/forms/CitaForm'; // <-- Importar formulario
+import { CitaForm } from '@/components/forms/CitaForm';
 import { useToast } from '@/hooks/use-toast';
 
+// Configuración Localizer
+const locales = { 'es': es };
+const localizer = dateFnsLocalizer({
+  format: (date, formatStr, culture) => format(date, formatStr, { locale: locales[culture as keyof typeof locales] }),
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { locale: es }),
+  getDay,
+  locales,
+});
+
+interface CalendarEvent {
+  title: string;
+  start: Date;
+  end: Date;
+  resourceId: string;
+  data: Cita & Models.Document;
+  clienteInfo: string;
+  tratamientos: string;
+}
+
 const Agenda = () => {
-  // Estado para el día seleccionado
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
+  // Estados y Hooks
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const { toast } = useToast();
 
-  // Hooks de datos y mutaciones
-  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas } = useGetCitasPorDia(
-      selectedDate || new Date()
+  const { data: citasDelDia, isLoading: loadingCitas, error: errorCitas, isFetching } = useGetCitasPorDia(
+      selectedDate
   );
+  const { data: empleadosData, isLoading: loadingEmpleados, error: errorEmpleados } = useGetEmpleados(false);
+  const { data: clientesData, isLoading: loadingClientes, error: errorClientes } = useGetClientes();
+
   const createCitaMutation = useCreateCita();
   const updateCitaMutation = useUpdateCita();
   const deleteCitaMutation = useDeleteCita();
 
-  // Estado para el diálogo
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [citaToEdit, setCitaToEdit] = useState<(Cita & Models.Document) | null>(null);
+  const [formInitialDate, setFormInitialDate] = useState<Date | undefined>(new Date());
+  const [selectedEmpleadosIds, setSelectedEmpleadosIds] = useState<string[]>([]);
 
-  // Formatear la fecha seleccionada
   const fechaSeleccionadaFormateada = selectedDate
       ? format(selectedDate, 'EEEE, dd MMMM yyyy', { locale: es })
       : 'Seleccione una fecha';
 
-  // --- Manejadores CRUD ---
-  const handleOpenCreateDialog = () => {
-    setCitaToEdit(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenEditDialog = (cita: Cita & Models.Document) => {
-    setCitaToEdit(cita);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteCita = async (cita: Cita & Models.Document) => {
-    try {
-      if (window.confirm(`¿Estás seguro de eliminar la cita de las ${format(parseISO(cita.fecha_hora), 'HH:mm')}?`)) {
-        // Pasar la fecha de la cita para invalidar queries
-        await deleteCitaMutation.mutateAsync({ id: cita.$id, fechaCita: cita.fecha_hora });
-        toast({ title: "Cita eliminada" });
-        // refetchCitas(); // InvalidateQueries lo hace
-      }
-    } catch (err) {
-      toast({ title: "Error al eliminar la cita", description: (err as Error).message, variant: "destructive" });
-    }
-  };
-
-  const handleFormSubmit = async (data: LipooutUserInput<CitaInput>) => {
-    try {
-      if (citaToEdit) {
-        await updateCitaMutation.mutateAsync({ id: citaToEdit.$id, data });
-        toast({ title: "Cita actualizada" });
-      } else {
-        await createCitaMutation.mutateAsync(data);
-        toast({ title: "Cita creada" });
-      }
-      setIsDialogOpen(false);
-      setCitaToEdit(null);
-      // refetchCitas(); // InvalidateQueries lo hace
-    } catch (err) {
-      toast({ title: `Error al ${citaToEdit ? 'actualizar' : 'crear'} la cita`, description: (err as Error).message, variant: "destructive" });
-    }
-  };
-
-
-  // Renderizar la tabla de citas
-  const renderCitasDelDia = () => {
-    if (loadingCitas) {
-      return <div className="flex justify-center py-8"><LoadingSpinner /></div>;
-    }
+  // Log datos del hook useGetCitasPorDia
+   useEffect(() => {
+    console.log('%c[Agenda Component] Datos de useGetCitasPorDia:', 'color: purple; font-weight: bold;', citasDelDia);
+    console.log(`%c[Agenda Component] Estado Carga Citas: isLoading=${loadingCitas}, isFetching=${isFetching}, hasError=${!!errorCitas}`, 'color: purple;');
     if (errorCitas) {
-      return <p className="text-center text-destructive py-8">Error al cargar las citas.</p>;
+        console.error('[Agenda Component] Error en useGetCitasPorDia:', errorCitas);
     }
-    if (!selectedDate || !citasDelDia || citasDelDia.length === 0) {
-      return <p className="text-center text-muted-foreground py-8">No hay citas programadas para este día.</p>;
+  }, [citasDelDia, loadingCitas, isFetching, errorCitas]);
+
+  // Lista completa empleados
+  const allEmpleados = useMemo(() => {
+    console.log('[Agenda Component - useMemo allEmpleados] Input empleadosData:', empleadosData);
+    const result = empleadosData || []; // Fallback a array vacío si es undefined
+    console.log('[Agenda Component - useMemo allEmpleados] Output allEmpleados:', result);
+    return result;
+  }, [empleadosData]);
+
+  // Efecto seleccionar activos por defecto
+   useEffect(() => {
+    // Solo proceder si allEmpleados es un array (incluso vacío)
+    if (Array.isArray(allEmpleados)) {
+        if (allEmpleados.length > 0) {
+          const activeEmpleadosIds = allEmpleados
+            .filter((emp: Empleado) => emp.activo)
+            .map((emp: Empleado) => emp.$id);
+          // Solo actualiza si los IDs activos han cambiado
+          setSelectedEmpleadosIds(prevIds => {
+             const newSet = new Set(activeEmpleadosIds);
+             const currentSet = new Set(prevIds);
+             if (newSet.size === currentSet.size && [...newSet].every(id => currentSet.has(id))) {
+                 return prevIds;
+             }
+             console.log('[Agenda Component - useEffect] Seleccionando empleados activos por defecto:', activeEmpleadosIds);
+             return activeEmpleadosIds;
+          });
+        } else if (!loadingEmpleados) { // Si la lista está vacía y no está cargando
+            console.log('[Agenda Component - useEffect] Limpiando selección de empleados (lista vacía o carga finalizada)');
+            setSelectedEmpleadosIds([]);
+        }
+    } else {
+        // Log por si allEmpleados no fuera un array inesperadamente
+         console.warn('[Agenda Component - useEffect] allEmpleados no es un array:', allEmpleados);
+         setSelectedEmpleadosIds([]); // Asegurar que sea un array vacío
+    }
+  }, [allEmpleados, loadingEmpleados]); // Depender de allEmpleados y loadingEmpleados
+
+  // Recursos (Empleados filtrados)
+   const resources = useMemo(() => {
+    // Asegurar que allEmpleados sea un array antes de filtrar
+    if (!Array.isArray(allEmpleados)) return [];
+    const filteredResources = allEmpleados
+      .filter((emp: Empleado) => selectedEmpleadosIds.includes(emp.$id))
+      .map((emp: Empleado) => ({
+        resourceId: emp.$id,
+        resourceTitle: emp.nombre_completo || `${emp.nombre} ${emp.apellidos}`,
+      }));
+     console.log('[Agenda Component - useMemo resources] Recursos calculados:', filteredResources);
+     return filteredResources;
+  }, [allEmpleados, selectedEmpleadosIds]);
+
+  // useMemo para EVENTOS (Corregido con Array.isArray)
+  const events: CalendarEvent[] = useMemo(() => {
+    console.log('%c[Agenda Component - useMemo events] Iniciando cálculo de eventos...', 'color: darkcyan;');
+    console.log('[Agenda Component - useMemo events] Input citasDelDia:', citasDelDia);
+    console.log(`[Agenda Component - useMemo events] Estado clientes: loading=${loadingClientes}, data is array=${Array.isArray(clientesData)}`);
+
+    if (!citasDelDia || loadingClientes || !Array.isArray(clientesData)) {
+        console.warn('[Agenda Component - useMemo events] Devolviendo array vacío (faltan citas, clientes cargando, o clientesData no es un array)');
+        return [];
     }
 
-    // Filtramos de nuevo por si acaso la query trajo citas fuera del día exacto
-    const citasFiltradas = citasDelDia.filter(cita =>
-      format(startOfDay(parseISO(cita.fecha_hora)), 'yyyy-MM-dd') === format(startOfDay(selectedDate), 'yyyy-MM-dd')
-    );
+    const clienteMap = new Map(clientesData.map((c: Cliente) => [c.$id, c]));
+    console.log('[Agenda Component - useMemo events] Mapa de clientes creado, tamaño:', clienteMap.size);
 
-     if (citasFiltradas.length === 0) {
-      return <p className="text-center text-muted-foreground py-8">No hay citas programadas para este día.</p>;
-    }
+    const transformedEvents = citasDelDia.map((cita: Cita & Models.Document, index: number) => {
+      // console.log(`%c[Agenda Component - useMemo events] Procesando cita[${index}] ID: ${cita.$id}`, 'color: gray;', cita); // Descomentar si es necesario
+
+      if (!cita.fecha_hora || typeof cita.fecha_hora !== 'string') { /* ... warn y return null ... */ console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: fecha_hora inválida o ausente.`); return null;}
+      if (!cita.empleado_id) { /* ... warn y return null ... */ console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: empleado_id ausente.`); return null;}
+      let duration = 60;
+      if (typeof cita.duracion === 'number' && cita.duracion > 0) { duration = cita.duracion; }
+      else { console.warn(`[Agenda Component - useMemo events] Cita ${cita.$id}: Duración inválida (${cita.duracion}), usando default 60min.`); }
+
+      let start, end;
+      try {
+           start = parseISO(cita.fecha_hora);
+           if (!isValid(start)) { throw new Error('Fecha de inicio inválida después de parsear'); }
+           end = addMinutes(start, duration);
+      } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          console.error(`[Agenda Component - useMemo events] Error procesando fechas para cita ${cita.$id}: Fecha='${cita.fecha_hora}', Error='${errorMessage}'`);
+          return null;
+       }
+
+      const cliente = clienteMap.get(cita.cliente_id);
+      const clienteNombreCompleto = cliente?.nombre_completo || `${cliente?.nomcli || ''} ${cliente?.ape1cli || ''}`.trim();
+      const clienteInfo = `${clienteNombreCompleto || 'Cliente?'} (${cliente?.tel1cli || 'Sin Tlf'})`;
+
+      let tratamientos = 'Artículo no especificado';
+      try {
+         if (cita.articulos && typeof cita.articulos === 'string' && cita.articulos.trim().startsWith('[')) {
+            const arts: unknown = JSON.parse(cita.articulos);
+            if (Array.isArray(arts) && arts.length > 0) {
+                tratamientos = arts.map(String).filter(art => art.trim() !== '').join(', ');
+                if (!tratamientos) tratamientos = 'Artículo(s) vacío(s)';
+            } else { tratamientos = cita.articulos; }
+        } else if (typeof cita.articulos === 'string' && cita.articulos.trim() !== '') { tratamientos = cita.articulos; }
+      } catch (e) { tratamientos = typeof cita.articulos === 'string' ? cita.articulos : 'Error parseo Arts.'; }
+      if (!tratamientos || tratamientos.trim() === '') tratamientos = 'Artículo no especificado';
+
+      const title = `${clienteInfo} - ${tratamientos}`;
+
+      const eventData: CalendarEvent = {
+        title: title, start: start, end: end, resourceId: cita.empleado_id, data: cita, clienteInfo: clienteInfo, tratamientos: tratamientos,
+      };
+      return eventData;
+
+    }).filter((event): event is CalendarEvent => event !== null);
+
+    console.log('%c[Agenda Component - useMemo events] Array final de eventos transformados:', 'color: darkcyan; font-weight: bold;', transformedEvents);
+    return transformedEvents;
+
+  }, [citasDelDia, clientesData, loadingClientes]);
 
 
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[80px]">Hora</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Tratamiento</TableHead>
-            <TableHead>Profesional</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {citasFiltradas.map((cita: Cita & Models.Document) => (
-            <TableRow key={cita.$id}>
-              <TableCell className="font-medium">
-                  {format(parseISO(cita.fecha_hora), 'HH:mm')}
-              </TableCell>
-              <TableCell>{cita.cliente_id}</TableCell>
-              <TableCell>{cita.articulos}</TableCell>
-              <TableCell>{cita.empleado_id}</TableCell>
-              <TableCell>{cita.estado}</TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                     <Button variant="ghost" size="icon" className="h-8 w-8"> <MoreHorizontal className="w-4 h-4" /> <span className="sr-only">Acciones</span> </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleOpenEditDialog(cita)} className="cursor-pointer">
-                       <Edit className="mr-2 h-4 w-4" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleDeleteCita(cita)} className="text-destructive cursor-pointer">
-                       <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
+  const isLoading = loadingCitas || loadingEmpleados || loadingClientes;
+  const hasError = errorCitas || errorEmpleados || errorClientes;
+
+  // Manejadores
+  const handleOpenCreateDialog = () => { /* ... */ };
+  const handleSelectSlot = (slotInfo: { start: Date, end: Date, resourceId?: string }) => { /* ... */ };
+  const handleSelectEvent = (event: CalendarEvent) => { /* ... */ };
+  const handleOpenEditDialog = (cita: Cita & Models.Document) => { /* ... */ };
+
+  // handleNavigate CON LOG
+  const handleNavigate = (newDate: Date) => {
+    console.log('[Agenda Component] handleNavigate llamado con fecha:', newDate); // <-- LOG AÑADIDO
+    setSelectedDate(startOfDay(newDate));
   };
 
+  const handleEmpleadoSelectToggle = (empleadoId: string) => { /* ... */ };
+  const handleDeleteCita = async (cita: Cita & Models.Document) => { /* ... */ };
+  const handleFormSubmit = async (data: LipooutUserInput<CitaInput>) => { /* ... */ };
+
+  // CustomEvent
+  const CustomEvent = ({ event }: EventProps<CalendarEvent>) => {
+      return (
+          <div className="rbc-event-content" title={event.title}>
+              <strong className="rbc-event-label">{format(event.start, 'HH:mm')}</strong>
+              <div className="text-xs overflow-hidden">
+                  <p className="font-semibold truncate">{event.clienteInfo}</p>
+                  <p className="truncate">{event.tratamientos}</p>
+              </div>
+          </div>
+      );
+  };
+
+  // Renderizado principal (JSX)
   return (
     <div className="space-y-6">
-       <div className="flex justify-between items-center">
-         <div>
-            <h1 className="text-3xl font-bold">Agenda</h1>
-            <p className="text-muted-foreground">Calendario y gestión de citas.</p>
-         </div>
-         <Button onClick={handleOpenCreateDialog}>
-             <PlusCircle className="w-4 h-4 mr-2" />
-             Nueva Cita
-         </Button>
-       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna Calendario */}
-        <div className="lg:col-span-1">
-           <Card>
-               <CardContent className="p-0">
-                <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    className="p-3"
-                    locale={es}
-                />
-               </CardContent>
-           </Card>
+       {/* Header */}
+        <div className="flex justify-between items-center">
+             <div>
+                <h1 className="text-3xl font-bold">Agenda</h1>
+                <p className="text-muted-foreground">Gestión de citas por profesional.</p>
+             </div>
+             <div className="flex items-center gap-2">
+                 <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                          <Users className="w-4 h-4 mr-2" />
+                          {/* CORRECCIÓN TypeError: Usar optional chaining y fallback */}
+                          Empleados ({selectedEmpleadosIds.length}/{allEmpleados?.length ?? 0})
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                         <DropdownMenuLabel>Mostrar Empleados</DropdownMenuLabel>
+                         <DropdownMenuSeparator />
+                         {loadingEmpleados ? (
+                           <DropdownMenuItem disabled>Cargando...</DropdownMenuItem>
+                         ) : Array.isArray(allEmpleados) && allEmpleados.length > 0 ? ( // Asegurar que es array
+                           allEmpleados.map((emp: Empleado & Models.Document) => (
+                             <DropdownMenuCheckboxItem
+                               key={emp.$id}
+                               checked={selectedEmpleadosIds.includes(emp.$id)}
+                               onCheckedChange={() => handleEmpleadoSelectToggle(emp.$id)}
+                             >
+                               {emp.nombre_completo || `${emp.nombre} ${emp.apellidos}`}
+                               {!emp.activo && " (Inactivo)"}
+                             </DropdownMenuCheckboxItem>
+                           ))
+                         ) : (
+                            <DropdownMenuItem disabled>No hay empleados</DropdownMenuItem>
+                         )}
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem
+                           onSelect={() => {
+                               // Asegurar que allEmpleados es array antes de filtrar/mapear
+                               const activeIds = Array.isArray(allEmpleados)
+                                   ? allEmpleados.filter(e => e.activo).map(e => e.$id)
+                                   : [];
+                               console.log("[Agenda Component] Seleccionando todos los activos:", activeIds);
+                               setSelectedEmpleadosIds(activeIds);
+                           }}
+                           className="cursor-pointer"
+                           // Deshabilitar si allEmpleados no es array o no hay activos
+                           disabled={!Array.isArray(allEmpleados) || allEmpleados.filter(e => e.activo).length === 0}
+                         >
+                           Seleccionar todos (activos)
+                         </DropdownMenuItem>
+                         <DropdownMenuItem
+                           onSelect={() => {
+                               console.log("[Agenda Component] Deseleccionando todos");
+                               setSelectedEmpleadosIds([]);
+                           }}
+                           className="cursor-pointer text-destructive"
+                           disabled={selectedEmpleadosIds.length === 0}
+                         >
+                           No seleccionar ninguno
+                         </DropdownMenuItem>
+                      </DropdownMenuContent>
+                 </DropdownMenu>
+                 <Button onClick={handleOpenCreateDialog}>
+                     <PlusCircle className="w-4 h-4 mr-2" />
+                     Nueva Cita
+                 </Button>
+             </div>
         </div>
 
-        {/* Columna Citas del Día */}
-        <div className="lg:col-span-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Citas para: {fechaSeleccionadaFormateada}</CardTitle>
-                    <CardDescription>Listado de citas programadas para el día seleccionado.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {renderCitasDelDia()}
-                </CardContent>
-            </Card>
-        </div>
-      </div>
+      {/* Card Contenedor Calendario */}
+      <Card>
+          <CardHeader>
+              <CardTitle>Citas para: {fechaSeleccionadaFormateada}</CardTitle>
+              {isFetching && <CardDescription className="text-blue-600 animate-pulse">Actualizando citas...</CardDescription>}
+              {!isFetching && <CardDescription>Haga clic en un hueco para crear una cita o en una cita existente para editarla.</CardDescription>}
+          </CardHeader>
+          <CardContent className="p-2 md:p-4">
+              {/* Estados de Carga y Error */}
+              {isLoading && !isFetching && (
+                  <div className="flex justify-center py-20"><LoadingSpinner /></div>
+              )}
+              {hasError && (
+                  <p className="text-center text-destructive py-20">
+                    Error al cargar datos.
+                    {errorCitas && <span> (Citas: {errorCitas.message})</span>}
+                    {errorEmpleados && <span> (Empleados: {errorEmpleados.message})</span>}
+                    {errorClientes && <span> (Clientes: {errorClientes.message})</span>}
+                  </p>
+              )}
 
-       {/* --- Diálogo para Crear/Editar Cita --- */}
+              {/* Contenido Principal: Mensaje o Calendario */}
+              {!isLoading && !hasError && (
+                <>
+                  {/* Mensaje si no hay empleados o no seleccionados */}
+                  {resources.length === 0 && !loadingEmpleados ? (
+                     <p className="text-center text-muted-foreground py-20">
+                        {(!Array.isArray(allEmpleados) || allEmpleados.length === 0) // Comprobación más segura
+                          ? "No hay empleados definidos en el sistema."
+                          : "No se han seleccionado empleados para mostrar."
+                        }
+                        <br />
+                        {Array.isArray(allEmpleados) && allEmpleados.length > 0 && "Utilice el filtro de \"Empleados\" para seleccionar al menos uno."}
+                     </p>
+                  ) : (
+                    // Mostrar calendario si hay recursos o si empleados aún carga
+                    (resources.length > 0 || loadingEmpleados) &&
+                    <div style={{ height: '75vh', minHeight: '600px' }}>
+                      <BigCalendar
+                        localizer={localizer}
+                        culture='es'
+                        events={events} // Pasar los eventos (¡ahora deberían estar aquí!)
+                        resources={resources}
+                        defaultView={Views.DAY}
+                        views={[Views.DAY, Views.WEEK]}
+                        date={selectedDate} // Controlado por el estado
+                        onNavigate={handleNavigate} // Manejador para botones
+                        onSelectEvent={handleSelectEvent}
+                        onSelectSlot={handleSelectSlot}
+                        selectable={true}
+                        step={15}
+                        timeslots={4}
+                        min={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 8, 0, 0)}
+                        max={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 21, 0, 0)}
+                        resourceAccessor="resourceId"
+                        resourceTitleAccessor="resourceTitle"
+                        messages={{
+                          next: "Siguiente", previous: "Anterior", today: "Hoy", month: "Mes", week: "Semana", day: "Día", agenda: "Agenda",
+                          date: "Fecha", time: "Hora", event: "Evento", noEventsInRange: "No hay citas programadas para este día.",
+                          showMore: total => `+${total} más`
+                        }}
+                        components={{
+                            event: CustomEvent,
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+          </CardContent>
+      </Card>
+
+      {/* Dialog para Crear/Editar Cita */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl"> {/* Ancho ajustado */}
-          <DialogHeader>
-            <DialogTitle>{citaToEdit ? 'Editar Cita' : 'Crear Nueva Cita'}</DialogTitle>
-          </DialogHeader>
-          <CitaForm
-            citaInicial={citaToEdit}
-            fechaInicial={selectedDate} // Pasamos la fecha seleccionada
-            onSubmit={handleFormSubmit}
-            isSubmitting={createCitaMutation.isPending || updateCitaMutation.isPending}
-          />
-        </DialogContent>
+           <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                 <DialogTitle>{citaToEdit ? 'Editar Cita' : 'Crear Nueva Cita'}</DialogTitle>
+              </DialogHeader>
+              <CitaForm
+                citaInicial={citaToEdit}
+                fechaInicial={formInitialDate}
+                onSubmit={handleFormSubmit}
+                isSubmitting={createCitaMutation.isPending || updateCitaMutation.isPending}
+              />
+           </DialogContent>
       </Dialog>
     </div>
   );

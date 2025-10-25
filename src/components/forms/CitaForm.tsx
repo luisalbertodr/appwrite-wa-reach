@@ -114,7 +114,8 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       estado: citaInicial.estado || 'agendada',
       comentarios: citaInicial.comentarios || '',
       datos_clinicos: citaInicial.datos_clinicos || '',
-      precio_total: citaInicial.precio_total || 0,
+      // Asumimos que si no existe en la DB, no viene en citaInicial
+      precio_total: (citaInicial as any).precio_total || (citaInicial as any).precio || 0,
       recursos_cabina: citaInicial.recursos_cabina || '',
       recursos_aparatos: citaInicial.recursos_aparatos || '',
     };
@@ -205,7 +206,6 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       const fechaHora = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
 
       // Crear el objeto final para Appwrite (CitaInput)
-      // Solo incluir campos opcionales si tienen valores
       const finalData: any = {
         fecha_hora: fechaHora.toISOString(),
         duracion: data.duracion,
@@ -213,7 +213,11 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
         empleado_id: data.empleado_id,
         articulos: JSON.stringify(articulosSeleccionados),
         estado: data.estado,
-        precio_total: data.precio_total,
+        
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Eliminamos el campo de precio, ya que no existe en la colección 'citas'
+        // precio: data.precio_total, // <--- CAMPO ELIMINADO
+        // --- FIN DE LA CORRECCIÓN ---
       };
 
       // Agregar campos opcionales solo si tienen valor

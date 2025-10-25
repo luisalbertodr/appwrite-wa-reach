@@ -1,47 +1,39 @@
-import { CalendarEvent } from '@/types/calendar.types';
-import { format } from 'date-fns';
+import { CitaEventProps } from '@/types/calendar.types';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-interface CitaEventComponentProps {
-  event: CalendarEvent;
-}
+// Helper para obtener el color del estado
+const getEstadoColor = (estado: string) => {
+  switch (estado) {
+    case 'agendada':
+      return 'bg-blue-100 text-blue-800';
+    case 'confirmada':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'realizada':
+      return 'bg-green-100 text-green-800';
+    case 'cancelada':
+      return 'bg-red-100 text-red-800';
+    case 'no_asistio':
+      return 'bg-gray-100 text-gray-800 line-through';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
 
-export const CitaEventComponent = ({ event }: CitaEventComponentProps) => {
-  const { resource } = event;
-  const { estado, clienteNombre, articulos } = resource;
-
-  // Determinar el color según el estado
-  const getEstadoColor = (estado: string) => {
-    switch (estado.toLowerCase()) {
-      case 'confirmada':
-        return 'bg-green-500 text-white';
-      case 'pendiente':
-        return 'bg-yellow-500 text-white';
-      case 'cancelada':
-        return 'bg-red-500 text-white';
-      case 'completada':
-        return 'bg-blue-500 text-white';
-      default:
-        return 'bg-gray-500 text-white';
-    }
-  };
+export const CitaEventComponent = ({ event }: CitaEventProps) => {
+  // Extraemos la información del objeto 'resource' anidado
+  const { clienteNombre, articulos, estado } = event.resource;
 
   return (
-    <div className="flex flex-col h-full p-1 overflow-hidden">
-      <div className="flex items-center justify-between gap-1 mb-1">
-        <span className="text-xs font-semibold truncate flex-1">
-          {format(event.start, 'HH:mm')}
-        </span>
-        <Badge variant="secondary" className={`text-[10px] px-1 py-0 ${getEstadoColor(estado)}`}>
-          {estado}
-        </Badge>
-      </div>
-      <div className="text-xs font-medium truncate">
-        {clienteNombre}
-      </div>
-      <div className="text-[10px] text-muted-foreground truncate">
-        {articulos}
-      </div>
+    <div className={cn("p-1 h-full text-xs rounded-sm", getEstadoColor(estado))}>
+      <strong className="truncate block">{clienteNombre}</strong>
+      <span className="truncate block">{articulos}</span>
+      <Badge 
+        variant="default" 
+        className={cn("mt-1 text-[10px] p-0 px-1", getEstadoColor(estado))}
+      >
+        {estado}
+      </Badge>
     </div>
   );
 };

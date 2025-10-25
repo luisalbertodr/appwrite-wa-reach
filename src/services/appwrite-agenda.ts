@@ -1,115 +1,144 @@
 import { databases, DATABASE_ID, CITAS_COLLECTION_ID } from '@/lib/appwrite';
-import { Cita, CitaInput } from '@/types'; // Import CitaInput
-import { ID, Query, Models } from 'appwrite'; // Import Models
-import { startOfDay, endOfDay } from 'date-fns';
+import { Cita, CitaInput, LipooutUserInput } from '@/types';
+import { ID, Query, Models } from 'appwrite';
+import { startOfDay, endOfDay, formatISO } from 'date-fns';
 
-// Usamos el tipo CitaInput directamente
+// Tipos Create/Update Input (Asegúrate que coincidan con tu definición)
+// export type CreateCitaInput = LipooutUserInput<CitaInput>; // Si usas LipooutUserInput
+// export type UpdateCitaInput = Partial<CreateCitaInput>; // Si usas LipooutUserInput
+// O si no usas LipooutUserInput globalmente:
 export type CreateCitaInput = CitaInput;
 export type UpdateCitaInput = Partial<CitaInput>;
 
-// Obtener citas para un día específico y opcionalmente un empleado
-export const getCitasPorDia = async (fecha: Date, empleadoId?: string): Promise<Cita[]> => {
-  const inicioDia = startOfDay(fecha);
-  const finDia = endOfDay(fecha);
 
-  // Convertir a formato ISO sin milisegundos y en UTC
-  const inicioDiaStr = inicioDia.toISOString().split('.')[0] + 'Z';
-  const finDiaStr = finDia.toISOString().split('.')[0] + 'Z';
+export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Document)[]> => {
+  const startOfDayDate = startOfDay(fecha);
+  const endOfDayDate = endOfDay(fecha);
 
-  const queries = [
-    Query.greaterThanEqual('fecha_hora', inicioDiaStr),
-    Query.lessThanEqual('fecha_hora', finDiaStr),
-    Query.orderAsc('fecha_hora'),
-    Query.limit(500),
-  ];
+  // Convertir a ISO string para Appwrite
+  const startOfDayISO = formatISO(startOfDayDate);
+  const endOfDayISO = formatISO(endOfDayDate);
 
-  if (empleadoId) {
-    queries.push(Query.equal('empleado_id', empleadoId));
-  }
+  // --- LOG 1 ---
+  console.log(`%c[Service: getCitasPorDia] Buscando citas entre ${startOfDayISO} y ${endOfDayISO}`, 'color: blue; font-weight: bold;');
 
-  const response = await databases.listDocuments<Cita>(
-    DATABASE_ID,
-    CITAS_COLLECTION_ID,
-    queries
-  );
-  return response.documents;
-};
-
-// Obtener citas para un rango de fechas (útil para vista de calendario)
-export const getCitasPorRango = async (
-  fechaInicio: Date,
-  fechaFin: Date,
-  empleadoId?: string
-): Promise<Cita[]> => {
-  // Convertir a formato ISO sin milisegundos y en UTC
-  const fechaInicioStr = fechaInicio.toISOString().split('.')[0] + 'Z';
-  const fechaFinStr = fechaFin.toISOString().split('.')[0] + 'Z';
-
-  const queries = [
-    Query.greaterThanEqual('fecha_hora', fechaInicioStr),
-    Query.lessThanEqual('fecha_hora', fechaFinStr),
-    Query.orderAsc('fecha_hora'),
-    Query.limit(500),
-  ];
-
-  if (empleadoId) {
-    queries.push(Query.equal('empleado_id', empleadoId));
-  }
-
-  const response = await databases.listDocuments<Cita>(
-    DATABASE_ID,
-    CITAS_COLLECTION_ID,
-    queries
-  );
-  return response.documents;
-};
-
-// Crear una nueva cita
-export const createCita = async (cita: CreateCitaInput) => {
-  console.log('=== CREAR CITA - Datos enviados ===');
-  console.log('DATABASE_ID:', DATABASE_ID);
-  console.log('CITAS_COLLECTION_ID:', CITAS_COLLECTION_ID);
-  console.log('Datos de la cita:', JSON.stringify(cita, null, 2));
-  console.log('Tipo de cada campo:');
-  Object.entries(cita).forEach(([key, value]) => {
-    console.log(`  ${key}: ${typeof value} =`, value);
-  });
-  
   try {
-    const result = await databases.createDocument(
+    const response = await databases.listDocuments<Cita & Models.Document>(
+      DATABASE_ID,
+      CITAS_COLLECTION_ID,
+      [
+        Query.greaterThanEqual('fecha_hora', startOfDayISO),
+        Query.lessThan('fecha_hora', endOfDayISO), // Usar lessThan con el fin del día
+        Query.limit(100), // Límite razonable
+        Query.orderAsc('fecha_hora') // Ordenar por hora
+      ]
+    );
+
+    // --- LOG 2 ---
+    console.log('[Service: getCitasPorDia] Documentos recibidos de Appwrite:', response.documents);
+    // --- LOG 2.1 (Opcional pero útil): Ver total y comparar con documentos ---
+    console.log(`[Service: getCitasPorDia] Total reportado por Appwrite: ${response.total}`);
+    // --- LOG 2.2 (Opcional): Si no devuelve nada, loguear los parámetros ---
+    if (response.documents.length === 0) {
+        console.warn(`[Service: getCitasPorDia] Appwrite devolvió 0 documentos. Parámetros de consulta:`, {
+            DATABASE_ID,
+            CITAS_COLLECTION_ID,
+            queries: [
+                `greaterThanEqual('fecha_hora', ${startOfDayISO})`,
+                `lessThan('fecha_hora', ${endOfDayISO})`,
+                `limit(100)`,
+                `orderAsc('fecha_hora')`
+            ]
+        });
+    }
+
+
+    return response.documents;
+  } catch (error) {
+    console.error("%c[Service: getCitasPorDia] ERROR fetching citas:", 'color: red; font-weight: bold;', error);
+    // Ver el tipo de error puede ayudar
+    if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        // Si tienes una estructura específica de error de Appwrite, puedes loguearla
+        // console.error("Appwrite error details:", JSON.stringify(error, null, 2));
+    }
+    return []; // Devolver vacío en caso de error
+  }
+};
+
+// --- createCita (con Logs detallados) ---
+export const createCita = async (cita: LipooutUserInput<CitaInput>): Promise<Cita & Models.Document> => {
+    // --- LOG 3 ---
+    console.log('%c=== CREAR CITA - Datos enviados ===', 'color: green; font-weight: bold;');
+    console.log('DATABASE_ID:', DATABASE_ID);
+    console.log('CITAS_COLLECTION_ID:', CITAS_COLLECTION_ID);
+    console.log('Datos de la cita:', cita);
+    // Loguear tipos para asegurar formato correcto
+    console.log('Tipo de cada campo:');
+    for (const key in cita) {
+        if (Object.prototype.hasOwnProperty.call(cita, key)) {
+            const value = cita[key as keyof typeof cita];
+            console.log(`   ${key}: ${typeof value} = ${JSON.stringify(value)}`);
+        }
+    }
+    // --- FIN LOG 3 ---
+
+  try {
+    const response = await databases.createDocument<Cita & Models.Document>(
       DATABASE_ID,
       CITAS_COLLECTION_ID,
       ID.unique(),
-      cita
+      cita // Pasar directamente el objeto cita recibido
     );
-    console.log('✓ Cita creada exitosamente:', result.$id);
-    return result;
-  } catch (error: any) {
-    console.error('=== ERROR AL CREAR CITA ===');
-    console.error('Error completo:', error);
-    console.error('Mensaje:', error.message);
-    console.error('Code:', error.code);
-    console.error('Type:', error.type);
-    console.error('Response:', error.response);
-    throw error;
+    // --- LOG 4 ---
+    console.log(`%c✓ Cita creada exitosamente: ${response.$id}`, 'color: green;', response);
+    // --- FIN LOG 4 ---
+    return response;
+  } catch (error) {
+     console.error("%c✗ Error al crear cita:", 'color: red; font-weight: bold;', error);
+     // Loguear detalles del error
+     if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        // Si es un error específico de Appwrite con response
+        // const appwriteError = error as any;
+        // if (appwriteError.response) {
+        //     console.error("Appwrite Response:", appwriteError.response);
+        // }
+     }
+     throw error; // Relanzar para que react-query lo maneje
   }
 };
 
-// Actualizar una cita existente
-export const updateCita = (id: string, cita: UpdateCitaInput) => {
-  return databases.updateDocument(
-    DATABASE_ID,
-    CITAS_COLLECTION_ID,
-    id,
-    cita
-  );
+// --- updateCita ---
+export const updateCita = async (id: string, data: LipooutUserInput<Partial<CitaInput>>): Promise<Cita & Models.Document> => {
+    console.log(`%c=== ACTUALIZAR CITA ${id} ===`, 'color: orange; font-weight: bold;', data);
+     try {
+        const response = await databases.updateDocument<Cita & Models.Document>(
+            DATABASE_ID,
+            CITAS_COLLECTION_ID,
+            id,
+            data
+        );
+        console.log(`%c✓ Cita ${id} actualizada exitosamente`, 'color: orange;', response);
+        return response;
+     } catch(error) {
+        console.error(`%c✗ Error al actualizar cita ${id}:`, 'color: red; font-weight: bold;', error);
+        throw error;
+     }
 };
 
-// Eliminar una cita
-export const deleteCita = (id: string) => {
-  return databases.deleteDocument(
-    DATABASE_ID,
-    CITAS_COLLECTION_ID,
-    id
-  );
+// --- deleteCita ---
+export const deleteCita = async (id: string): Promise<void> => {
+    console.log(`%c=== ELIMINAR CITA ${id} ===`, 'color: red; font-weight: bold;');
+    try {
+        await databases.deleteDocument(
+            DATABASE_ID,
+            CITAS_COLLECTION_ID,
+            id
+        );
+        console.log(`%c✓ Cita ${id} eliminada exitosamente`, 'color: red;');
+    } catch (error) {
+        console.error(`%c✗ Error al eliminar cita ${id}:`, 'color: red; font-weight: bold;', error);
+        throw error;
+    }
 };
