@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CitaFormData, citaSchema } from '@/lib/validators';
-import { Cita, CitaInput, Empleado, Articulo } from '@/types';
+import { Cita, CitaInput, Empleado, Articulo, ArticuloEnCita } from '@/types';
 import { Models } from 'appwrite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,14 +17,15 @@ import { useGetClientes } from '@/hooks/useClientes';
 import { useGetArticulos } from '@/hooks/useArticulos';
 import { useGetEmpleados } from '@/hooks/useEmpleados';
 import LoadingSpinner from '../LoadingSpinner';
-import { format, parseISO, setHours, setMinutes, setSeconds, isValid } from 'date-fns';
+import { format, parseISO, setHours, setMinutes, setSeconds, isValid, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CalendarIcon, UserSearch, PackageSearch } from 'lucide-react';
+import { CalendarIcon, UserSearch, PackageSearch, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CitaFormProps {
   citaInicial?: (Cita & Models.Document) | null;
   fechaInicial?: Date;
+  empleadoInicial?: string;
   onSubmit: (data: CitaInput) => Promise<void>;
   isSubmitting: boolean;
 }
@@ -64,7 +65,7 @@ const getDateDeISO = (isoString: string | undefined, fechaInicial?: Date) => {
   }
 };
 
-export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: CitaFormProps) => {
+export const CitaForm = ({ citaInicial, fechaInicial, empleadoInicial, onSubmit, isSubmitting }: CitaFormProps) => {
 
   // --- Estado local para componentes complejos (buscadores y fechas) ---
   const [clienteSearch, setClienteSearch] = useState('');
@@ -78,8 +79,8 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
   );
   const [horaInicio, setHoraInicio] = useState(getHoraDeISO(citaInicial?.fecha_hora));
   
-  // Estado para artículos seleccionados (para precio total)
-  const [articulosSeleccionados, setArticulosSeleccionados] = useState<string[]>([]);
+  // Estado para artículos seleccionados con programación (ArticuloEnCita[])
+  const [articulosProgramados, setArticulosProgramados] = useState<ArticuloEnCita[]>([]);
 
   // --- Carga de datos para selectores ---
   const { data: clientes, isLoading: loadingClientes } = useGetClientes(clienteSearch);
@@ -92,17 +93,8 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       return {
         ...defaultValues,
         fecha_hora: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '',
+        empleado_id: empleadoInicial || '',
       };
-    }
-
-    // Parsear articulos desde JSON string
-    let articulosArray: string[] = [];
-    try {
-      if (citaInicial.articulos) {
-        articulosArray = JSON.parse(citaInicial.articulos);
-      }
-    } catch (e) {
-      console.error('Error parsing articulos:', e);
     }
 
     return {
@@ -114,7 +106,6 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       estado: citaInicial.estado || 'agendada',
       comentarios: citaInicial.comentarios || '',
       datos_clinicos: citaInicial.datos_clinicos || '',
-      // Asumimos que si no existe en la DB, no viene en citaInicial
       precio_total: (citaInicial as any).precio_total || (citaInicial as any).precio || 0,
       recursos_cabina: citaInicial.recursos_cabina || '',
       recursos_aparatos: citaInicial.recursos_aparatos || '',
@@ -126,32 +117,71 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
     defaultValues: getInitialFormValues(),
   });
 
-  // Parsear artículos seleccionados al inicio
+  // Parsear artículos programados al inicio o cuando cambia la hora
   useEffect(() => {
     if (citaInicial?.articulos) {
       try {
         const parsed = JSON.parse(citaInicial.articulos);
-        setArticulosSeleccionados(Array.isArray(parsed) ? parsed : []);
+        // Verificar si ya es ArticuloEnCita[] o es legacy (string[])
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (typeof parsed[0] === 'object' && 'articulo_id' in parsed[0]) {
+            // Ya es ArticuloEnCita[]
+            setArticulosProgramados(parsed);
+          } else {
+            // Legacy: convertir string[] a ArticuloEnCita[]
+            const articulosConvertidos: ArticuloEnCita[] = parsed.map((artId: string, index: number) => {
+              const articulo = articulos?.find(a => a.$id === artId);
+              // Calcular hora_inicio basada en el índice
+              const citaInicio = citaInicial.fecha_hora ? parseISO(citaInicial.fecha_hora) : new Date();
+              const minutosOffset = index * 60; // Asumir 60 min por defecto entre servicios
+              const horaInicioServicio = addMinutes(citaInicio, minutosOffset);
+              
+              return {
+                articulo_id: artId,
+                articulo_nombre: articulo?.nombre || 'Desconocido',
+                duracion: articulo?.duracion || 60,
+                hora_inicio: horaInicioServicio.toISOString(),
+                precio: articulo?.precio || 0,
+                cantidad: 1,
+              };
+            });
+            setArticulosProgramados(articulosConvertidos);
+          }
+        }
       } catch (e) {
-        setArticulosSeleccionados([]);
+        console.error('Error parsing articulos:', e);
+        setArticulosProgramados([]);
       }
     }
-  }, [citaInicial]);
+  }, [citaInicial, articulos]);
 
-  // --- Calcular precio total automáticamente ---
+  // --- Calcular precio total y duración total automáticamente ---
   useEffect(() => {
-    if (!articulos || articulosSeleccionados.length === 0) {
+    if (articulosProgramados.length === 0) {
       form.setValue('precio_total', 0);
+      form.setValue('duracion', 60);
       return;
     }
     
-    const total = articulosSeleccionados.reduce((sum, artId) => {
-      const articulo = articulos.find(a => a.$id === artId);
-      return sum + (articulo?.precio || 0);
+    const total = articulosProgramados.reduce((sum, art) => {
+      return sum + (art.precio * art.cantidad);
     }, 0);
     
+    // Calcular duración total: desde el primer servicio hasta el final del último
+    const duraciones = articulosProgramados.map(art => {
+      const inicio = parseISO(art.hora_inicio);
+      return { inicio, fin: addMinutes(inicio, art.duracion) };
+    });
+    
+    if (duraciones.length > 0) {
+      const inicioMin = new Date(Math.min(...duraciones.map(d => d.inicio.getTime())));
+      const finMax = new Date(Math.max(...duraciones.map(d => d.fin.getTime())));
+      const duracionTotal = Math.ceil((finMax.getTime() - inicioMin.getTime()) / (1000 * 60));
+      form.setValue('duracion', Math.max(duracionTotal, 15)); // Mínimo 15 minutos
+    }
+    
     form.setValue('precio_total', total);
-  }, [articulosSeleccionados, articulos, form]);
+  }, [articulosProgramados, form]);
 
   // --- Lógica de Búsqueda y Selección ---
   const nombreClienteSel = useMemo(() => {
@@ -161,29 +191,75 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
     return cliente?.nombre_completo || id;
   }, [form.watch('cliente_id'), clientes]);
 
-  const nombreArticulosSel = useMemo(() => {
-    if (articulosSeleccionados.length === 0) return 'Seleccionar Tratamiento(s)...';
-    
-    const nombres = articulosSeleccionados.map(artId => {
-      const articulo = articulos?.find(a => a.$id === artId);
-      return articulo?.nombre || artId;
-    });
-    
-    return nombres.join(', ');
-  }, [articulosSeleccionados, articulos]);
+  // --- Agregar artículo programado ---
+  const agregarArticulo = (articuloId: string) => {
+    const articulo = articulos?.find(a => a.$id === articuloId);
+    if (!articulo) return;
 
-  // --- Toggle de selección de artículos ---
-  const toggleArticulo = (articuloId: string) => {
-    setArticulosSeleccionados(prev => {
-      const isSelected = prev.includes(articuloId);
-      const newSelection = isSelected 
-        ? prev.filter(id => id !== articuloId)
-        : [...prev, articuloId];
-      
-      // Actualizar el form field con JSON string
-      form.setValue('articulos', JSON.stringify(newSelection));
-      return newSelection;
-    });
+    // Determinar hora de inicio del nuevo tratamiento
+    let horaInicioNuevo: Date;
+    
+    if (articulosProgramados.length === 0) {
+      // Primer tratamiento: usar la hora de inicio de la cita
+      if (!selectedDate) return;
+      const [hora, minutos] = horaInicio.split(':').map(Number);
+      horaInicioNuevo = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
+    } else {
+      // Siguientes tratamientos: agregar después del último
+      const ultimoArticulo = articulosProgramados[articulosProgramados.length - 1];
+      const finUltimo = addMinutes(parseISO(ultimoArticulo.hora_inicio), ultimoArticulo.duracion);
+      horaInicioNuevo = finUltimo;
+    }
+
+    const nuevoArticulo: ArticuloEnCita = {
+      articulo_id: articulo.$id,
+      articulo_nombre: articulo.nombre,
+      duracion: articulo.duracion || 60,
+      hora_inicio: horaInicioNuevo.toISOString(),
+      precio: articulo.precio,
+      cantidad: 1,
+    };
+
+    setArticulosProgramados(prev => [...prev, nuevoArticulo]);
+    
+    // Actualizar el form field con JSON string
+    form.setValue('articulos', JSON.stringify([...articulosProgramados, nuevoArticulo]));
+  };
+
+  // --- Eliminar artículo programado ---
+  const eliminarArticulo = (index: number) => {
+    const nuevosArticulos = articulosProgramados.filter((_, i) => i !== index);
+    setArticulosProgramados(nuevosArticulos);
+    form.setValue('articulos', JSON.stringify(nuevosArticulos));
+  };
+
+  // --- Actualizar hora de inicio de un tratamiento ---
+  const actualizarHoraInicio = (index: number, nuevaHora: string) => {
+    const nuevosArticulos = [...articulosProgramados];
+    if (!selectedDate) return;
+    
+    const [hora, minutos] = nuevaHora.split(':').map(Number);
+    const nuevaFechaHora = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
+    
+    nuevosArticulos[index] = {
+      ...nuevosArticulos[index],
+      hora_inicio: nuevaFechaHora.toISOString(),
+    };
+    
+    setArticulosProgramados(nuevosArticulos);
+    form.setValue('articulos', JSON.stringify(nuevosArticulos));
+  };
+
+  // --- Actualizar duración de un tratamiento ---
+  const actualizarDuracion = (index: number, nuevaDuracion: number) => {
+    const nuevosArticulos = [...articulosProgramados];
+    nuevosArticulos[index] = {
+      ...nuevosArticulos[index],
+      duracion: Math.max(15, nuevaDuracion), // Mínimo 15 minutos
+    };
+    
+    setArticulosProgramados(nuevosArticulos);
+    form.setValue('articulos', JSON.stringify(nuevosArticulos));
   };
 
   // --- Envío del Formulario ---
@@ -196,7 +272,7 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
     }
     
     // Validar que hay al menos un artículo
-    if (articulosSeleccionados.length === 0) {
+    if (articulosProgramados.length === 0) {
       form.setError("articulos", { message: "Debe seleccionar al menos un tratamiento" });
       return;
     }
@@ -206,39 +282,40 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
       const fechaHora = setSeconds(setMinutes(setHours(selectedDate, hora), minutos), 0);
 
       // Crear el objeto final para Appwrite (CitaInput)
-      const finalData: any = {
+      // IMPORTANTE: Solo incluir campos obligatorios y opcionales con valor real
+      // NO enviar campos opcionales como strings vacíos ya que Appwrite los rechaza
+      const finalData: Partial<CitaInput> = {
         fecha_hora: fechaHora.toISOString(),
         duracion: data.duracion,
         cliente_id: data.cliente_id,
         empleado_id: data.empleado_id,
-        articulos: JSON.stringify(articulosSeleccionados),
+        articulos: JSON.stringify(articulosProgramados),
         estado: data.estado,
-        
-        // --- INICIO DE LA CORRECCIÓN ---
-        // Eliminamos el campo de precio, ya que no existe en la colección 'citas'
-        // precio: data.precio_total, // <--- CAMPO ELIMINADO
-        // --- FIN DE LA CORRECCIÓN ---
+        precio_total: data.precio_total,
       };
 
-      // Agregar campos opcionales solo si tienen valor
-      if (data.comentarios && data.comentarios.trim()) {
-        finalData.comentarios = data.comentarios;
+      // Agregar campos opcionales solo si tienen valor real (no vacíos ni undefined)
+      if (data.comentarios && data.comentarios.trim().length > 0) {
+        finalData.comentarios = data.comentarios.trim();
       }
-      if (data.datos_clinicos && data.datos_clinicos.trim()) {
-        finalData.datos_clinicos = data.datos_clinicos;
+      if (data.datos_clinicos && data.datos_clinicos.trim().length > 0) {
+        finalData.datos_clinicos = data.datos_clinicos.trim();
       }
-      if (data.recursos_cabina && data.recursos_cabina.trim()) {
-        finalData.recursos_cabina = data.recursos_cabina;
+      if (data.recursos_cabina && data.recursos_cabina.trim().length > 0) {
+        finalData.recursos_cabina = data.recursos_cabina.trim();
       }
-      if (data.recursos_aparatos && data.recursos_aparatos.trim()) {
-        finalData.recursos_aparatos = data.recursos_aparatos;
+      if (data.recursos_aparatos && data.recursos_aparatos.trim().length > 0) {
+        finalData.recursos_aparatos = data.recursos_aparatos.trim();
       }
       
-      await onSubmit(finalData);
+      console.log('[CitaForm] Datos finales a enviar:', finalData);
+      console.log('[CitaForm] Campos incluidos:', Object.keys(finalData));
+      
+      await onSubmit(finalData as CitaInput);
 
     } catch (e) {
       console.error("Error en el formulario", e);
-      form.setError("fecha_hora", { message: "Formato de hora inválido (HH:mm)" });
+      form.setError("fecha_hora", { message: "Error al procesar la fecha y hora" });
     }
   };
 
@@ -339,12 +416,25 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
               <FormMessage />
             </FormItem>
 
+            {/* --- Hora Inicio --- */}
+            <FormItem>
+              <FormLabel>Hora Inicio *</FormLabel>
+              <FormControl>
+                <Input 
+                  type="time" 
+                  value={horaInicio} 
+                  onChange={e => setHoraInicio(e.target.value)} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+
             {/* --- Empleado (Selector) --- */}
             <FormField
               control={form.control}
               name="empleado_id"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel>Profesional *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
@@ -365,102 +455,124 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
               )}
             />
 
-            {/* --- Hora Inicio --- */}
-            <FormItem>
-              <FormLabel>Hora Inicio *</FormLabel>
-              <FormControl>
-                <Input 
-                  type="time" 
-                  value={horaInicio} 
-                  onChange={e => setHoraInicio(e.target.value)} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+            {/* --- Buscador para Agregar Artículos --- */}
+            <div className="md:col-span-2 space-y-2">
+              <FormLabel>Agregar Tratamiento(s) *</FormLabel>
+              <Popover open={articuloPopoverOpen} onOpenChange={setArticuloPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    role="combobox" 
+                    className="w-full justify-between font-normal"
+                    type="button"
+                  >
+                    <span className="truncate">Buscar y agregar tratamiento...</span>
+                    <PackageSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Buscar artículo..." 
+                      value={articuloSearch} 
+                      onValueChange={setArticuloSearch}
+                    />
+                    <CommandList>
+                      {loadingArticulos && <CommandItem disabled><LoadingSpinner/></CommandItem>}
+                      <CommandEmpty>No encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {(articuloSearch 
+                          ? articulos?.filter(a => 
+                              a.nombre.toLowerCase().includes(articuloSearch.toLowerCase())
+                            ) 
+                          : articulos
+                        )
+                          ?.filter(a => a.tipo === 'servicio' || a.tipo === 'bono')
+                          .map((articulo: Articulo) => (
+                            <CommandItem 
+                              key={articulo.$id} 
+                              value={articulo.nombre} 
+                              onSelect={() => {
+                                agregarArticulo(articulo.$id);
+                                setArticuloPopoverOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span>
+                                  {articulo.nombre} ({articulo.precio.toFixed(2)}€)
+                                  {articulo.duracion && ` - ${articulo.duracion} min`}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-            {/* --- Duración --- */}
+            {/* --- Lista de Tratamientos Programados --- */}
+            {articulosProgramados.length > 0 && (
+              <div className="md:col-span-2 space-y-2">
+                <FormLabel>Tratamientos Programados</FormLabel>
+                <div className="space-y-2 border rounded-md p-3">
+                  {articulosProgramados.map((art, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
+                        <div className="font-medium truncate">
+                          {art.articulo_nombre}
+                        </div>
+                        <Input
+                          type="time"
+                          value={format(parseISO(art.hora_inicio), 'HH:mm')}
+                          onChange={(e) => actualizarHoraInicio(index, e.target.value)}
+                          className="text-sm"
+                        />
+                        <Input
+                          type="number"
+                          min="15"
+                          step="15"
+                          value={art.duracion}
+                          onChange={(e) => actualizarDuracion(index, parseInt(e.target.value) || 15)}
+                          className="text-sm"
+                          placeholder="min"
+                        />
+                        <div className="text-sm text-muted-foreground">
+                          {art.precio.toFixed(2)}€
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => eliminarArticulo(index)}
+                        className="h-8 w-8"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* --- Duración Total (calculada automáticamente, solo lectura) --- */}
             <FormField
               control={form.control}
               name="duracion"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duración (minutos) *</FormLabel>
+                  <FormLabel>Duración Total (min)</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
-                      min="15" 
-                      step="15" 
                       {...field}
-                      onChange={e => field.onChange(parseInt(e.target.value))}
+                      value={field.value}
+                      disabled
+                      className="bg-muted"
                     />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* --- Artículos (Buscador multi-selección) --- */}
-            <FormField
-              control={form.control}
-              name="articulos"
-              render={() => (
-                <FormItem className="flex flex-col md:col-span-2">
-                  <FormLabel>Tratamiento(s)/Servicio(s) *</FormLabel>
-                  <Popover open={articuloPopoverOpen} onOpenChange={setArticuloPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button 
-                          variant="outline" 
-                          role="combobox" 
-                          className={cn(
-                            "justify-between font-normal", 
-                            articulosSeleccionados.length === 0 && "text-muted-foreground"
-                          )}
-                        >
-                          <span className="truncate">{nombreArticulosSel}</span>
-                          <PackageSearch className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[40vh] p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <CommandInput 
-                          placeholder="Buscar artículo..." 
-                          value={articuloSearch} 
-                          onValueChange={setArticuloSearch}
-                        />
-                        <CommandList>
-                          {loadingArticulos && <CommandItem disabled><LoadingSpinner/></CommandItem>}
-                          <CommandEmpty>No encontrado.</CommandEmpty>
-                          <CommandGroup>
-                            {(articuloSearch 
-                              ? articulos?.filter(a => 
-                                  a.nombre.toLowerCase().includes(articuloSearch.toLowerCase())
-                                ) 
-                              : articulos
-                            )
-                              ?.filter(a => a.tipo === 'servicio' || a.tipo === 'bono')
-                              .map((articulo: Articulo) => (
-                                <CommandItem 
-                                  key={articulo.$id} 
-                                  value={articulo.nombre} 
-                                  onSelect={() => toggleArticulo(articulo.$id)}
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span>
-                                      {articulo.nombre} ({articulo.precio.toFixed(2)}€)
-                                    </span>
-                                    {articulosSeleccionados.includes(articulo.$id) && (
-                                      <span className="text-green-600">✓</span>
-                                    )}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
@@ -472,7 +584,7 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
               name="precio_total"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Precio Total *</FormLabel>
+                  <FormLabel>Precio Total (€)</FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
@@ -480,6 +592,8 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
                       step="0.01"
                       {...field}
                       onChange={e => field.onChange(parseFloat(e.target.value))}
+                      className="bg-muted"
+                      disabled
                     />
                   </FormControl>
                   <FormMessage />
@@ -492,7 +606,7 @@ export const CitaForm = ({ citaInicial, fechaInicial, onSubmit, isSubmitting }: 
               control={form.control}
               name="estado"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-2">
                   <FormLabel>Estado *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>

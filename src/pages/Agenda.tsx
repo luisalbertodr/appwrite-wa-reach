@@ -19,7 +19,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 
 import { Calendar as BigCalendar, dateFnsLocalizer, View, EventProps, Views } from 'react-big-calendar';
 import { format, parse, getDay, startOfWeek, startOfDay, parseISO, addMinutes, isValid } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, Locale } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 import { PlusCircle, MoreHorizontal, Edit, Trash2, Users } from 'lucide-react';
@@ -44,10 +44,13 @@ import { useToast } from '@/hooks/use-toast';
 // Configuración Localizer
 const locales = { 'es': es };
 const localizer = dateFnsLocalizer({
-  format: (date, formatStr, culture) => format(date, formatStr, { locale: locales[culture as keyof typeof locales] }),
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { locale: es }),
-  getDay,
+  format: (date: Date, formatStr: string, culture?: string) => 
+    format(date, formatStr, { locale: locales[culture as keyof typeof locales] }),
+  parse: (dateStr: string, formatStr: string, culture?: string) =>
+    parse(dateStr, formatStr, new Date(), { locale: locales[culture as keyof typeof locales] }),
+  startOfWeek: (date: Date, options?: { locale?: Locale; weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6 }) => 
+    startOfWeek(date, { locale: es, weekStartsOn: 1 }),
+  getDay: (date: Date) => getDay(date),
   locales,
 });
 
@@ -97,43 +100,37 @@ const Agenda = () => {
   // Lista completa empleados
   const allEmpleados = useMemo(() => {
     console.log('[Agenda Component - useMemo allEmpleados] Input empleadosData:', empleadosData);
-    const result = empleadosData || []; // Fallback a array vacío si es undefined
+    const result = empleadosData || []; // Fallback a array vacío
     console.log('[Agenda Component - useMemo allEmpleados] Output allEmpleados:', result);
     return result;
   }, [empleadosData]);
 
   // Efecto seleccionar activos por defecto
    useEffect(() => {
-    // Solo proceder si allEmpleados es un array (incluso vacío)
     if (Array.isArray(allEmpleados)) {
         if (allEmpleados.length > 0) {
           const activeEmpleadosIds = allEmpleados
             .filter((emp: Empleado) => emp.activo)
             .map((emp: Empleado) => emp.$id);
-          // Solo actualiza si los IDs activos han cambiado
           setSelectedEmpleadosIds(prevIds => {
              const newSet = new Set(activeEmpleadosIds);
              const currentSet = new Set(prevIds);
-             if (newSet.size === currentSet.size && [...newSet].every(id => currentSet.has(id))) {
-                 return prevIds;
-             }
+             if (newSet.size === currentSet.size && [...newSet].every(id => currentSet.has(id))) { return prevIds; }
              console.log('[Agenda Component - useEffect] Seleccionando empleados activos por defecto:', activeEmpleadosIds);
              return activeEmpleadosIds;
           });
-        } else if (!loadingEmpleados) { // Si la lista está vacía y no está cargando
+        } else if (!loadingEmpleados) {
             console.log('[Agenda Component - useEffect] Limpiando selección de empleados (lista vacía o carga finalizada)');
             setSelectedEmpleadosIds([]);
         }
     } else {
-        // Log por si allEmpleados no fuera un array inesperadamente
          console.warn('[Agenda Component - useEffect] allEmpleados no es un array:', allEmpleados);
-         setSelectedEmpleadosIds([]); // Asegurar que sea un array vacío
+         setSelectedEmpleadosIds([]);
     }
-  }, [allEmpleados, loadingEmpleados]); // Depender de allEmpleados y loadingEmpleados
+  }, [allEmpleados, loadingEmpleados]);
 
   // Recursos (Empleados filtrados)
    const resources = useMemo(() => {
-    // Asegurar que allEmpleados sea un array antes de filtrar
     if (!Array.isArray(allEmpleados)) return [];
     const filteredResources = allEmpleados
       .filter((emp: Empleado) => selectedEmpleadosIds.includes(emp.$id))
@@ -160,10 +157,10 @@ const Agenda = () => {
     console.log('[Agenda Component - useMemo events] Mapa de clientes creado, tamaño:', clienteMap.size);
 
     const transformedEvents = citasDelDia.map((cita: Cita & Models.Document, index: number) => {
-      // console.log(`%c[Agenda Component - useMemo events] Procesando cita[${index}] ID: ${cita.$id}`, 'color: gray;', cita); // Descomentar si es necesario
+      // console.log(`%c[Agenda Component - useMemo events] Procesando cita[${index}] ID: ${cita.$id}`, 'color: gray;', cita);
 
-      if (!cita.fecha_hora || typeof cita.fecha_hora !== 'string') { /* ... warn y return null ... */ console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: fecha_hora inválida o ausente.`); return null;}
-      if (!cita.empleado_id) { /* ... warn y return null ... */ console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: empleado_id ausente.`); return null;}
+      if (!cita.fecha_hora || typeof cita.fecha_hora !== 'string') { console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: fecha_hora inválida o ausente.`); return null;}
+      if (!cita.empleado_id) { console.warn(`[Agenda Component - useMemo events] Saltando cita ${cita.$id}: empleado_id ausente.`); return null;}
       let duration = 60;
       if (typeof cita.duracion === 'number' && cita.duracion > 0) { duration = cita.duracion; }
       else { console.warn(`[Agenda Component - useMemo events] Cita ${cita.$id}: Duración inválida (${cita.duracion}), usando default 60min.`); }
@@ -214,20 +211,97 @@ const Agenda = () => {
   const hasError = errorCitas || errorEmpleados || errorClientes;
 
   // Manejadores
-  const handleOpenCreateDialog = () => { /* ... */ };
-  const handleSelectSlot = (slotInfo: { start: Date, end: Date, resourceId?: string }) => { /* ... */ };
-  const handleSelectEvent = (event: CalendarEvent) => { /* ... */ };
-  const handleOpenEditDialog = (cita: Cita & Models.Document) => { /* ... */ };
+  const handleOpenCreateDialog = () => {
+    setCitaToEdit(null);
+    setFormInitialDate(new Date());
+    setIsDialogOpen(true);
+  };
 
-  // handleNavigate CON LOG
+  const handleSelectSlot = (slotInfo: { start: Date; end: Date; resourceId?: string | number }) => {
+    console.log('[Agenda Component] handleSelectSlot llamado:', slotInfo);
+    setCitaToEdit(null);
+    setFormInitialDate(slotInfo.start);
+    setIsDialogOpen(true);
+  };
+
+  const handleSelectEvent = (event: CalendarEvent) => {
+    console.log('[Agenda Component] handleSelectEvent llamado:', event);
+    handleOpenEditDialog(event.data);
+  };
+
+  const handleOpenEditDialog = (cita: Cita & Models.Document) => {
+    setCitaToEdit(cita);
+    setFormInitialDate(undefined);
+    setIsDialogOpen(true);
+  };
+
   const handleNavigate = (newDate: Date) => {
-    console.log('[Agenda Component] handleNavigate llamado con fecha:', newDate); // <-- LOG AÑADIDO
+    console.log('[Agenda Component] handleNavigate llamado con fecha:', newDate);
     setSelectedDate(startOfDay(newDate));
   };
 
-  const handleEmpleadoSelectToggle = (empleadoId: string) => { /* ... */ };
-  const handleDeleteCita = async (cita: Cita & Models.Document) => { /* ... */ };
-  const handleFormSubmit = async (data: LipooutUserInput<CitaInput>) => { /* ... */ };
+  const handleEmpleadoSelectToggle = (empleadoId: string) => {
+    setSelectedEmpleadosIds(prevIds => {
+      const isCurrentlySelected = prevIds.includes(empleadoId);
+      if (isCurrentlySelected) {
+        console.log(`[Agenda Component] Deseleccionando empleado: ${empleadoId}`);
+        return prevIds.filter(id => id !== empleadoId);
+      } else {
+        console.log(`[Agenda Component] Seleccionando empleado: ${empleadoId}`);
+        return [...prevIds, empleadoId];
+      }
+    });
+  };
+
+  const handleDeleteCita = async (cita: Cita & Models.Document) => {
+    if (!window.confirm('¿Está seguro de eliminar esta cita?')) return;
+    
+    try {
+      await deleteCitaMutation.mutateAsync({ 
+        id: cita.$id,
+        fechaCita: cita.fecha_hora 
+      });
+      toast({
+        title: 'Cita eliminada',
+        description: 'La cita ha sido eliminada correctamente.',
+      });
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('[Agenda Component] Error al eliminar cita:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar la cita.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleFormSubmit = async (data: LipooutUserInput<CitaInput>) => {
+    try {
+      if (citaToEdit) {
+        await updateCitaMutation.mutateAsync({ id: citaToEdit.$id, data });
+        toast({
+          title: 'Cita actualizada',
+          description: 'La cita ha sido actualizada correctamente.',
+        });
+      } else {
+        await createCitaMutation.mutateAsync(data);
+        toast({
+          title: 'Cita creada',
+          description: 'La cita ha sido creada correctamente.',
+        });
+      }
+      setIsDialogOpen(false);
+      setCitaToEdit(null);
+    } catch (error) {
+      console.error('[Agenda Component] Error al guardar cita:', error);
+      toast({
+        title: 'Error',
+        description: citaToEdit ? 'No se pudo actualizar la cita.' : 'No se pudo crear la cita.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // CustomEvent
   const CustomEvent = ({ event }: EventProps<CalendarEvent>) => {
@@ -265,7 +339,7 @@ const Agenda = () => {
                          <DropdownMenuSeparator />
                          {loadingEmpleados ? (
                            <DropdownMenuItem disabled>Cargando...</DropdownMenuItem>
-                         ) : Array.isArray(allEmpleados) && allEmpleados.length > 0 ? ( // Asegurar que es array
+                         ) : Array.isArray(allEmpleados) && allEmpleados.length > 0 ? (
                            allEmpleados.map((emp: Empleado & Models.Document) => (
                              <DropdownMenuCheckboxItem
                                key={emp.$id}
@@ -282,7 +356,6 @@ const Agenda = () => {
                          <DropdownMenuSeparator />
                          <DropdownMenuItem
                            onSelect={() => {
-                               // Asegurar que allEmpleados es array antes de filtrar/mapear
                                const activeIds = Array.isArray(allEmpleados)
                                    ? allEmpleados.filter(e => e.activo).map(e => e.$id)
                                    : [];
@@ -290,7 +363,6 @@ const Agenda = () => {
                                setSelectedEmpleadosIds(activeIds);
                            }}
                            className="cursor-pointer"
-                           // Deshabilitar si allEmpleados no es array o no hay activos
                            disabled={!Array.isArray(allEmpleados) || allEmpleados.filter(e => e.activo).length === 0}
                          >
                            Seleccionar todos (activos)
@@ -329,9 +401,9 @@ const Agenda = () => {
               {hasError && (
                   <p className="text-center text-destructive py-20">
                     Error al cargar datos.
-                    {errorCitas && <span> (Citas: {errorCitas.message})</span>}
-                    {errorEmpleados && <span> (Empleados: {errorEmpleados.message})</span>}
-                    {errorClientes && <span> (Clientes: {errorClientes.message})</span>}
+                    {errorCitas && <span> (Citas: {errorCitas instanceof Error ? errorCitas.message : String(errorCitas)})</span>}
+                    {errorEmpleados && <span> (Empleados: {errorEmpleados instanceof Error ? errorEmpleados.message : String(errorEmpleados)})</span>}
+                    {errorClientes && <span> (Clientes: {errorClientes instanceof Error ? errorClientes.message : String(errorClientes)})</span>}
                   </p>
               )}
 
@@ -341,7 +413,7 @@ const Agenda = () => {
                   {/* Mensaje si no hay empleados o no seleccionados */}
                   {resources.length === 0 && !loadingEmpleados ? (
                      <p className="text-center text-muted-foreground py-20">
-                        {(!Array.isArray(allEmpleados) || allEmpleados.length === 0) // Comprobación más segura
+                        {(!Array.isArray(allEmpleados) || allEmpleados.length === 0)
                           ? "No hay empleados definidos en el sistema."
                           : "No se han seleccionado empleados para mostrar."
                         }
@@ -355,7 +427,7 @@ const Agenda = () => {
                       <BigCalendar
                         localizer={localizer}
                         culture='es'
-                        events={events} // Pasar los eventos (¡ahora deberían estar aquí!)
+                        events={events} // Pasar los eventos ¡Corregido!
                         resources={resources}
                         defaultView={Views.DAY}
                         views={[Views.DAY, Views.WEEK]}

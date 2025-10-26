@@ -41,6 +41,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
       precio: articuloInicial.precio || 0,
       tipo: articuloInicial.tipo || 'servicio',
       familia_id: articuloInicial.familia_id || articuloInicial.familia?.$id || '',
+      duracion: articuloInicial.duracion || null,
       stock: articuloInicial.stock || 0,
       sesiones_bono: articuloInicial.sesiones_bono || 0,
       activo: articuloInicial.activo ?? true,
@@ -61,6 +62,7 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
         ...data,
         // Asegurar que los campos opcionales sean undefined si no aplican o están vacíos
         descripcion: data.descripcion || undefined,
+        duracion: (data.tipo === 'servicio' || data.tipo === 'bono') ? (data.duracion ?? undefined) : undefined,
         stock: data.tipo === 'producto' ? (data.stock ?? undefined) : undefined,
         sesiones_bono: data.tipo === 'bono' ? (data.sesiones_bono ?? undefined) : undefined,
     };
@@ -116,6 +118,29 @@ export const ArticuloForm = ({ articuloInicial, onSubmit, isSubmitting }: Articu
                 <FormMessage />
                 </FormItem>
             )}/>
+
+            {/* Campo Duración - solo para servicios y bonos */}
+            {(tipoSeleccionado === 'servicio' || tipoSeleccionado === 'bono') && (
+                <FormField control={form.control} name="duracion" render={({ field }) => ( 
+                    <FormItem> 
+                        <FormLabel>Duración (minutos)</FormLabel> 
+                        <FormControl>
+                            <Input 
+                                type="number" 
+                                step="1" 
+                                placeholder="Ej: 60"
+                                {...field} 
+                                value={field.value ?? ''} 
+                                onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value) || 0)} 
+                            />
+                        </FormControl>
+                        <FormDescription>
+                            Duración del servicio/bono en minutos (máx. 500)
+                        </FormDescription>
+                        <FormMessage /> 
+                    </FormItem> 
+                )}/>
+            )}
 
             {/* Campos condicionales */}
             {tipoSeleccionado === 'producto' && (

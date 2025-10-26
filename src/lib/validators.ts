@@ -154,6 +154,7 @@ export const articuloSchema = z.object({
   precio: z.number().min(0, "El precio debe ser 0 o mayor"),
   tipo: z.enum(['producto', 'servicio', 'bono']),
   familia_id: z.string().min(1, "La familia es obligatoria"),
+  duracion: z.number().min(0, "La duración debe ser 0 o mayor").max(500, "Duración máxima 500 minutos").optional().nullable(),
   stock: z.number().optional().nullable(),
   sesiones_bono: z.number().optional().nullable(),
   activo: z.boolean(),
@@ -168,11 +169,11 @@ export const citaSchema = z.object({
   cliente_id: z.string().min(1, "Cliente obligatorio"),
   empleado_id: z.string().min(1, "Empleado obligatorio"),
   articulos: z.string().min(1, "Artículos/Servicios obligatorios"), // JSON string
-  recursos_cabina: z.string().optional(),
-  recursos_aparatos: z.string().optional(),
+  recursos_cabina: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  recursos_aparatos: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
   estado: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'no_asistio']),
-  comentarios: z.string().optional(),
-  datos_clinicos: z.string().optional(),
+  comentarios: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  datos_clinicos: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
   precio_total: z.number().min(0, "Precio total obligatorio"),
 });
 export type CitaFormData = z.infer<typeof citaSchema>;

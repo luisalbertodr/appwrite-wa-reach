@@ -66,18 +66,37 @@ export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Docume
   }
 };
 
+// Helper para limpiar campos undefined y strings vacíos
+const cleanUndefinedFields = <T extends Record<string, any>>(obj: T): Partial<T> => {
+  const cleaned: any = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      // Solo incluir el campo si tiene un valor válido (no undefined, no null, no string vacío)
+      if (value !== undefined && value !== null && value !== '') {
+        cleaned[key] = value;
+      }
+    }
+  }
+  return cleaned;
+};
+
 // --- createCita (con Logs detallados) ---
 export const createCita = async (cita: LipooutUserInput<CitaInput>): Promise<Cita & Models.Document> => {
+    // Limpiar campos undefined antes de enviar
+    const citaLimpia = cleanUndefinedFields(cita);
+    
     // --- LOG 3 ---
     console.log('%c=== CREAR CITA - Datos enviados ===', 'color: green; font-weight: bold;');
     console.log('DATABASE_ID:', DATABASE_ID);
     console.log('CITAS_COLLECTION_ID:', CITAS_COLLECTION_ID);
-    console.log('Datos de la cita:', cita);
+    console.log('Datos originales:', cita);
+    console.log('Datos limpiados:', citaLimpia);
     // Loguear tipos para asegurar formato correcto
     console.log('Tipo de cada campo:');
-    for (const key in cita) {
-        if (Object.prototype.hasOwnProperty.call(cita, key)) {
-            const value = cita[key as keyof typeof cita];
+    for (const key in citaLimpia) {
+        if (Object.prototype.hasOwnProperty.call(citaLimpia, key)) {
+            const value = citaLimpia[key as keyof typeof citaLimpia];
             console.log(`   ${key}: ${typeof value} = ${JSON.stringify(value)}`);
         }
     }
@@ -88,7 +107,7 @@ export const createCita = async (cita: LipooutUserInput<CitaInput>): Promise<Cit
       DATABASE_ID,
       CITAS_COLLECTION_ID,
       ID.unique(),
-      cita // Pasar directamente el objeto cita recibido
+      citaLimpia
     );
     // --- LOG 4 ---
     console.log(`%c✓ Cita creada exitosamente: ${response.$id}`, 'color: green;', response);
@@ -100,10 +119,10 @@ export const createCita = async (cita: LipooutUserInput<CitaInput>): Promise<Cit
      if (error instanceof Error) {
         console.error("Error message:", error.message);
         // Si es un error específico de Appwrite con response
-        // const appwriteError = error as any;
-        // if (appwriteError.response) {
-        //     console.error("Appwrite Response:", appwriteError.response);
-        // }
+        const appwriteError = error as any;
+        if (appwriteError.response) {
+            console.error("Appwrite Response:", appwriteError.response);
+        }
      }
      throw error; // Relanzar para que react-query lo maneje
   }
@@ -111,13 +130,18 @@ export const createCita = async (cita: LipooutUserInput<CitaInput>): Promise<Cit
 
 // --- updateCita ---
 export const updateCita = async (id: string, data: LipooutUserInput<Partial<CitaInput>>): Promise<Cita & Models.Document> => {
-    console.log(`%c=== ACTUALIZAR CITA ${id} ===`, 'color: orange; font-weight: bold;', data);
+    // Limpiar campos undefined antes de enviar
+    const dataLimpia = cleanUndefinedFields(data) as any;
+    
+    console.log(`%c=== ACTUALIZAR CITA ${id} ===`, 'color: orange; font-weight: bold;');
+    console.log('Datos originales:', data);
+    console.log('Datos limpiados:', dataLimpia);
      try {
         const response = await databases.updateDocument<Cita & Models.Document>(
             DATABASE_ID,
             CITAS_COLLECTION_ID,
             id,
-            data
+            dataLimpia
         );
         console.log(`%c✓ Cita ${id} actualizada exitosamente`, 'color: orange;', response);
         return response;

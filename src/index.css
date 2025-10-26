@@ -110,3 +110,135 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Estilos para react-big-calendar - Tema Oscuro */
+.dark .rbc-calendar {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+.dark .rbc-header {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-time-content {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-time-header-content {
+  border-left: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-time-slot {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-day-slot .rbc-time-slot {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-timeslot-group {
+  border-left: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-day-bg + .rbc-day-bg {
+  border-left: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-time-header-cell {
+  border-left: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-current-time-indicator {
+  background-color: hsl(var(--primary));
+}
+
+.dark .rbc-today {
+  background-color: hsl(var(--accent));
+}
+
+.dark .rbc-event {
+  background-color: hsl(217 91% 60%);
+  color: hsl(210 40% 98%);
+  border: 1px solid hsl(217 91% 70%);
+}
+
+.dark .rbc-event:hover {
+  background-color: hsl(217 91% 55%);
+}
+
+.dark .rbc-event.rbc-selected {
+  background-color: hsl(217 91% 50%);
+}
+
+.dark .rbc-show-more {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .rbc-toolbar button {
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+}
+
+.dark .rbc-toolbar button:hover {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.dark .rbc-toolbar button:active,
+.dark .rbc-toolbar button.rbc-active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+.dark .rbc-off-range {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .rbc-off-range-bg {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+.dark .rbc-time-content > * + * > * {
+  border-left: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-time-header.rbc-overflowing {
+  border-right: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .rbc-month-view {
+  border: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-month-row {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.dark .rbc-date-cell {
+  color: hsl(var(--foreground));
+}
+
+.dark .rbc-button-link {
+  color: hsl(var(--foreground));
+}
+
+.dark .rbc-overlay {
+  background-color: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+
+.dark .rbc-overlay-header {
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--popover-foreground));
+}

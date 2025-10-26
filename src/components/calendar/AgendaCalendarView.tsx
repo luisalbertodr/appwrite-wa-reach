@@ -10,10 +10,12 @@ const locales = {
   'es': es,
 };
 const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: (date) => startOfWeek(date, { weekStartsOn: 1 }), // Lunes
-  getDay,
+  format: (date: Date, formatStr: string, culture?: string) => 
+    format(date, formatStr, { locale: locales[culture as keyof typeof locales] }),
+  parse: (dateStr: string, formatStr: string, culture?: string) =>
+    parse(dateStr, formatStr, new Date(), { locale: locales[culture as keyof typeof locales] }),
+  startOfWeek: (date: Date) => startOfWeek(date, { weekStartsOn: 1, locale: es }),
+  getDay: (date: Date) => getDay(date),
   locales,
 });
 
@@ -48,7 +50,7 @@ interface AgendaCalendarViewProps {
   defaultDate?: Date;
   resources?: CalendarResource[];
   onSelectEvent: (event: CalendarEvent) => void;
-  onSelectSlot: (slotInfo: { start: Date; end: Date }) => void;
+  onSelectSlot: (slotInfo: { start: Date; end: Date; resourceId?: string | number }) => void;
   onNavigate: (newDate: Date) => void;
 }
 

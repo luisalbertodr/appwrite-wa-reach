@@ -23,8 +23,6 @@ export const useGetCitasPorDia = (fecha: Date | undefined) => {
     // La queryKey ahora incluye la fecha específica
     queryKey: [CITAS_QUERY_KEY, fechaKey],
     queryFn: () => getCitasPorDia(fechaValida), // Llama a la función del servicio con fecha válida
-    // Habilitar la query solo si la fecha está definida (opcional, pero buena práctica)
-    enabled: !!fecha,
     // Opciones adicionales (ej. staleTime) pueden ir aquí
     staleTime: 1000 * 60 * 5, // Cache por 5 minutos, por ejemplo
     // Habilitar refetch al montar o si la ventana recupera el foco puede ser útil

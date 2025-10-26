@@ -742,6 +742,15 @@
                     "default": null
                 },
                 {
+                    "key": "duracion",
+                    "type": "integer",
+                    "required": false,
+                    "array": false,
+                    "min": 0,
+                    "max": 500,
+                    "default": null
+                },
+                {
                     "key": "activo",
                     "type": "boolean",
                     "required": true,

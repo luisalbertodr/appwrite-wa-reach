@@ -10,7 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Upload, Loader2, Save, Settings, Server, Users, Package, Wrench, Building2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Save, Settings, Server, Users, Package, Wrench, Building2, Plus, Pencil, Trash2, Moon, Sun, Monitor } from 'lucide-react';
+import { useTheme } from '@/components/theme-provider';
+import { ThemeToggle } from '@/components/theme-toggle';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
 import { EmpleadoForm } from '@/components/forms/EmpleadoForm';
@@ -301,7 +303,8 @@ const Configuracion = () => {
        </div>
 
       <Tabs defaultValue="waha">
-        <TabsList className="mb-4 grid w-full grid-cols-7 gap-1">
+        <TabsList className="mb-4 grid w-full grid-cols-8 gap-1">
+          <TabsTrigger value="apariencia"><Moon className="w-4 h-4 mr-2"/> Apariencia</TabsTrigger>
           <TabsTrigger value="clinica"><Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
           <TabsTrigger value="waha"><Server className="w-4 h-4 mr-2"/> WAHA</TabsTrigger>
           <TabsTrigger value="import"><Upload className="w-4 h-4 mr-2"/> Import</TabsTrigger>
@@ -310,6 +313,19 @@ const Configuracion = () => {
           <TabsTrigger value="aparatos"><Wrench className="w-4 h-4 mr-2"/> Aparatos</TabsTrigger>
           <TabsTrigger value="proveedores"><Building2 className="w-4 h-4 mr-2"/> Proveedores</TabsTrigger>
         </TabsList>
+
+        {/* --- Contenido Pestaña Apariencia --- */}
+        <TabsContent value="apariencia">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tema de la Aplicación</CardTitle>
+              <CardDescription>Personaliza la apariencia de la interfaz.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ThemeToggle />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* --- Contenido Pestaña Clínica --- */}
         <TabsContent value="clinica">
