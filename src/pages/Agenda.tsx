@@ -82,6 +82,7 @@ const Agenda = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [citaToEdit, setCitaToEdit] = useState<(Cita & Models.Document) | null>(null);
   const [formInitialDate, setFormInitialDate] = useState<Date | undefined>(new Date());
+  const [formInitialEmpleado, setFormInitialEmpleado] = useState<string | undefined>(undefined);
   const [selectedEmpleadosIds, setSelectedEmpleadosIds] = useState<string[]>([]);
 
   const fechaSeleccionadaFormateada = selectedDate
@@ -185,7 +186,8 @@ const Agenda = () => {
          if (cita.articulos && typeof cita.articulos === 'string' && cita.articulos.trim().startsWith('[')) {
             const arts: unknown = JSON.parse(cita.articulos);
             if (Array.isArray(arts) && arts.length > 0) {
-                tratamientos = arts.map(String).filter(art => art.trim() !== '').join(', ');
+                // CORRECCIÓN: Mapear por 'articulo_nombre' en lugar de 'String'
+                tratamientos = arts.map((art: any) => art.articulo_nombre || 'Desconocido').join(', ');
                 if (!tratamientos) tratamientos = 'Artículo(s) vacío(s)';
             } else { tratamientos = cita.articulos; }
         } else if (typeof cita.articulos === 'string' && cita.articulos.trim() !== '') { tratamientos = cita.articulos; }
@@ -214,6 +216,7 @@ const Agenda = () => {
   const handleOpenCreateDialog = () => {
     setCitaToEdit(null);
     setFormInitialDate(new Date());
+    setFormInitialEmpleado(undefined); 
     setIsDialogOpen(true);
   };
 
@@ -221,6 +224,7 @@ const Agenda = () => {
     console.log('[Agenda Component] handleSelectSlot llamado:', slotInfo);
     setCitaToEdit(null);
     setFormInitialDate(slotInfo.start);
+    setFormInitialEmpleado(slotInfo.resourceId ? String(slotInfo.resourceId) : undefined);
     setIsDialogOpen(true);
   };
 
@@ -232,6 +236,7 @@ const Agenda = () => {
   const handleOpenEditDialog = (cita: Cita & Models.Document) => {
     setCitaToEdit(cita);
     setFormInitialDate(undefined);
+    setFormInitialEmpleado(undefined); 
     setIsDialogOpen(true);
   };
 
@@ -330,7 +335,6 @@ const Agenda = () => {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline">
                           <Users className="w-4 h-4 mr-2" />
-                          {/* CORRECCIÓN TypeError: Usar optional chaining y fallback */}
                           Empleados ({selectedEmpleadosIds.length}/{allEmpleados?.length ?? 0})
                         </Button>
                       </DropdownMenuTrigger>
@@ -427,12 +431,12 @@ const Agenda = () => {
                       <BigCalendar
                         localizer={localizer}
                         culture='es'
-                        events={events} // Pasar los eventos ¡Corregido!
+                        events={events} 
                         resources={resources}
                         defaultView={Views.DAY}
                         views={[Views.DAY, Views.WEEK]}
-                        date={selectedDate} // Controlado por el estado
-                        onNavigate={handleNavigate} // Manejador para botones
+                        date={selectedDate} 
+                        onNavigate={handleNavigate} 
                         onSelectEvent={handleSelectEvent}
                         onSelectSlot={handleSelectSlot}
                         selectable={true}
@@ -440,8 +444,15 @@ const Agenda = () => {
                         timeslots={4}
                         min={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 8, 0, 0)}
                         max={new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 21, 0, 0)}
-                        resourceAccessor="resourceId"
-                        resourceTitleAccessor="resourceTitle"
+                        
+                        // --- CORRECCIÓN EXPLÍCITA ---
+                        // Define cómo acceder al ID del array 'resources'
+                        resourceIdAccessor="resourceId" 
+                        // Define cómo acceder al Título del array 'resources'
+                        resourceTitleAccessor="resourceTitle" 
+                        // Define cómo acceder al ID de recurso desde un 'event'
+                        resourceAccessor="resourceId" 
+                        
                         messages={{
                           next: "Siguiente", previous: "Anterior", today: "Hoy", month: "Mes", week: "Semana", day: "Día", agenda: "Agenda",
                           date: "Fecha", time: "Hora", event: "Evento", noEventsInRange: "No hay citas programadas para este día.",
@@ -467,6 +478,7 @@ const Agenda = () => {
               <CitaForm
                 citaInicial={citaToEdit}
                 fechaInicial={formInitialDate}
+                empleadoInicial={formInitialEmpleado} 
                 onSubmit={handleFormSubmit}
                 isSubmitting={createCitaMutation.isPending || updateCitaMutation.isPending}
               />

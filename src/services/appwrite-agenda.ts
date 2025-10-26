@@ -1,7 +1,8 @@
 import { databases, DATABASE_ID, CITAS_COLLECTION_ID } from '@/lib/appwrite';
 import { Cita, CitaInput, LipooutUserInput } from '@/types';
 import { ID, Query, Models } from 'appwrite';
-import { startOfDay, endOfDay, formatISO } from 'date-fns';
+// CORRECCIÓN: Importar 'addDays'
+import { startOfDay, endOfDay, formatISO, addDays } from 'date-fns';
 
 // Tipos Create/Update Input (Asegúrate que coincidan con tu definición)
 // export type CreateCitaInput = LipooutUserInput<CitaInput>; // Si usas LipooutUserInput
@@ -13,14 +14,18 @@ export type UpdateCitaInput = Partial<CitaInput>;
 
 export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Document)[]> => {
   const startOfDayDate = startOfDay(fecha);
-  const endOfDayDate = endOfDay(fecha);
+  // CORRECCIÓN: Usar el inicio del DÍA SIGUIENTE en lugar de endOfDay
+  // Esto evita problemas con el cambio de hora (DST)
+  // const endOfDayDate = endOfDay(fecha); // Antiguo
+  const startOfNextDayDate = startOfDay(addDays(fecha, 1)); // Nuevo
 
   // Convertir a ISO string para Appwrite
   const startOfDayISO = formatISO(startOfDayDate);
-  const endOfDayISO = formatISO(endOfDayDate);
+  // const endOfDayISO = formatISO(endOfDayDate); // Antiguo
+  const startOfNextDayISO = formatISO(startOfNextDayDate); // Nuevo
 
-  // --- LOG 1 ---
-  console.log(`%c[Service: getCitasPorDia] Buscando citas entre ${startOfDayISO} y ${endOfDayISO}`, 'color: blue; font-weight: bold;');
+  // --- LOG 1 (Actualizado) ---
+  console.log(`%c[Service: getCitasPorDia] Buscando citas entre ${startOfDayISO} (inclusive) y ${startOfNextDayISO} (exclusive)`, 'color: blue; font-weight: bold;');
 
   try {
     const response = await databases.listDocuments<Cita & Models.Document>(
@@ -28,7 +33,9 @@ export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Docume
       CITAS_COLLECTION_ID,
       [
         Query.greaterThanEqual('fecha_hora', startOfDayISO),
-        Query.lessThan('fecha_hora', endOfDayISO), // Usar lessThan con el fin del día
+        // CORRECCIÓN: Usar 'lessThan' con el inicio del día siguiente
+        // Query.lessThan('fecha_hora', endOfDayISO), // Antiguo
+        Query.lessThan('fecha_hora', startOfNextDayISO), // Nuevo
         Query.limit(100), // Límite razonable
         Query.orderAsc('fecha_hora') // Ordenar por hora
       ]
@@ -45,7 +52,8 @@ export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Docume
             CITAS_COLLECTION_ID,
             queries: [
                 `greaterThanEqual('fecha_hora', ${startOfDayISO})`,
-                `lessThan('fecha_hora', ${endOfDayISO})`,
+                // `lessThan('fecha_hora', ${endOfDayISO})`, // Antiguo
+                `lessThan('fecha_hora', ${startOfNextDayISO})`, // Nuevo
                 `limit(100)`,
                 `orderAsc('fecha_hora')`
             ]
