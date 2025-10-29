@@ -99,8 +99,12 @@ export function CampaignsTab() {
     if (filters.nombreApellido) {
         const searchWords = filters.nombreApellido.split(' ').filter(word => word.length > 0);
         if (searchWords.length > 0) {
-            const searchConditions = searchWords.map(word => Query.search('nombre_completo', word));
-            newQueries.push(...searchConditions);
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Unir las palabras en un solo término de búsqueda
+            const searchTerm = searchWords.join(' ');
+            // Añadir UNA sola consulta de búsqueda
+            newQueries.push(Query.search('nombre_completo', searchTerm));
+            // --- FIN DE LA CORRECCIÓN ---
         }
     }
     if (filters.email) newQueries.push(Query.search('email', filters.email));
@@ -430,7 +434,7 @@ export function CampaignsTab() {
                 <div><Label>Facturación (Mín)</Label><Input type="number" value={filters.facturacionMin} onChange={(e) => setFilters({ ...filters, facturacionMin: e.target.value })}/></div>
                 <div><Label>Facturación (Máx)</Label><Input type="number" value={filters.facturacionMax} onChange={(e) => setFilters({ ...filters, facturacionMax: e.target.value })}/></div>
                 <div><Label>Código Postal</Label><Input value={filters.codposcli} onChange={(e) => setFilters({ ...filters, codposcli: e.target.value })}/></div>
-                <div><Label>Población</Label><Input value={filters.pobcli} onChange={(e) => setFilters({ ...filters, pobcli: e.target.value })}/></div>
+                <div><Label>Población</Label><Input value={filters.pobcli} onChange={(e) => setFilters({ ...filters, pobcli: e.g.target.value })}/></div>
                 <div><Label>Provincia</Label><Input value={filters.procli} onChange={(e) => setFilters({ ...filters, procli: e.target.value })}/></div>
                 <div><Label>Intereses</Label><Input value={filters.intereses} onChange={(e) => setFilters({ ...filters, intereses: e.target.value })}/></div>
               </div>

@@ -52,42 +52,52 @@ const Configuracion = () => {
 
     const fetchWahaSessions = async () => {
       try {
-        // Solución: Usar async: false para esperar el resultado completo
         const result = await functions.createExecution(
           'getWahaSessionsFunction',
-          '',  // data vacío
-          false // async: false para esperar el resultado
+          '',
+          false
         );
 
-        let sessions: string[] = [];
+        console.log('Resultado completo de la función:', result);
 
-        try {
-          // Usar any para evitar errores de tipo y acceder a las propiedades dinámicamente
-          const resultAny = result as any;
-          const responseBody = resultAny.stdout || resultAny.responseBody || resultAny.response || '';
+        // La respuesta de Appwrite tiene la propiedad responseBody
+        const responseBody = result.responseBody;
+        console.log('responseBody:', responseBody);
+        console.log('Tipo de responseBody:', typeof responseBody);
 
-          if (!responseBody) {
-            throw new Error("La función no devolvió ningún resultado.");
-          }
-
-          const parsed = JSON.parse(responseBody);
-
-          if (Array.isArray(parsed)) {
-            sessions = parsed;
-          } else {
-            throw new Error("Formato inesperado en la respuesta de la función.");
-          }
-        } catch (err) {
-          console.error("Error parseando respuesta de la función:", err, result);
-          throw new Error("La función devolvió un formato no válido o vacío.");
+        if (!responseBody) {
+          throw new Error("La función no devolvió ningún resultado.");
         }
 
-        setWahaSessions(sessions);
+        // Parsear la respuesta JSON
+        const parsed = JSON.parse(responseBody);
+        console.log('Respuesta parseada:', parsed);
+        console.log('Tipo de respuesta parseada:', typeof parsed);
+        console.log('Es array?:', Array.isArray(parsed));
+
+        // Verificar si es un objeto con propiedad success o error
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (parsed.success === false) {
+            throw new Error(parsed.error || 'Error al obtener sesiones de Waha');
+          }
+          // Si tiene alguna propiedad que contenga el array de sesiones
+          if (parsed.sessions && Array.isArray(parsed.sessions)) {
+            setWahaSessions(parsed.sessions);
+            return;
+          }
+        }
+
+        // Verificar que sea un array
+        if (!Array.isArray(parsed)) {
+          throw new Error(`La función devolvió un formato inesperado. Se esperaba un array pero se recibió: ${typeof parsed}`);
+        }
+
+        setWahaSessions(parsed);
       } catch (error) {
-        console.error(error);
+        console.error('Error al obtener sesiones de Waha:', error);
         toast({
           title: 'Error al obtener sesiones de Waha',
-          description: 'No se pudieron cargar las sesiones disponibles.',
+          description: error instanceof Error ? error.message : 'No se pudieron cargar las sesiones disponibles.',
           variant: 'destructive',
         });
       }
