@@ -1,4 +1,4 @@
-import { client, databases, DATABASE_ID, CLIENTS_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CONFIG_COLLECTION_ID, IMPORT_LOGS_COLLECTION_ID } from './appwrite';
+import { client, databases, DATABASE_ID, CLIENTS_COLLECTION_ID, CAMPAIGNS_COLLECTION_ID, TEMPLATES_COLLECTION_ID, CONFIG_COLLECTION_ID, IMPORT_LOGS_COLLECTION_ID, MESSAGE_LOGS_COLLECTION_ID, CAMPAIGN_PROGRESS_COLLECTION_ID } from './appwrite';
 import { ID, Permission, Role } from 'appwrite';
 import { toast } from '@/hooks/use-toast';
 
@@ -34,6 +34,7 @@ const schema = {
         { key: 'sexo', type: 'string', size: 50, required: true }, // Enum: H, M, Otro
         { key: 'fecalta', type: 'datetime', required: true },
         { key: 'edad', type: 'integer', required: false }, // Calculated, not stored directly in Appwrite schema
+        { key: 'nombre_completo', type: 'string', size: 512, required: false }, // Concatenación de nomcli y ape1cli
       ],
     },
     {
@@ -96,6 +97,38 @@ const schema = {
         { key: 'totalProcessed', type: 'integer', required: true },
         { key: 'errors', type: 'string', array: true, size: 2000, required: false }, // Store errors as string array
         { key: 'status', type: 'string', size: 50, required: true }, // Enum: completed, completed_with_errors, failed
+      ],
+    },
+    {
+      id: MESSAGE_LOGS_COLLECTION_ID,
+      name: 'message_logs',
+      permissions: [
+        Permission.create(Role.any()),
+        Permission.read(Role.any()),
+        Permission.update(Role.any()),
+        Permission.delete(Role.any()),
+      ],
+      attributes: [
+        { key: 'campaignId', type: 'string', size: 255, required: true },
+        { key: 'clientId', type: 'string', size: 255, required: true },
+        { key: 'clientName', type: 'string', size: 512, required: false },
+        { key: 'status', type: 'string', size: 50, required: true }, // Enum: sent, failed, skipped
+        { key: 'timestamp', type: 'datetime', required: true },
+        { key: 'error', type: 'string', size: 2000, required: false },
+      ],
+    },
+    {
+      id: CAMPAIGN_PROGRESS_COLLECTION_ID,
+      name: 'campaign_progress',
+      permissions: [
+        Permission.create(Role.any()),
+        Permission.read(Role.any()),
+        Permission.update(Role.any()),
+        Permission.delete(Role.any()),
+      ],
+      attributes: [
+        { key: 'currentClientName', type: 'string', size: 255, required: false },
+        { key: 'currentClientPhone', type: 'string', size: 255, required: false },
       ],
     },
   ],

@@ -5,6 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: "./", // <-- ¡ESTA ES LA LÍNEA QUE SOLUCIONA EL PROBLEMA!
   server: {
     allowedHosts: ['oporto.local'],
     host: "::",

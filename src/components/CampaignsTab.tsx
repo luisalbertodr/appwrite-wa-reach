@@ -434,7 +434,7 @@ export function CampaignsTab() {
                 <div><Label>Facturación (Mín)</Label><Input type="number" value={filters.facturacionMin} onChange={(e) => setFilters({ ...filters, facturacionMin: e.target.value })}/></div>
                 <div><Label>Facturación (Máx)</Label><Input type="number" value={filters.facturacionMax} onChange={(e) => setFilters({ ...filters, facturacionMax: e.target.value })}/></div>
                 <div><Label>Código Postal</Label><Input value={filters.codposcli} onChange={(e) => setFilters({ ...filters, codposcli: e.target.value })}/></div>
-                <div><Label>Población</Label><Input value={filters.pobcli} onChange={(e) => setFilters({ ...filters, pobcli: e.g.target.value })}/></div>
+                <div><Label>Población</Label><Input value={filters.pobcli} onChange={(e) => setFilters({ ...filters, pobcli: e.target.value })}/></div>
                 <div><Label>Provincia</Label><Input value={filters.procli} onChange={(e) => setFilters({ ...filters, procli: e.target.value })}/></div>
                 <div><Label>Intereses</Label><Input value={filters.intereses} onChange={(e) => setFilters({ ...filters, intereses: e.target.value })}/></div>
               </div>
@@ -531,7 +531,10 @@ export function CampaignsTab() {
                     <div><Label>Horas hábiles (hasta)</Label><Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></div>
                 </div>
               <p className="text-sm text-muted-foreground">Se enviará a los <strong className="text-primary">{selectedClients.size}</strong> clientes seleccionados.</p>
-              <p className="text-sm text-muted-foreground">Duración estimada: <strong className="text-primary">{estimatedDuration}</strong></p>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span>Duración estimada: <strong className="text-primary">{estimatedDuration}</strong></span>
+                <span>Sesión Waha: <strong className="text-primary">{wahaConfig?.session || 'default'}</strong></span>
+              </div>
               <Button onClick={startCampaign} disabled={isSending || !!activeCampaignId || selectedClients.size === 0} className="w-full">
                 {(isSending || activeCampaignId) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {activeCampaignId ? 'En Progreso...' : isSending ? 'Iniciando...' : 'Iniciar Campaña'}

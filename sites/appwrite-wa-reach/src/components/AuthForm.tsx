@@ -19,7 +19,7 @@ const AuthForm: React.FC<{ onLoginSuccess: (user: any) => void }> = ({ onLoginSu
     try {
       await account.createEmailPasswordSession(email, password);
       const user = await account.get();
-      onLoginSuccess(user); // Llama a la función del componente padre
+      onLoginSuccess(user);
     } catch (err: any) {
       setError(err.message || 'An error occurred during authentication.');
     } finally {
@@ -31,8 +31,12 @@ const AuthForm: React.FC<{ onLoginSuccess: (user: any) => void }> = ({ onLoginSu
     setError('');
     setLoading(true);
     try {
-      // Reemplaza con tus URLs de redirección reales si son diferentes
-      await account.createOAuth2Session(OAuthProvider.Google, 'http://localhost:8080/', 'http://localhost:8080/login');
+      // --- INICIO DE LA MODIFICACIÓN ---
+      // Reemplaza "https://tu-dominio.com/" con la URL de tu aplicación desplegada
+      const successUrl = 'https://wasap.lipoout.com/';
+      const failureUrl = 'https://wasap.lipoout.com/login';
+      await account.createOAuth2Session(OAuthProvider.Google, successUrl, failureUrl);
+      // --- FIN DE LA MODIFICACIÓN ---
     } catch (err: any) {
       setError(err.message || 'An error occurred during Google authentication.');
     } finally {

@@ -88,6 +88,24 @@
             "commands": "npm install",
             "path": "functions/sendWhatsAppFunction",
             "specification": "s-1vcpu-512mb"
+        },
+        {
+            "$id": "getWahaSessionsFunction",
+            "name": "getWahaSessionsFunction",
+            "runtime": "node-18.0",
+            "path": "functions/getWahaSessionsFunction",
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "execute": [
+                "users"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 15,
+            "enabled": true,
+            "logging": true,
+            "scopes": [],
+            "specification": "s-1vcpu-512mb"
         }
     ],
     "databases": [
@@ -346,6 +364,24 @@
                     "array": false,
                     "min": -9223372036854775808,
                     "max": 9223372036854775807,
+                    "default": null
+                },
+                {
+                    "key": "startTime",
+                    "type": "string",
+                    "size": 10,
+                    "required": false,
+                    "array": false,
+                    "encrypt": false,
+                    "default": null
+                },
+                {
+                    "key": "endTime",
+                    "type": "string",
+                    "size": 10,
+                    "required": false,
+                    "array": false,
+                    "encrypt": false,
                     "default": null
                 }
             ],
@@ -925,6 +961,33 @@
                     "size": 30,
                     "default": null,
                     "encrypt": false
+                },
+                {
+                    "key": "startTime",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 10,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "endTime",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 10,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "session",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
                 }
             ],
             "indexes": []
@@ -1310,7 +1373,7 @@
                     "type": "string",
                     "required": false,
                     "array": true,
-                    "size": 2000,
+                    "size": 10000,
                     "default": null,
                     "encrypt": false
                 },
@@ -1378,6 +1441,15 @@
                     "required": false,
                     "array": false,
                     "size": 500,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "clientName",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
                     "default": null,
                     "encrypt": false
                 }
@@ -1552,6 +1624,58 @@
                 }
             ],
             "indexes": []
+        },
+        {
+            "$id": "campaign_progress",
+            "$permissions": [
+                "create(\"users\")",
+                "read(\"users\")",
+                "update(\"users\")",
+                "delete(\"users\")"
+            ],
+            "databaseId": "68d78cb20028fac621d4",
+            "name": "Campaign Progress",
+            "enabled": true,
+            "rowSecurity": false,
+            "columns": [
+                {
+                    "key": "currentClientName",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                },
+                {
+                    "key": "currentClientPhone",
+                    "type": "string",
+                    "required": false,
+                    "array": false,
+                    "size": 255,
+                    "default": null,
+                    "encrypt": false
+                }
+            ],
+            "indexes": []
+        }
+    ],
+    "sites": [
+        {
+            "$id": "68eea1960024e6d4cc0c",
+            "name": "appwrite-wa-reach",
+            "enabled": true,
+            "logging": true,
+            "framework": "other",
+            "timeout": 30,
+            "installCommand": "",
+            "buildCommand": "",
+            "outputDirectory": "./",
+            "specification": "s-1vcpu-512mb",
+            "buildRuntime": "node-22",
+            "adapter": "static",
+            "fallbackFile": "index.html",
+            "path": "sites/appwrite-wa-reach"
         }
     ]
 }

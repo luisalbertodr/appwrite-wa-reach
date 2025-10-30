@@ -1,0 +1,14 @@
+{
+  "name": "import-csv-function",
+  "version": "1.0.0",
+  "description": "Appwrite Function to import CSV data into the clients collection.",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^11.1.1",
+    "papaparse": "^5.4.1"
+  }
+}

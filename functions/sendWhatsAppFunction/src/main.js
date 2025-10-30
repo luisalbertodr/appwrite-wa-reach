@@ -336,9 +336,29 @@ module.exports = async ({ req, res, log, error }) => {
         
         messagesSinceLastBatchPause++;
 
-        // Notificación de progreso (usa 'clients.length' para el total)
-        if ((index + 1) % notificationInterval === 0) {
-            await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Procesados (aprox): ${index + 1}/${clients.length}\n- Enviados (este chunk): ${totalSent}\n- Fallidos (este chunk): ${totalFailed}\n- Saltados (este chunk): ${totalSkipped}`);
+        // Notificación de progreso basada en el total acumulado de mensajes enviados
+        try {
+            const sentResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
+                Query.equal('campaignId', campaignId),
+                Query.equal('status', 'sent'),
+                Query.limit(1)
+            ]);
+            const totalSentSoFar = sentResponse.total;
+            
+            // Enviar notificación cada 'notificationInterval' mensajes enviados
+            if (totalSentSoFar > 0 && totalSentSoFar % notificationInterval === 0) {
+                // Verificar que no hayamos enviado esta notificación específica antes
+                // (en caso de que múltiples mensajes se procesen simultáneamente)
+                const lastNotificationMark = Math.floor(totalSentSoFar / notificationInterval) * notificationInterval;
+                
+                // Enviar notificación solo si acabamos de alcanzar este múltiplo exacto
+                if (totalSentSoFar === lastNotificationMark) {
+                    await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Mensajes enviados: ${totalSentSoFar}/${clients.length}\n- Enviados (este chunk): ${totalSent}\n- Fallidos (este chunk): ${totalFailed}\n- Saltados (este chunk): ${totalSkipped}`);
+                    log(`Notificación de progreso enviada en ${totalSentSoFar} mensajes enviados`);
+                }
+            }
+        } catch (e) {
+            error(`Error al verificar progreso para notificación: ${e.message}`);
         }
         
         // Lógica de pausa de lote (batch)
