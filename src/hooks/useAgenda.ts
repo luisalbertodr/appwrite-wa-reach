@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getCitasPorDia,
+  getCitasPorSemana,
   createCita,
   updateCita,
   deleteCita,
 } from '../services/appwrite-agenda'; // Asumiendo que las funciones CRUD están aquí
 import { Cita, CitaInput, LipooutUserInput } from '@/types'; // Asegúrate de importar los tipos necesarios
 import { Models } from 'appwrite';
-import { format, startOfDay, parseISO } from 'date-fns'; // Importar date-fns
+import { format, startOfDay, parseISO, startOfWeek } from 'date-fns'; // Importar date-fns
 
 // --- CLAVE BASE PARA LAS QUERIES DE CITAS ---
 export const CITAS_QUERY_KEY = 'citas';
@@ -26,6 +27,21 @@ export const useGetCitasPorDia = (fecha: Date | undefined) => {
     // Opciones adicionales (ej. staleTime) pueden ir aquí
     staleTime: 1000 * 60 * 5, // Cache por 5 minutos, por ejemplo
     // Habilitar refetch al montar o si la ventana recupera el foco puede ser útil
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+// --- HOOK PARA OBTENER CITAS POR SEMANA (LUNES A SÁBADO) ---
+export const useGetCitasPorSemana = (fecha: Date | undefined) => {
+  const fechaValida = fecha || new Date();
+  // Crear una clave única basada en el inicio de la semana (lunes)
+  const semanaKey = format(startOfWeek(fechaValida, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  
+  return useQuery({
+    queryKey: [CITAS_QUERY_KEY, 'semana', semanaKey],
+    queryFn: () => getCitasPorSemana(fechaValida),
+    staleTime: 1000 * 60 * 5, // Cache por 5 minutos
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });

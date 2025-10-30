@@ -118,9 +118,11 @@ All colors MUST be HSL.
 }
 
 .dark .rbc-header {
-  background-color: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
+  background-color: hsl(217.2 32.6% 20%);
+  color: hsl(210 40% 98%);
   border-bottom: 1px solid hsl(var(--border));
+  font-weight: 600;
+  padding: 8px 4px;
 }
 
 .dark .rbc-time-content {
@@ -213,7 +215,20 @@ All colors MUST be HSL.
 }
 
 .dark .rbc-label {
-  color: hsl(var(--muted-foreground));
+  color: hsl(210 40% 98%);
+  font-weight: 600;
+  padding-right: 8px;
+  font-size: 0.875rem;
+}
+
+.dark .rbc-time-gutter {
+  background-color: hsl(217.2 32.6% 15%);
+}
+
+.dark .rbc-time-gutter .rbc-label {
+  color: hsl(210 40% 98%);
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .dark .rbc-month-view {
@@ -241,4 +256,26 @@ All colors MUST be HSL.
 .dark .rbc-overlay-header {
   border-bottom: 1px solid hsl(var(--border));
   color: hsl(var(--popover-foreground));
+}
+
+/* Ocultar domingo (día 0) en vista semanal - lunes a sábado solamente */
+/* Header de la semana */
+.rbc-time-header-content .rbc-header:first-child {
+  display: none;
+}
+
+/* Columna de time slots del domingo */
+.rbc-time-content > .rbc-day-slot:first-child {
+  display: none;
+}
+
+/* Asegurar que el ancho se distribuya correctamente entre 6 días */
+.rbc-time-header-content {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.rbc-time-content {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
 }

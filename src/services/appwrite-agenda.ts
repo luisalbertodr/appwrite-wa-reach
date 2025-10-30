@@ -1,8 +1,8 @@
 import { databases, DATABASE_ID, CITAS_COLLECTION_ID } from '@/lib/appwrite';
 import { Cita, CitaInput, LipooutUserInput } from '@/types';
 import { ID, Query, Models } from 'appwrite';
-// CORRECCIÓN: Importar 'addDays'
-import { startOfDay, endOfDay, formatISO, addDays } from 'date-fns';
+// CORRECCIÓN: Importar 'addDays' y funciones de semana
+import { startOfDay, endOfDay, formatISO, addDays, startOfWeek, endOfWeek } from 'date-fns';
 
 // Tipos Create/Update Input (Asegúrate que coincidan con tu definición)
 // export type CreateCitaInput = LipooutUserInput<CitaInput>; // Si usas LipooutUserInput
@@ -71,6 +71,44 @@ export const getCitasPorDia = async (fecha: Date): Promise<(Cita & Models.Docume
         // console.error("Appwrite error details:", JSON.stringify(error, null, 2));
     }
     return []; // Devolver vacío en caso de error
+  }
+};
+
+// Obtener citas de toda la semana (Lunes a Sábado)
+export const getCitasPorSemana = async (fecha: Date): Promise<(Cita & Models.Document)[]> => {
+  // Obtener inicio de semana (Lunes)
+  const inicioSemana = startOfWeek(fecha, { weekStartsOn: 1 });
+  // Obtener fin de semana (Sábado) - añadimos 6 días desde el lunes
+  const finSemana = addDays(inicioSemana, 6);
+  // Obtener el inicio del día siguiente (Domingo) para la comparación lessThan
+  const inicioDomingo = startOfDay(addDays(finSemana, 1));
+
+  const inicioSemanaISO = formatISO(inicioSemana);
+  const inicioDomingoISO = formatISO(inicioDomingo);
+
+  console.log(`%c[Service: getCitasPorSemana] Buscando citas entre ${inicioSemanaISO} (L) y ${inicioDomingoISO} (D exclusive)`, 'color: blue; font-weight: bold;');
+
+  try {
+    const response = await databases.listDocuments<Cita & Models.Document>(
+      DATABASE_ID,
+      CITAS_COLLECTION_ID,
+      [
+        Query.greaterThanEqual('fecha_hora', inicioSemanaISO),
+        Query.lessThan('fecha_hora', inicioDomingoISO),
+        Query.limit(500), // Límite mayor para semana completa
+        Query.orderAsc('fecha_hora')
+      ]
+    );
+
+    console.log(`[Service: getCitasPorSemana] Documentos recibidos: ${response.documents.length}`, response.documents);
+    
+    return response.documents;
+  } catch (error) {
+    console.error("%c[Service: getCitasPorSemana] ERROR fetching citas:", 'color: red; font-weight: bold;', error);
+    if (error instanceof Error) {
+        console.error("Error message:", error.message);
+    }
+    return [];
   }
 };
 

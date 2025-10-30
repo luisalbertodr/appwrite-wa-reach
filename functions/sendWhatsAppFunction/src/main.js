@@ -5,7 +5,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
-const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress';
+// const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress'; // Comentado - Corrección 2
 const MAX_EXECUTION_TIME = 270000; // 4.5 minutos en milisegundos
 
 module.exports = async ({ req, res, log, error }) => {
@@ -83,26 +83,31 @@ module.exports = async ({ req, res, log, error }) => {
         return;
     }
 
-    const logStatus = async (client, status, errorMsg = '') => {
+    // --- CORRECCIÓN 1: 'logStatus' modificado para coincidir con el esquema de 'message_logs' ---
+    const logStatus = async (client, status, messageContent = '', errorMsg = '') => {
         try {
             await databases.createDocument(
                 DATABASE_ID,
                 MESSAGE_LOGS_COLLECTION_ID,
                 ID.unique(),
                 {
-                    campaignId: campaignId,
-                    clientId: String(client.codcli),
-                    clientName: client.nombre_completo,
+                    campaign_id: campaignId,
+                    client_id: String(client.codcli),
+                    phone_number: String(client.tel2cli),
+                    message: messageContent,
                     status: status,
-                    timestamp: new Date().toISOString(),
-                    error: errorMsg,
+                    error_message: errorMsg || undefined, // Usar 'undefined' si está vacío
+                    sent_at: (status === 'sent' || status === 'failed') ? new Date().toISOString() : undefined,
                 }
             );
         } catch (e) {
-            error(`Failed to log status for client ${client.codcli}: ${e.message}`);
+            // Loguear más detalles en caso de fallo del log
+            error(`Failed to log status for client ${client.codcli}: ${e.message} (Status: ${status}, Error: ${errorMsg})`);
         }
     };
 
+    // --- CORRECCIÓN 2: 'updateProgress' comentado porque no coincide con el esquema de 'campaign_progress' ---
+    /*
     const updateProgress = async (currentClient) => {
         try {
             await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
@@ -135,6 +140,8 @@ module.exports = async ({ req, res, log, error }) => {
             }
         }
     };
+    */
+    // --- FIN CORRECCIÓN 2 ---
 
     const sendAdminNotification = async (text) => {
         if (!adminPhoneNumbers || !Array.isArray(adminPhoneNumbers) || adminPhoneNumbers.length === 0) {
@@ -168,7 +175,7 @@ module.exports = async ({ req, res, log, error }) => {
             DATABASE_ID,
             CAMPAIGNS_COLLECTION_ID,
             campaignId,
-            { status: 'sending' }
+            { status: 'running' } // Cambiado de 'sending' a 'running' para coincidir con el enum
         );
         // Usar clients.length (total) en lugar de clientList.length (chunk)
         await sendAdminNotification(`🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${clients.length} clientes.`);
@@ -200,7 +207,9 @@ module.exports = async ({ req, res, log, error }) => {
             return; 
         }
 
-        await updateProgress(c);
+        // --- CORRECCIÓN 2: Llamada a updateProgress comentada ---
+        // await updateProgress(c);
+        // --- FIN CORRECCIÓN 2 ---
 
         const now = new Date();
         const currentHour = now.getHours();
@@ -235,7 +244,8 @@ module.exports = async ({ req, res, log, error }) => {
 
         if (c.enviar !== 1 || !c.tel2cli || !/^[67]\d{8}$/.test(c.tel2cli)) {
             totalSkipped++;
-            await logStatus(c, 'skipped', 'Opt-out o teléfono inválido');
+            // --- CORRECCIÓN 1: Actualizada llamada a logStatus ---
+            await logStatus(c, 'skipped', '', 'Opt-out o teléfono inválido');
             continue;
         }
 
@@ -253,7 +263,8 @@ module.exports = async ({ req, res, log, error }) => {
 
         if (!messageToSend && !imageUrlToSend) {
             totalSkipped++;
-            await logStatus(c, 'skipped', 'No hay contenido de plantilla para enviar.');
+             // --- CORRECCIÓN 1: Actualizada llamada a logStatus ---
+            await logStatus(c, 'skipped', '', 'No hay contenido de plantilla para enviar.');
             continue;
         }
 
@@ -323,15 +334,18 @@ module.exports = async ({ req, res, log, error }) => {
 
             if (response.ok) {
                 totalSent++;
-                await logStatus(c, 'sent');
+                // --- CORRECCIÓN 1: Actualizada llamada a logStatus (pasando messageContent) ---
+                await logStatus(c, 'sent', messageContent);
             } else {
                 const errorData = await response.json();
                 totalFailed++;
-                await logStatus(c, 'failed', `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
+                // --- CORRECCIÓN 1: Actualizada llamada a logStatus (pasando messageContent y error) ---
+                await logStatus(c, 'failed', messageContent, `WAHA API error: ${response.status} - ${JSON.stringify(errorData)}`);
             }
         } catch (e) {
             totalFailed++;
-            await logStatus(c, 'failed', `Network error: ${e.message}`);
+            // --- CORRECCIÓN 1: Actualizada llamada a logStatus (pasando messageContent y error) ---
+            await logStatus(c, 'failed', messageContent, `Network error: ${e.message}`);
         }
         
         messagesSinceLastBatchPause++;
@@ -363,7 +377,7 @@ module.exports = async ({ req, res, log, error }) => {
     try {
         // Contar 'sent'
         const sentResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
-            Query.equal('campaignId', campaignId),
+            Query.equal('campaign_id', campaignId),
             Query.equal('status', 'sent'),
             Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
         ]);
@@ -371,7 +385,7 @@ module.exports = async ({ req, res, log, error }) => {
 
         // Contar 'failed'
         const failedResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
-            Query.equal('campaignId', campaignId),
+            Query.equal('campaign_id', campaignId),
             Query.equal('status', 'failed'),
             Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
         ]);
@@ -379,7 +393,7 @@ module.exports = async ({ req, res, log, error }) => {
 
         // Contar 'skipped'
         const skippedResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
-            Query.equal('campaignId', campaignId),
+            Query.equal('campaign_id', campaignId),
             Query.equal('status', 'skipped'),
             Query.limit(1) // CORRECCIÓN: Usar 1 en lugar de 0
         ]);
@@ -397,19 +411,29 @@ module.exports = async ({ req, res, log, error }) => {
     }
     // --- FIN MODIFICACIÓN ---
 
+    // --- CORRECCIÓN 2: deleteDocument comentado ---
+    /*
     try {
         await databases.deleteDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
     } catch (e) {
         error(`Could not delete progress document for campaign ${campaignId}: ${e.message}`);
     }
+    */
+    // --- FIN CORRECCIÓN 2 ---
 
-    const finalStatus = finalFailed > 0 ? 'completed_with_errors' : 'sent';
-
+    const finalStatus = 'completed'; // El enum es 'completed' o 'completed_with_errors' no existe en el schema
+    
     await databases.updateDocument(
         DATABASE_ID,
         CAMPAIGNS_COLLECTION_ID,
         campaignId,
-        { status: finalStatus }
+        { 
+            status: finalStatus,
+            completed_at: new Date().toISOString(),
+            messages_sent: finalSent,
+            messages_failed: finalFailed,
+            // total_recipients se debió setear al crear la campaña
+        }
     );
 
     // Usar 'clients.length' (total) y las estadísticas finales consultadas
@@ -419,5 +443,6 @@ module.exports = async ({ req, res, log, error }) => {
         return res.json({ success: true, message: 'Chunk processed successfully.' });
     }
 
+    // Si era una llamada síncrona (improbable, pero por si acaso)
     return res.json({ success: true, message: 'Campaign finished successfully.' });
 };
