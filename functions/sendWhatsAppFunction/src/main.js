@@ -144,10 +144,7 @@ module.exports = async ({ req, res, log, error }) => {
 
     const updateProgress = async (currentClient) => {
         try {
-            await retryWithBackoff(async () => {
-                await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
-            });
-            
+            // Intentar actualizar directamente sin verificar primero si existe
             await retryWithBackoff(async () => {
                 await databases.updateDocument(
                     DATABASE_ID,
@@ -160,6 +157,7 @@ module.exports = async ({ req, res, log, error }) => {
                 );
             });
         } catch (e) {
+            // Si el documento no existe (404), crearlo
             if (e.code === 404) {
                 try {
                     await retryWithBackoff(async () => {
@@ -173,6 +171,7 @@ module.exports = async ({ req, res, log, error }) => {
                             }
                         );
                     });
+                    log(`Documento de progreso creado para campaña ${campaignId}`);
                 } catch (e2) {
                     error(`Failed to create progress for campaign ${campaignId} after retries: ${e2.message}`);
                 }

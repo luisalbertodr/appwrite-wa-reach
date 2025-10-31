@@ -2064,7 +2064,7 @@
             "buildRuntime": "node-22",
             "adapter": "static",
             "fallbackFile": "index.html",
-            "path": "sites/appwrite-wa-reach"
+            "path": "."
         }
     ]
 }
