@@ -6,7 +6,44 @@ const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)
 
 const MESSAGE_LOGS_COLLECTION_ID = 'message_logs';
 const CAMPAIGN_PROGRESS_COLLECTION_ID = 'campaign_progress';
-const MAX_EXECUTION_TIME = 270000; // 4.5 minutos en milisegundos
+const MAX_EXECUTION_TIME = 120000; // 2 minutos en milisegundos (reducido para evitar timeouts)
+
+// Función auxiliar para reintentar operaciones con exponential backoff
+const retryWithBackoff = async (operation, maxRetries = 3, initialDelayMs = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (e) {
+            if (attempt === maxRetries) {
+                throw e; // Si es el último intento, lanzar el error
+            }
+            const delay = initialDelayMs * Math.pow(2, attempt - 1);
+            console.error(`Intento ${attempt} falló, reintentando en ${delay}ms: ${e.message}`);
+            await sleep(delay);
+        }
+    }
+};
+
+// Función auxiliar para fetch con timeout
+const fetchWithTimeout = async (url, options = {}, timeoutMs = 30000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (e) {
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeoutMs}ms`);
+        }
+        throw e;
+    }
+};
 
 module.exports = async ({ req, res, log, error }) => {
     if (req.method !== 'POST') {
@@ -85,53 +122,62 @@ module.exports = async ({ req, res, log, error }) => {
 
     const logStatus = async (client, status, errorMsg = '') => {
         try {
-            await databases.createDocument(
-                DATABASE_ID,
-                MESSAGE_LOGS_COLLECTION_ID,
-                ID.unique(),
-                {
-                    campaignId: campaignId,
-                    clientId: String(client.codcli),
-                    clientName: client.nombre_completo,
-                    status: status,
-                    timestamp: new Date().toISOString(),
-                    error: errorMsg,
-                }
-            );
+            await retryWithBackoff(async () => {
+                await databases.createDocument(
+                    DATABASE_ID,
+                    MESSAGE_LOGS_COLLECTION_ID,
+                    ID.unique(),
+                    {
+                        campaignId: campaignId,
+                        clientId: String(client.codcli),
+                        clientName: client.nombre_completo,
+                        status: status,
+                        timestamp: new Date().toISOString(),
+                        error: errorMsg,
+                    }
+                );
+            });
         } catch (e) {
-            error(`Failed to log status for client ${client.codcli}: ${e.message}`);
+            error(`Failed to log status for client ${client.codcli} after retries: ${e.message}`);
         }
     };
 
     const updateProgress = async (currentClient) => {
         try {
-            await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
-            await databases.updateDocument(
-                DATABASE_ID,
-                CAMPAIGN_PROGRESS_COLLECTION_ID,
-                campaignId,
-                {
-                    currentClientName: currentClient.nomcli,
-                    currentClientPhone: currentClient.tel2cli
-                }
-            );
+            await retryWithBackoff(async () => {
+                await databases.getDocument(DATABASE_ID, CAMPAIGN_PROGRESS_COLLECTION_ID, campaignId);
+            });
+            
+            await retryWithBackoff(async () => {
+                await databases.updateDocument(
+                    DATABASE_ID,
+                    CAMPAIGN_PROGRESS_COLLECTION_ID,
+                    campaignId,
+                    {
+                        currentClientName: currentClient.nomcli,
+                        currentClientPhone: currentClient.tel2cli
+                    }
+                );
+            });
         } catch (e) {
             if (e.code === 404) {
                 try {
-                    await databases.createDocument(
-                        DATABASE_ID,
-                        CAMPAIGN_PROGRESS_COLLECTION_ID,
-                        campaignId,
-                        {
-                            currentClientName: currentClient.nomcli,
-                            currentClientPhone: currentClient.tel2cli
-                        }
-                    );
+                    await retryWithBackoff(async () => {
+                        await databases.createDocument(
+                            DATABASE_ID,
+                            CAMPAIGN_PROGRESS_COLLECTION_ID,
+                            campaignId,
+                            {
+                                currentClientName: currentClient.nomcli,
+                                currentClientPhone: currentClient.tel2cli
+                            }
+                        );
+                    });
                 } catch (e2) {
-                    error(`Failed to create progress for campaign ${campaignId}: ${e2.message}`);
+                    error(`Failed to create progress for campaign ${campaignId} after retries: ${e2.message}`);
                 }
             } else {
-                error(`Failed to update progress for campaign ${campaignId}: ${e.message}`);
+                error(`Failed to update progress for campaign ${campaignId} after retries: ${e.message}`);
             }
         }
     };
@@ -151,11 +197,11 @@ module.exports = async ({ req, res, log, error }) => {
             formattedAdminPhoneNumber = formattedAdminPhoneNumber.includes('@c.us') ? formattedAdminPhoneNumber : `${formattedAdminPhoneNumber}@c.us`;
 
             try {
-                await fetch(`${WAHA_API_URL}/api/sendText`, {
+                await fetchWithTimeout(`${WAHA_API_URL}/api/sendText`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
                     body: JSON.stringify({ chatId: formattedAdminPhoneNumber, text: text, session: session }),
-                });
+                }, 30000); // 30 segundos timeout
                 log(`Notificación de admin enviada a ${adminPhoneNumber}`);
             } catch (e) {
                 error(`Fallo al enviar notificación de admin a ${adminPhoneNumber}: ${e.message}`);
@@ -163,13 +209,26 @@ module.exports = async ({ req, res, log, error }) => {
         }
     };
 
+    // Warmup de base de datos para evitar cold start
     if (!remainingClients) {
-        await databases.updateDocument(
-            DATABASE_ID,
-            CAMPAIGNS_COLLECTION_ID,
-            campaignId,
-            { status: 'sending' }
-        );
+        log('Iniciando warmup de base de datos...');
+        try {
+            await retryWithBackoff(async () => {
+                await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [Query.limit(1)]);
+            });
+            log('Warmup de base de datos completado');
+        } catch (e) {
+            error(`Error en warmup de base de datos: ${e.message}`);
+        }
+
+        await retryWithBackoff(async () => {
+            await databases.updateDocument(
+                DATABASE_ID,
+                CAMPAIGNS_COLLECTION_ID,
+                campaignId,
+                { status: 'sending' }
+            );
+        });
         // Usar clients.length (total) en lugar de clientList.length (chunk)
         await sendAdminNotification(`🚀 *Inicio de Campaña*\n\n- ID: ${campaignId}\n- Audiencia: ${clients.length} clientes.`);
     }
@@ -178,11 +237,26 @@ module.exports = async ({ req, res, log, error }) => {
     let totalSkipped = 0;
     let totalFailed = 0;
 
+    // Obtener el conteo inicial de mensajes enviados (una sola vez al inicio del chunk)
+    let initialSentCount = 0;
+    try {
+        const sentResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
+            Query.equal('campaignId', campaignId),
+            Query.equal('status', 'sent'),
+            Query.limit(1)
+        ]);
+        initialSentCount = sentResponse.total;
+        log(`Conteo inicial de mensajes enviados para campaignId ${campaignId}: ${initialSentCount}`);
+    } catch (e) {
+        error(`Error al obtener conteo inicial de mensajes enviados: ${e.message}`);
+    }
+
     const validMessages = template.messages.filter(m => m && m.trim() !== '');
     const validImageUrls = template.imageUrls.filter(url => url && url.trim() !== '');
     
     let currentBatchSize = getRandomNumber(batchSizeMin, batchSizeMax);
     let messagesSinceLastBatchPause = 0;
+    let lastNotificationSent = Math.floor(initialSentCount / notificationInterval) * notificationInterval;
 
     for (const [index, c] of clientList.entries()) {
         const elapsedTime = Date.now() - executionStartTime;
@@ -264,19 +338,6 @@ module.exports = async ({ req, res, log, error }) => {
         }
         formattedPhoneNumber = formattedPhoneNumber.includes('@c.us') ? formattedPhoneNumber : `${formattedPhoneNumber}@c.us`;
 
-        // --- MODIFICACIÓN (Sin retraso inicial) ---
-        // Se comprueba si 'remainingClients' existe. Si NO existe Y es el index 0, es el primer cliente.
-        const isFirstClientOfCampaign = !remainingClients && index === 0;
-
-        if (!isFirstClientOfCampaign) {
-            const delay = getRandomNumber(minDelayMs, maxDelayMs);
-            log(`Retraso individual de ${delay}ms antes de enviar a ${formattedPhoneNumber}`);
-            await sleep(delay);
-        } else {
-            log(`Procesando primer cliente de la campaña ${formattedPhoneNumber} sin retraso individual.`);
-        }
-        // --- FIN MODIFICACIÓN ---
-
         let messageContent = messageToSend.replace(/\[nombre\]/g, c.nomcli || '');
 
         log(`Attempting to send message to ${formattedPhoneNumber}`);
@@ -299,7 +360,7 @@ module.exports = async ({ req, res, log, error }) => {
                 const fileMeta = await storage.getFile(bucketId, fileId);
                 const mimetype = fileMeta.mimeType || 'image/jpeg';
 
-                response = await fetch(`${WAHA_API_URL}/api/sendImage`, {
+                response = await fetchWithTimeout(`${WAHA_API_URL}/api/sendImage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
                     body: JSON.stringify({
@@ -312,13 +373,13 @@ module.exports = async ({ req, res, log, error }) => {
                         caption: messageContent,
                         session: session
                     }),
-                });
+                }, 30000); // 30 segundos timeout
             } else {
-                response = await fetch(`${WAHA_API_URL}/api/sendText`, {
+                response = await fetchWithTimeout(`${WAHA_API_URL}/api/sendText`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Api-Key': WAHA_API_KEY },
                     body: JSON.stringify({ chatId: formattedPhoneNumber, text: messageContent, session: session }),
-                });
+                }, 30000); // 30 segundos timeout
             }
 
             if (response.ok) {
@@ -336,29 +397,25 @@ module.exports = async ({ req, res, log, error }) => {
         
         messagesSinceLastBatchPause++;
 
-        // Notificación de progreso basada en el total acumulado de mensajes enviados
-        try {
-            const sentResponse = await databases.listDocuments(DATABASE_ID, MESSAGE_LOGS_COLLECTION_ID, [
-                Query.equal('campaignId', campaignId),
-                Query.equal('status', 'sent'),
-                Query.limit(1)
-            ]);
-            const totalSentSoFar = sentResponse.total;
-            
-            // Enviar notificación cada 'notificationInterval' mensajes enviados
-            if (totalSentSoFar > 0 && totalSentSoFar % notificationInterval === 0) {
-                // Verificar que no hayamos enviado esta notificación específica antes
-                // (en caso de que múltiples mensajes se procesen simultáneamente)
-                const lastNotificationMark = Math.floor(totalSentSoFar / notificationInterval) * notificationInterval;
-                
-                // Enviar notificación solo si acabamos de alcanzar este múltiplo exacto
-                if (totalSentSoFar === lastNotificationMark) {
-                    await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Mensajes enviados: ${totalSentSoFar}/${clients.length}\n- Enviados (este chunk): ${totalSent}\n- Fallidos (este chunk): ${totalFailed}\n- Saltados (este chunk): ${totalSkipped}`);
-                    log(`Notificación de progreso enviada en ${totalSentSoFar} mensajes enviados`);
-                }
-            }
-        } catch (e) {
-            error(`Error al verificar progreso para notificación: ${e.message}`);
+        // Aplicar delay individual DESPUÉS del envío (excepto para el último mensaje antes de un batch pause)
+        const isLastClientInList = index === clientList.length - 1;
+        const willBatchPause = messagesSinceLastBatchPause >= currentBatchSize;
+        
+        if (!isLastClientInList && !willBatchPause) {
+            const delay = getRandomNumber(minDelayMs, maxDelayMs);
+            log(`Delay individual de ${delay}ms (${delay/1000}s) después de enviar a ${formattedPhoneNumber}`);
+            await sleep(delay);
+        }
+
+        // Notificación de progreso optimizada (sin consultar la BD en cada iteración)
+        const totalSentSoFar = initialSentCount + totalSent;
+        const nextNotificationMark = lastNotificationSent + notificationInterval;
+        
+        // Verificar si alcanzamos el siguiente múltiplo del intervalo
+        if (totalSentSoFar >= nextNotificationMark && notificationInterval > 0) {
+            await sendAdminNotification(`📊 *Progreso de Campaña*\n\n- ID: ${campaignId}\n- Mensajes enviados: ${totalSentSoFar}/${clients.length}\n- Enviados (este chunk): ${totalSent}\n- Fallidos (este chunk): ${totalFailed}\n- Saltados (este chunk): ${totalSkipped}`);
+            log(`Notificación de progreso enviada en ${totalSentSoFar} mensajes enviados`);
+            lastNotificationSent = nextNotificationMark;
         }
         
         // Lógica de pausa de lote (batch)
