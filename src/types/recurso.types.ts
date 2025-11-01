@@ -5,6 +5,7 @@ export interface Recurso extends LipooutDocument {
   descripcion?: string;
   tipo: TipoRecurso;
   activo: boolean;
+  color?: string;
 }
 
-export type TipoRecurso = 'sala' | 'camilla' | 'equipamiento' | 'otro';
+export type TipoRecurso = 'cabina' | 'equipos';

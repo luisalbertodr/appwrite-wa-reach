@@ -51,4 +51,29 @@ export interface ArticuloEnCita {
   hora_inicio: string; // ISO 8601 string - hora de inicio dentro de la cita
   precio: number;
   cantidad: number; // Para productos o sesiones de bono usadas
+  // NUEVO: Recursos asignados a este tratamiento
+  sala_id?: string; // Una única sala por tratamiento
+  equipamiento_ids?: string[]; // Múltiples equipos por tratamiento
+}
+
+// Tipo para tiempos no billables (descansos, reuniones, etc.)
+export interface TiempoNoBillable {
+  tipo: 'tiempo_no_billable';
+  nombre: string; // Texto personalizable por el usuario
+  duracion: number; // Duración en minutos
+  hora_inicio: string; // ISO 8601 string
+  sala_id?: string; // Sala ocupada durante este tiempo
+  equipamiento_ids?: string[]; // Equipamiento ocupado durante este tiempo
+}
+
+// Tipo unión para items en una cita (puede ser tratamiento o tiempo no billable)
+export type ItemCita = ArticuloEnCita | TiempoNoBillable;
+
+// Type guard para distinguir entre tratamientos y tiempos no billables
+export function esTiempoNoBillable(item: ItemCita): item is TiempoNoBillable {
+  return 'tipo' in item && item.tipo === 'tiempo_no_billable';
+}
+
+export function esArticuloEnCita(item: ItemCita): item is ArticuloEnCita {
+  return 'articulo_id' in item;
 }

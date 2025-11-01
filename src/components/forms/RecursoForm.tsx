@@ -20,8 +20,9 @@ interface RecursoFormProps {
 const defaultValues: RecursoFormData = {
   nombre: '',
   descripcion: '',
-  tipo: 'sala',
+  tipo: 'cabina',
   activo: true,
+  color: '#3b82f6',
 };
 
 export const RecursoForm = ({ recursoInicial, onSubmit, isSubmitting }: RecursoFormProps) => {
@@ -30,8 +31,9 @@ export const RecursoForm = ({ recursoInicial, onSubmit, isSubmitting }: RecursoF
     return {
       nombre: recursoInicial.nombre || '',
       descripcion: recursoInicial.descripcion || '',
-      tipo: recursoInicial.tipo || 'sala',
+      tipo: recursoInicial.tipo || 'cabina',
       activo: recursoInicial.activo ?? true,
+      color: recursoInicial.color || '#3b82f6',
     };
   };
 
@@ -81,12 +83,27 @@ export const RecursoForm = ({ recursoInicial, onSubmit, isSubmitting }: RecursoF
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="sala">Sala</SelectItem>
-                      <SelectItem value="camilla">Camilla</SelectItem>
-                      <SelectItem value="equipamiento">Equipamiento</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
+                      <SelectItem value="cabina">Cabina</SelectItem>
+                      <SelectItem value="equipos">Equipos</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField 
+              control={form.control} 
+              name="color" 
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color</FormLabel>
+                  <FormControl>
+                    <Input type="color" {...field} value={field.value ?? '#3b82f6'} />
+                  </FormControl>
+                  <FormDescription>
+                    Color para identificar visualmente el recurso en la agenda
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -162,15 +162,13 @@ export const articuloSchema = z.object({
 export type ArticuloFormData = z.infer<typeof articuloSchema>;
 
 
-// 5. Cita
+// 5. Cita (NUEVO SISTEMA - sin campos obsoletos recursos_cabina/recursos_aparatos)
 export const citaSchema = z.object({
   fecha_hora: z.string().min(1, "Fecha y hora obligatorias"), // Se enviará como ISO string
   duracion: z.number().min(1, "Duración obligatoria"),
   cliente_id: z.string().min(1, "Cliente obligatorio"),
   empleado_id: z.string().min(1, "Empleado obligatorio"),
-  articulos: z.string().min(1, "Artículos/Servicios obligatorios"), // JSON string
-  recursos_cabina: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
-  recursos_aparatos: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
+  articulos: z.string().min(1, "Artículos/Servicios obligatorios"), // JSON string de ItemCita[]
   estado: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'no_asistio']),
   comentarios: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
   datos_clinicos: z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val),
@@ -201,12 +199,13 @@ export const configurationSchema = z.object({
 });
 export type ConfigurationFormData = z.infer<typeof configurationSchema>;
 
-// 8. Recurso
+// 8. Recurso (NUEVO SISTEMA - solo 'cabina' y 'equipos')
 export const recursoSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   descripcion: z.string().optional(),
-  tipo: z.enum(['sala', 'camilla', 'equipamiento', 'otro']),
+  tipo: z.enum(['cabina', 'equipos']),
   activo: z.boolean(),
+  color: z.string().optional(),
 });
 export type RecursoFormData = z.infer<typeof recursoSchema>;
 

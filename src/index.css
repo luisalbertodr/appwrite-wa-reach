@@ -46,20 +46,25 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Variables para react-big-calendar modo claro */
+    --calendar-bg: 0 0% 100%;
+    --calendar-header-bg: 210 40% 96.1%;
+    --calendar-border: 214.3 31.8% 91.4%;
+    --calendar-today-bg: 210 40% 96.1%;
+    --calendar-event-bg: 217.2 91.2% 59.8%;
+    --calendar-event-border: 217.2 91.2% 69.8%;
+    --calendar-event-hover: 217.2 91.2% 54.8%;
+    --calendar-event-selected: 217.2 91.2% 49.8%;
+    --calendar-gutter-bg: 210 40% 98%;
+    --calendar-off-range: 215.4 16.3% 76.9%;
   }
 
   .dark {
@@ -90,6 +95,7 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -98,12 +104,25 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Variables para react-big-calendar modo oscuro */
+    --calendar-bg: 222.2 84% 4.9%;
+    --calendar-header-bg: 217.2 32.6% 20%;
+    --calendar-border: 217.2 32.6% 17.5%;
+    --calendar-today-bg: 217.2 32.6% 17.5%;
+    --calendar-event-bg: 217 91% 60%;
+    --calendar-event-border: 217 91% 70%;
+    --calendar-event-hover: 217 91% 55%;
+    --calendar-event-selected: 217 91% 50%;
+    --calendar-gutter-bg: 217.2 32.6% 15%;
+    --calendar-off-range: 215 20.2% 45.1%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
 
   body {
@@ -111,155 +130,274 @@ All colors MUST be HSL.
   }
 }
 
-/* Estilos para react-big-calendar - Tema Oscuro */
-.dark .rbc-calendar {
-  background-color: hsl(var(--card));
-  color: hsl(var(--card-foreground));
+/* ===================================
+   Estilos para react-big-calendar
+   =================================== */
+
+/* Base Calendar Styles - Aplicables a ambos temas */
+.rbc-calendar {
+  background-color: hsl(var(--calendar-bg));
+  color: hsl(var(--foreground));
+  font-family: inherit;
 }
 
-.dark .rbc-header {
-  background-color: hsl(217.2 32.6% 20%);
-  color: hsl(210 40% 98%);
-  border-bottom: 1px solid hsl(var(--border));
+.rbc-header {
+  background-color: hsl(var(--calendar-header-bg));
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--calendar-border));
   font-weight: 600;
-  padding: 8px 4px;
+  padding: 10px 4px;
+  font-size: 0.9rem;
 }
 
-.dark .rbc-time-content {
-  border-top: 1px solid hsl(var(--border));
+.rbc-time-content {
+  border-top: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-time-header-content {
-  border-left: 1px solid hsl(var(--border));
+.rbc-time-header-content {
+  border-left: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-time-slot {
-  border-top: 1px solid hsl(var(--border));
+.rbc-time-slot {
+  border-top: 1px solid hsl(var(--calendar-border));
+  min-height: 40px;
 }
 
-.dark .rbc-day-slot .rbc-time-slot {
-  border-top: 1px solid hsl(var(--border));
+.rbc-day-slot .rbc-time-slot {
+  border-top: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-timeslot-group {
-  border-left: 1px solid hsl(var(--border));
+.rbc-timeslot-group {
+  border-left: 1px solid hsl(var(--calendar-border));
+  min-height: 80px;
 }
 
-.dark .rbc-day-bg + .rbc-day-bg {
-  border-left: 1px solid hsl(var(--border));
+.rbc-day-bg + .rbc-day-bg {
+  border-left: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-time-header-cell {
-  border-left: 1px solid hsl(var(--border));
+.rbc-time-header-cell {
+  border-left: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-current-time-indicator {
-  background-color: hsl(var(--primary));
+.rbc-current-time-indicator {
+  background-color: hsl(var(--destructive));
+  height: 2px;
+  z-index: 3;
 }
 
-.dark .rbc-today {
-  background-color: hsl(var(--accent));
+.rbc-today {
+  background-color: hsl(var(--calendar-today-bg) / 0.5);
 }
 
-.dark .rbc-event {
-  background-color: hsl(217 91% 60%);
-  color: hsl(210 40% 98%);
-  border: 1px solid hsl(217 91% 70%);
+/* Event Styles */
+.rbc-event {
+  background-color: hsl(var(--calendar-event-bg));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--calendar-event-border));
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.dark .rbc-event:hover {
-  background-color: hsl(217 91% 55%);
+.rbc-event:hover {
+  background-color: hsl(var(--calendar-event-hover));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
-.dark .rbc-event.rbc-selected {
-  background-color: hsl(217 91% 50%);
+.rbc-event.rbc-selected {
+  background-color: hsl(var(--calendar-event-selected));
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.3);
 }
 
-.dark .rbc-show-more {
+.rbc-event-label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.rbc-event-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.rbc-show-more {
   background-color: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.dark .rbc-toolbar button {
+.rbc-show-more:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Toolbar Styles */
+.rbc-toolbar button {
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
   background-color: hsl(var(--background));
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.dark .rbc-toolbar button:hover {
+.rbc-toolbar button:hover {
   background-color: hsl(var(--muted));
   color: hsl(var(--foreground));
+  border-color: hsl(var(--ring));
 }
 
-.dark .rbc-toolbar button:active,
-.dark .rbc-toolbar button.rbc-active {
+.rbc-toolbar button:active,
+.rbc-toolbar button.rbc-active {
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   border-color: hsl(var(--primary));
 }
 
-.dark .rbc-off-range {
-  color: hsl(var(--muted-foreground));
+/* Off-range dates */
+.rbc-off-range {
+  color: hsl(var(--calendar-off-range));
 }
 
-.dark .rbc-off-range-bg {
-  background-color: hsl(var(--muted) / 0.5);
+.rbc-off-range-bg {
+  background-color: hsl(var(--muted) / 0.3);
 }
 
-.dark .rbc-time-content > * + * > * {
-  border-left: 1px solid hsl(var(--border));
+/* Time Grid Styles */
+.rbc-time-content > * + * > * {
+  border-left: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-time-header.rbc-overflowing {
-  border-right: 1px solid hsl(var(--border));
+.rbc-time-header.rbc-overflowing {
+  border-right: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-label {
-  color: hsl(210 40% 98%);
+.rbc-label {
+  color: hsl(var(--foreground));
   font-weight: 600;
   padding-right: 8px;
   font-size: 0.875rem;
 }
 
-.dark .rbc-time-gutter {
-  background-color: hsl(217.2 32.6% 15%);
+.rbc-time-gutter {
+  background-color: hsl(var(--calendar-gutter-bg));
 }
 
-.dark .rbc-time-gutter .rbc-label {
-  color: hsl(210 40% 98%);
+.rbc-time-gutter .rbc-label {
+  color: hsl(var(--foreground));
   font-weight: 600;
   font-size: 0.875rem;
 }
 
-.dark .rbc-month-view {
-  border: 1px solid hsl(var(--border));
+/* Month View */
+.rbc-month-view {
+  border: 1px solid hsl(var(--calendar-border));
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.dark .rbc-month-row {
-  border-top: 1px solid hsl(var(--border));
+.rbc-month-row {
+  border-top: 1px solid hsl(var(--calendar-border));
 }
 
-.dark .rbc-date-cell {
+.rbc-date-cell {
   color: hsl(var(--foreground));
+  padding: 4px;
 }
 
-.dark .rbc-button-link {
+.rbc-button-link {
   color: hsl(var(--foreground));
+  font-weight: 600;
 }
 
-.dark .rbc-overlay {
+/* Overlay (popup) */
+.rbc-overlay {
   background-color: hsl(var(--popover));
   border: 1px solid hsl(var(--border));
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  border-radius: 8px;
+  padding: 8px;
 }
 
-.dark .rbc-overlay-header {
+.rbc-overlay-header {
   border-bottom: 1px solid hsl(var(--border));
   color: hsl(var(--popover-foreground));
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
-/* Ocultar domingo (día 0) en vista semanal - lunes a sábado solamente */
-/* Header de la semana */
+/* Selection highlighting */
+.rbc-slot-selection {
+  background-color: hsl(var(--primary) / 0.2);
+  border: 2px dashed hsl(var(--primary));
+}
+
+.rbc-slot-selecting {
+  cursor: crosshair;
+}
+
+/* Drag and Drop styles */
+.rbc-addons-dnd .rbc-addons-dnd-resizable {
+  position: relative;
+}
+
+.rbc-addons-dnd .rbc-event {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rbc-addons-dnd-dragging {
+  opacity: 0.7;
+  transform: scale(1.02);
+  z-index: 100;
+}
+
+.rbc-addons-dnd-over {
+  background-color: hsl(var(--accent) / 0.5) !important;
+}
+
+.rbc-addons-dnd-resize-ns-anchor {
+  width: 100%;
+  text-align: center;
+  position: absolute;
+}
+
+.rbc-addons-dnd-resize-ns-anchor:first-child {
+  top: 0;
+  cursor: ns-resize;
+}
+
+.rbc-addons-dnd-resize-ns-anchor:last-child {
+  bottom: 0;
+  cursor: ns-resize;
+}
+
+.rbc-addons-dnd-resize-ns-icon {
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  background-color: hsl(var(--primary-foreground) / 0.5);
+  border-radius: 2px;
+}
+
+/* ===================================
+   Configuración personalizada: 
+   Ocultar domingo en vista semanal
+   =================================== */
+
+/* Header de la semana - ocultar domingo */
 .rbc-time-header-content .rbc-header:first-child {
   display: none;
 }
@@ -269,7 +407,7 @@ All colors MUST be HSL.
   display: none;
 }
 
-/* Asegurar que el ancho se distribuya correctamente entre 6 días */
+/* Asegurar que el ancho se distribuya correctamente entre 6 días (lunes-sábado) */
 .rbc-time-header-content {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -278,4 +416,56 @@ All colors MUST be HSL.
 .rbc-time-content {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
+}
+
+/* ===================================
+   Mejoras responsive
+   =================================== */
+
+@media (max-width: 768px) {
+  .rbc-header {
+    padding: 8px 2px;
+    font-size: 0.8rem;
+  }
+  
+  .rbc-event {
+    font-size: 0.75rem;
+    padding: 2px 4px;
+  }
+  
+  .rbc-label {
+    font-size: 0.75rem;
+    padding-right: 4px;
+  }
+  
+  .rbc-time-slot {
+    min-height: 30px;
+  }
+  
+  .rbc-timeslot-group {
+    min-height: 60px;
+  }
+  
+  .rbc-toolbar button {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Mejoras de accesibilidad */
+.rbc-event:focus,
+.rbc-day-slot:focus,
+.rbc-toolbar button:focus {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Animaciones suaves para cambios de vista */
+.rbc-calendar {
+  transition: opacity 0.2s ease;
+}
+
+/* Mejora visual para slots seleccionables */
+.rbc-day-slot .rbc-time-slot:hover {
+  background-color: hsl(var(--accent) / 0.3);
 }

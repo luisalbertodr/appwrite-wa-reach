@@ -77,15 +77,51 @@ interface CalendarEvent {
 
 const Agenda = () => {
   // Estados y Hooks
-  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const { toast } = useToast();
   
   // --- MODIFICACIÓN: Hook para obtener usuario actual ---
   const { data: currentUser } = useUser();
   // --- FIN MODIFICACIÓN ---
 
-  // --- MODIFICACIÓN: Estado de la vista añadido ---
-  const [view, setView] = useState<View>(Views.DAY);
+  // --- MODIFICACIÓN: Estado con inicialización desde localStorage ---
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    if (!currentUser?.$id) return startOfDay(new Date());
+    
+    try {
+      const storageKey = `agenda-position-date-${currentUser.$id}`;
+      const savedDate = localStorage.getItem(storageKey);
+      
+      if (savedDate) {
+        const parsedDate = parseISO(savedDate);
+        if (isValid(parsedDate)) {
+          console.log('[Agenda Component - useState selectedDate] Cargando fecha guardada:', parsedDate);
+          return startOfDay(parsedDate);
+        }
+      }
+    } catch (error) {
+      console.error('[Agenda Component - useState selectedDate] Error al cargar fecha:', error);
+    }
+    
+    return startOfDay(new Date());
+  });
+
+  const [view, setView] = useState<View>(() => {
+    if (!currentUser?.$id) return Views.DAY;
+    
+    try {
+      const storageKey = `agenda-position-view-${currentUser.$id}`;
+      const savedView = localStorage.getItem(storageKey);
+      
+      if (savedView && (savedView === Views.DAY || savedView === Views.WEEK)) {
+        console.log('[Agenda Component - useState view] Cargando vista guardada:', savedView);
+        return savedView as View;
+      }
+    } catch (error) {
+      console.error('[Agenda Component - useState view] Error al cargar vista:', error);
+    }
+    
+    return Views.DAY;
+  });
   // --- FIN MODIFICACIÓN ---
 
   // --- MODIFICACIÓN: Uso condicional del hook según la vista ---
@@ -122,6 +158,34 @@ const Agenda = () => {
   
   // Capitalizar la fecha
   const fechaCapitalizada = fechaSeleccionadaFormateada.charAt(0).toUpperCase() + fechaSeleccionadaFormateada.slice(1);
+
+  // Efecto para guardar selectedDate en localStorage
+  useEffect(() => {
+    if (!currentUser?.$id) return;
+    
+    const storageKey = `agenda-position-date-${currentUser.$id}`;
+    
+    try {
+      localStorage.setItem(storageKey, selectedDate.toISOString());
+      console.log('[Agenda Component - useEffect save date] Fecha guardada en localStorage:', selectedDate);
+    } catch (error) {
+      console.error('[Agenda Component - useEffect save date] Error al guardar fecha:', error);
+    }
+  }, [currentUser?.$id, selectedDate]);
+
+  // Efecto para guardar view en localStorage
+  useEffect(() => {
+    if (!currentUser?.$id) return;
+    
+    const storageKey = `agenda-position-view-${currentUser.$id}`;
+    
+    try {
+      localStorage.setItem(storageKey, view);
+      console.log('[Agenda Component - useEffect save view] Vista guardada en localStorage:', view);
+    } catch (error) {
+      console.error('[Agenda Component - useEffect save view] Error al guardar vista:', error);
+    }
+  }, [currentUser?.$id, view]);
 
 
   // Log datos de citas según la vista
@@ -254,18 +318,25 @@ const Agenda = () => {
       const clienteNombreCompleto = cliente?.nombre_completo || `${cliente?.nomcli || ''} ${cliente?.ape1cli || ''}`.trim();
       const clienteInfo = `${clienteNombreCompleto || 'Cliente?'} (${cliente?.tel1cli || 'Sin Tlf'})`;
 
-      let tratamientos = 'Artículo no especificado';
+      let tratamientos = 'Sin tratamientos';
       try {
-         if (cita.articulos && typeof cita.articulos === 'string' && cita.articulos.trim().startsWith('[')) {
-           const arts: unknown = JSON.parse(cita.articulos);
-           if (Array.isArray(arts) && arts.length > 0) {
-             // CORRECCIÓN: Mapear por 'articulo_nombre' en lugar de 'String'
-             tratamientos = arts.map((art: any) => art.articulo_nombre || 'Desconocido').join(', ');
-             if (!tratamientos) tratamientos = 'Artículo(s) vacío(s)';
-           } else { tratamientos = cita.articulos; }
-         } else if (typeof cita.articulos === 'string' && cita.articulos.trim() !== '') { tratamientos = cita.articulos; }
-       } catch (e) { tratamientos = typeof cita.articulos === 'string' ? cita.articulos : 'Error parseo Arts.'; }
-       if (!tratamientos || tratamientos.trim() === '') tratamientos = 'Artículo no especificado';
+        if (cita.articulos && typeof cita.articulos === 'string') {
+          const arts = JSON.parse(cita.articulos);
+          if (Array.isArray(arts) && arts.length > 0) {
+            tratamientos = arts.map((art: any) => {
+              // Manejar TiempoNoBillable
+              if (art.tipo === 'tiempo_no_billable') {
+                return art.nombre || 'Tiempo';
+              }
+              // Manejar ArticuloEnCita
+              return art.articulo_nombre || 'Tratamiento';
+            }).join(', ');
+          }
+        }
+      } catch (e) {
+        console.error(`Error al parsear artículos de cita ${cita.$id}:`, e);
+        tratamientos = 'Error en artículos';
+      }
 
        const title = `${clienteInfo} - ${tratamientos}`;
 
@@ -403,8 +474,6 @@ const Agenda = () => {
         articulos: cita.articulos,
         comentarios: cita.comentarios,
         estado: cita.estado,
-        recursos_cabina: cita.recursos_cabina,
-        recursos_aparatos: cita.recursos_aparatos,
         datos_clinicos: cita.datos_clinicos,
         precio_total: cita.precio_total,
       };
@@ -442,8 +511,6 @@ const Agenda = () => {
         articulos: cita.articulos,
         comentarios: cita.comentarios,
         estado: cita.estado,
-        recursos_cabina: cita.recursos_cabina,
-        recursos_aparatos: cita.recursos_aparatos,
         datos_clinicos: cita.datos_clinicos,
         precio_total: cita.precio_total,
       };
@@ -464,15 +531,113 @@ const Agenda = () => {
     }
   };
 
-  // CustomEvent
+  // CustomEvent - Componente mejorado para mostrar información gráfica de la cita
   const CustomEvent = ({ event }: EventProps<CalendarEvent>) => {
+      const cita = event.data;
+      const duracionMinutos = cita.duracion || 60;
+      const duracionTexto = duracionMinutos >= 60 
+        ? `${Math.floor(duracionMinutos / 60)}h ${duracionMinutos % 60 > 0 ? duracionMinutos % 60 + 'm' : ''}`.trim()
+        : `${duracionMinutos}m`;
+
+      // Parsear artículos para obtener tratamientos detallados
+      let articulosDetalle: any[] = [];
+      try {
+        if (cita.articulos && typeof cita.articulos === 'string') {
+          articulosDetalle = JSON.parse(cita.articulos);
+        }
+      } catch (e) {
+        console.error('Error al parsear artículos en CustomEvent:', e);
+      }
+
+      // Obtener recursos únicos de los artículos (cabinas y equipos)
+      let recursosData: { cabinas: string[], equipos: string[] } = { cabinas: [], equipos: [] };
+      const cabinaIds = new Set<string>();
+      const equipoIds = new Set<string>();
+      
+      articulosDetalle.forEach((art: any) => {
+        // Recopilar sala_id si existe
+        if (art.sala_id && art.sala_id !== 'ninguna') {
+          cabinaIds.add(art.sala_id);
+        }
+        // Recopilar equipamiento_ids si existe
+        if (art.equipamiento_ids && Array.isArray(art.equipamiento_ids)) {
+          art.equipamiento_ids.forEach((id: string) => equipoIds.add(id));
+        }
+      });
+      
+      recursosData.cabinas = Array.from(cabinaIds);
+      recursosData.equipos = Array.from(equipoIds);
+
+      // Obtener color de estado
+      const estadoColors: Record<string, string> = {
+        'Pendiente': 'bg-yellow-100 border-yellow-400',
+        'Confirmada': 'bg-blue-100 border-blue-400',
+        'En curso': 'bg-green-100 border-green-400',
+        'Completada': 'bg-gray-100 border-gray-400',
+        'Cancelada': 'bg-red-100 border-red-400',
+        'No asistió': 'bg-orange-100 border-orange-400',
+      };
+      const estadoColor = estadoColors[cita.estado || 'Pendiente'] || 'bg-gray-100 border-gray-400';
+
       return (
-          <div className="rbc-event-content" title={event.title}>
-              <strong className="rbc-event-label">{format(event.start, 'HH:mm')}</strong>
-              <div className="text-xs overflow-hidden">
-                  <p className="font-semibold truncate">{event.clienteInfo}</p>
-                  <p className="truncate">{event.tratamientos}</p>
+          <div className={`rbc-event-content h-full flex flex-col p-1 text-xs ${estadoColor} border-l-4 rounded-sm`} title={event.title}>
+              {/* Cabecera: Hora y Duración */}
+              <div className="flex justify-between items-start mb-0.5">
+                  <strong className="text-xs font-bold">{format(event.start, 'HH:mm')}</strong>
+                  <span className="text-[10px] opacity-70 font-medium">{duracionTexto}</span>
               </div>
+
+              {/* Cliente */}
+              <div className="font-semibold truncate text-xs leading-tight mb-0.5">
+                  {event.clienteInfo}
+              </div>
+
+              {/* Tratamientos con íconos de progreso */}
+              {articulosDetalle.length > 0 && (
+                <div className="space-y-0.5 mb-1">
+                  {articulosDetalle.slice(0, 3).map((art: any, idx: number) => {
+                    const nombre = art.tipo === 'tiempo_no_billable' 
+                      ? (art.nombre || 'Tiempo') 
+                      : (art.articulo_nombre || 'Tratamiento');
+                    const duracion = art.duracion || 0;
+                    
+                    return (
+                      <div key={idx} className="flex items-center gap-1 text-[10px]">
+                        <div className="w-1 h-1 rounded-full bg-current opacity-60" />
+                        <span className="truncate flex-1">{nombre}</span>
+                        <span className="opacity-60">{duracion}m</span>
+                      </div>
+                    );
+                  })}
+                  {articulosDetalle.length > 3 && (
+                    <div className="text-[10px] opacity-60 text-center">
+                      +{articulosDetalle.length - 3} más
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recursos (Cabinas y Equipos) */}
+              {(recursosData.cabinas.length > 0 || recursosData.equipos.length > 0) && (
+                <div className="mt-auto pt-1 border-t border-current/10">
+                  {recursosData.cabinas.length > 0 && (
+                    <div className="flex items-center gap-1 text-[10px] opacity-70 mb-0.5">
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span className="truncate">{recursosData.cabinas.join(', ')}</span>
+                    </div>
+                  )}
+                  {recursosData.equipos.length > 0 && (
+                    <div className="flex items-center gap-1 text-[10px] opacity-70">
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                      </svg>
+                      <span className="truncate">{recursosData.equipos.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
           </div>
       );
   };
@@ -639,11 +804,11 @@ const Agenda = () => {
                     
                     // --- CORRECCIÓN EXPLÍCITA ---
                     // Define cómo acceder al ID del array 'resources'
-                    resourceIdAccessor="resourceId" 
+                    resourceIdAccessor={(resource: any) => resource.resourceId}
                     // Define cómo acceder al Título del array 'resources'
-                    resourceTitleAccessor="resourceTitle" 
+                    resourceTitleAccessor={(resource: any) => resource.resourceTitle}
                     // Define cómo acceder al ID de recurso desde un 'event'
-                    resourceAccessor="resourceId" 
+                    resourceAccessor="resourceId"
                     
                     // --- DRAG AND DROP HANDLERS ---
                     onEventDrop={handleEventDrop}

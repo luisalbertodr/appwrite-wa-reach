@@ -47,6 +47,21 @@ export const useGetCitasPorSemana = (fecha: Date | undefined) => {
   });
 };
 
+// --- HOOK PARA OBTENER TODAS LAS CITAS (PARA VALIDACIÓN DE CONFLICTOS) ---
+export const useGetCitas = (fecha?: Date) => {
+  const fechaValida = fecha || new Date();
+  // Crear una clave única basada en el inicio de la semana (lunes)
+  const semanaKey = format(startOfWeek(fechaValida, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  
+  return useQuery({
+    queryKey: [CITAS_QUERY_KEY, 'todas', semanaKey],
+    queryFn: () => getCitasPorSemana(fechaValida),
+    staleTime: 1000 * 60 * 5, // Cache por 5 minutos
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
 // --- HOOK PARA CREAR UNA CITA ---
 export const useCreateCita = () => {
   const queryClient = useQueryClient();

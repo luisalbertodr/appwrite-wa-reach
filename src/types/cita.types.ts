@@ -1,5 +1,5 @@
 import { LipooutDocument } from './index';
-import { ArticuloEnCita } from './articulo.types';
+import { ItemCita } from './articulo.types';
 
 export type EstadoCita = 'agendada' | 'confirmada' | 'realizada' | 'cancelada' | 'no_asistio';
 
@@ -11,11 +11,7 @@ export interface Cita extends LipooutDocument {
   // IDs de las relaciones
   cliente_id: string;
   empleado_id: string;
-  articulos: string; // JSON string con array de ArticuloEnCita[]
-  
-  // Recursos (campos opcionales según el esquema)
-  recursos_cabina?: string;
-  recursos_aparatos?: string;
+  articulos: string; // JSON string con array de ItemCita[] (ArticuloEnCita | TiempoNoBillable)
   
   estado: EstadoCita;
   comentarios?: string;
@@ -31,10 +27,7 @@ export interface CitaInput {
   // Solo IDs para crear/actualizar
   cliente_id: string;
   empleado_id: string;
-  articulos: string; // JSON string con array de ArticuloEnCita[]
-
-  recursos_cabina?: string;
-  recursos_aparatos?: string;
+  articulos: string; // JSON string con array de ItemCita[] (ArticuloEnCita | TiempoNoBillable)
 
   estado: EstadoCita;
   comentarios?: string;
@@ -44,5 +37,5 @@ export interface CitaInput {
 
 // Tipo auxiliar para trabajar con artículos parseados
 export interface CitaConArticulosParsed extends Omit<Cita, 'articulos'> {
-  articulos_parsed: ArticuloEnCita[];
+  articulos_parsed: ItemCita[];
 }

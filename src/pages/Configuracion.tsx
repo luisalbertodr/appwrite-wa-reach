@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, ChangeEvent } from 'react';
 import { useAppwriteCollection } from '@/hooks/useAppwrite';
 import { WahaConfig, LipooutUserInput } from '@/types';
-import type { Configuracion, Empleado, Recurso, Aparato, Proveedor } from '@/types';
+import type { Configuracion, Empleado, Recurso, Proveedor } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,12 +17,10 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { ConfigurationForm } from '@/components/forms/ConfigurationForm';
 import { EmpleadoForm } from '@/components/forms/EmpleadoForm';
 import { RecursoForm } from '@/components/forms/RecursoForm';
-import { AparatoForm } from '@/components/forms/AparatoForm';
 import { ProveedorForm } from '@/components/forms/ProveedorForm';
 import { useGetConfiguration, useUpdateConfiguration } from '@/hooks/useConfiguration';
 import { useGetEmpleados, useCreateEmpleado, useUpdateEmpleado, useDeleteEmpleado } from '@/hooks/useEmpleados';
 import { useGetRecursos, useCreateRecurso, useUpdateRecurso, useDeleteRecurso } from '@/hooks/useRecursos';
-import { useGetAparatos, useCreateAparato, useUpdateAparato, useDeleteAparato } from '@/hooks/useAparatos';
 import { useGetProveedores, useCreateProveedor, useUpdateProveedor, useDeleteProveedor } from '@/hooks/useProveedores';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -74,9 +72,6 @@ const Configuracion = () => {
   const { data: recursos, isLoading: loadingRecursos } = useGetRecursos();
   const deleteRecursoMutation = useDeleteRecurso();
   
-  const { data: aparatos, isLoading: loadingAparatos } = useGetAparatos();
-  const deleteAparatoMutation = useDeleteAparato();
-  
   const { data: proveedores, isLoading: loadingProveedores } = useGetProveedores();
   const deleteProveedorMutation = useDeleteProveedor();
 
@@ -90,11 +85,6 @@ const Configuracion = () => {
   const [recursoEditing, setRecursoEditing] = useState<Recurso | null>(null);
   const createRecursoMutation = useCreateRecurso();
   const updateRecursoMutation = useUpdateRecurso();
-
-  const [aparatoSheetOpen, setAparatoSheetOpen] = useState(false);
-  const [aparatoEditing, setAparatoEditing] = useState<Aparato | null>(null);
-  const createAparatoMutation = useCreateAparato();
-  const updateAparatoMutation = useUpdateAparato();
 
   const [proveedorSheetOpen, setProveedorSheetOpen] = useState(false);
   const [proveedorEditing, setProveedorEditing] = useState<Proveedor | null>(null);
@@ -243,32 +233,6 @@ const Configuracion = () => {
     }
   };
 
-  // --- Handlers para Aparatos ---
-  const handleNuevoAparato = () => {
-    setAparatoEditing(null);
-    setAparatoSheetOpen(true);
-  };
-
-  const handleEditarAparato = (aparato: Aparato) => {
-    setAparatoEditing(aparato);
-    setAparatoSheetOpen(true);
-  };
-
-  const handleSaveAparato = async (data: any) => {
-    try {
-      if (aparatoEditing) {
-        await updateAparatoMutation.mutateAsync({ id: aparatoEditing.$id, data });
-        toast({ title: "Aparato actualizado" });
-      } else {
-        await createAparatoMutation.mutateAsync(data);
-        toast({ title: "Aparato creado" });
-      }
-      setAparatoSheetOpen(false);
-    } catch (err) {
-      toast({ title: "Error", description: (err as Error).message, variant: "destructive" });
-    }
-  };
-
   // --- Handlers para Proveedores ---
   const handleNuevoProveedor = () => {
     setProveedorEditing(null);
@@ -303,14 +267,13 @@ const Configuracion = () => {
        </div>
 
       <Tabs defaultValue="waha">
-        <TabsList className="mb-4 grid w-full grid-cols-8 gap-1">
+        <TabsList className="mb-4 grid w-full grid-cols-7 gap-1">
           <TabsTrigger value="apariencia"><Moon className="w-4 h-4 mr-2"/> Apariencia</TabsTrigger>
           <TabsTrigger value="clinica"><Settings className="w-4 h-4 mr-2"/> Clínica</TabsTrigger>
           <TabsTrigger value="waha"><Server className="w-4 h-4 mr-2"/> WAHA</TabsTrigger>
           <TabsTrigger value="import"><Upload className="w-4 h-4 mr-2"/> Import</TabsTrigger>
           <TabsTrigger value="empleados"><Users className="w-4 h-4 mr-2"/> Empleados</TabsTrigger>
           <TabsTrigger value="recursos"><Package className="w-4 h-4 mr-2"/> Recursos</TabsTrigger>
-          <TabsTrigger value="aparatos"><Wrench className="w-4 h-4 mr-2"/> Aparatos</TabsTrigger>
           <TabsTrigger value="proveedores"><Building2 className="w-4 h-4 mr-2"/> Proveedores</TabsTrigger>
         </TabsList>
 
@@ -578,62 +541,6 @@ const Configuracion = () => {
           </Card>
         </TabsContent>
 
-        {/* --- Contenido Pestaña Aparatos --- */}
-        <TabsContent value="aparatos">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Gestión de Aparatos</CardTitle>
-                <CardDescription>Administra los equipos médicos de la clínica.</CardDescription>
-              </div>
-              <Button onClick={handleNuevoAparato}><Plus className="w-4 h-4 mr-2"/> Nuevo Aparato</Button>
-            </CardHeader>
-            <CardContent>
-              {loadingAparatos ? <LoadingSpinner /> : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Marca/Modelo</TableHead>
-                      <TableHead>Nº Serie</TableHead>
-                      <TableHead>Próximo Mantenimiento</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {aparatos && aparatos.length > 0 ? aparatos.map(ap => (
-                      <TableRow key={ap.$id}>
-                        <TableCell className="font-medium">{ap.nombre}</TableCell>
-                        <TableCell>{ap.marca ? `${ap.marca} ${ap.modelo || ''}` : '-'}</TableCell>
-                        <TableCell>{ap.numero_serie || '-'}</TableCell>
-                        <TableCell>{ap.fecha_proximo_mantenimiento ? format(new Date(ap.fecha_proximo_mantenimiento), 'dd/MM/yyyy') : '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant={ap.activo ? 'default' : 'secondary'}>
-                            {ap.activo ? 'Activo' : 'Inactivo'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditarAparato(ap)}><Pencil className="w-4 h-4"/></Button>
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            if (confirm('¿Eliminar aparato?')) {
-                              deleteAparatoMutation.mutate(ap.$id);
-                            }
-                          }}><Trash2 className="w-4 h-4"/></Button>
-                        </TableCell>
-                      </TableRow>
-                    )) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground">No hay aparatos registrados.</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* --- Contenido Pestaña Proveedores --- */}
         <TabsContent value="proveedores">
           <Card>
@@ -714,19 +621,6 @@ const Configuracion = () => {
             recursoInicial={recursoEditing || undefined}
             onSubmit={handleSaveRecurso}
             isSubmitting={createRecursoMutation.isPending || updateRecursoMutation.isPending}
-          />
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={aparatoSheetOpen} onOpenChange={setAparatoSheetOpen}>
-        <SheetContent className="sm:max-w-[600px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{aparatoEditing ? 'Editar Aparato' : 'Nuevo Aparato'}</SheetTitle>
-          </SheetHeader>
-          <AparatoForm
-            aparatoInicial={aparatoEditing || undefined}
-            onSubmit={handleSaveAparato}
-            isSubmitting={createAparatoMutation.isPending || updateAparatoMutation.isPending}
           />
         </SheetContent>
       </Sheet>
